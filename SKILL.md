@@ -1,115 +1,164 @@
 ---
 name: skill-oracle
-description: Find the best locally installed skill for any task. Reads ~/.claude/skill-index.json and semantically matches against task context. Use when you need to discover which skill to invoke, when the user asks "is there a skill for X", or when you want to verify you're using the right tool before starting a complex task.
-argument-hint: "[task description or project context]"
+description: Find the best skill for any task — searches your full local library (all 3 skill roots) AND silently checks the skills.sh ecosystem in parallel, surfacing only the best options from both. Use when you need to find the right skill, or when the user asks "is there a skill for X".
+argument-hint: "[task description] [--compare | --list | --stats | --rebuild]"
 user-invocable: true
 allowed-tools: Read, Bash
 ---
 
 # Skill Oracle
 
-Finds the best locally installed skill for any task using semantic matching against the local skill index. Falls back to ecosystem search when no local skill matches.
+Finds the best skill for any task by searching your full local library and the skills.sh ecosystem simultaneously. Shows local results first, appends ecosystem options only when they offer something meaningfully better.
 
 ## When to Use
 
-Use this skill when:
-- User asks "is there a skill for X" or "do you have a tool for X"
+- User asks "is there a skill for X?" or "do you have a tool for X?"
 - You want to verify the best skill before starting a complex task
-- User asks "what skills do you have" or "what can you do"
-- You're about to start a non-trivial task and want to check if a specialized skill exists
+- User asks "what skills do you have?" or "what can you do?"
 - User says `/skill-oracle [task description]`
 
-## Instructions
+## Flags
 
-### Step 1 — Load the Index
+| Flag | What it does |
+|------|--------------|
+| *(none)* | Search local + silently enrich with ecosystem |
+| `--compare` | Show ALL ecosystem results, not just better ones |
+| `--list` | List every indexed skill grouped by root |
+| `--stats` | Total count, breakdown by root, last rebuild date |
+| `--rebuild` | Force rebuild the index right now |
 
-Read the skill index:
+---
 
+## Execution
+
+### `--rebuild`
+
+Run:
+```bash
+node ~/.claude/skills/skill-oracle/scripts/build-index.js
 ```
-~/.claude/skill-index.json
+Report how many skills were indexed.
+
+### `--stats`
+
+Read `~/.claude/skill-index.json` and report:
+- Total skills indexed
+- Count per root (`~/.claude/skills/`, `learned/`, `imported/`)
+- `generated_at` timestamp and how many hours ago that was
+
+### `--list`
+
+Read `~/.claude/skill-index.json` and list every skill grouped by root:
+```
+~/.claude/skills/ (42 skills)
+  • brainstorming — [description snippet]
+  • gsd-ship — [description snippet]
+  ...
+
+~/.claude/skills/learned/ (12 skills)
+  ...
 ```
 
+### Standard search (default)
+
+**Step 1 — Load the index**
+
+Read `~/.claude/skill-index.json`.
 On Windows: `C:\Users\<username>\.claude\skill-index.json`
 
-Use the `Read` tool with the absolute path. If the file doesn't exist, tell the user to run:
-```
+If the file is missing, tell the user to run:
+```bash
 node ~/.claude/skills/skill-oracle/scripts/build-index.js
 ```
 
-### Step 2 — Semantic Matching
+**Step 2 — Match local skills semantically**
 
-Read the full `skills` array from the index. For each skill, evaluate relevance based on:
+For each skill in the index, score relevance by:
+1. `description` — does it describe this type of task?
+2. `when_to_use` — does it explicitly name this scenario?
+3. `name` — does the name suggest this domain?
 
-1. **`description`** — does it describe this type of task?
-2. **`when_to_use`** — does it explicitly cover this scenario?
-3. **`name`** — does the name suggest this domain?
+Use **semantic similarity**, not exact keywords. "React performance" matches "why is my component re-rendering". "Code review" matches "check my PR before merging".
 
-Score conceptually — look for **semantic similarity**, not just keyword overlap. A skill about "React performance" is relevant to "why is my component re-rendering". A skill about "code review" is relevant to "check my PR before merging".
+**Step 3 — Show top local results immediately**
 
-### Step 3 — Output Top Results
-
-Present the **top 3–5 matches** in this format:
+Present the top 3–5 matches:
 
 ```
 ## Skills Found for: [task summary]
 
-### 1. [skill name]
-**Match reason:** [why this fits — 1 sentence]
-**Invocation:** `/skill-name` or `Skill("skill-id")`
-**Path:** [skill path]
+### From your library
 
-### 2. [skill name]
-...
+1. [skill name]
+   Why: [one sentence explaining the match]
+   Invoke: `/skill-name` or `Skill("skill-id")`
+
+2. [skill name]
+   ...
 ```
 
-**If no local skills match well** (confidence is low or none are clearly relevant), proceed to Step 4 automatically. Do NOT tell the user "no skill found" before searching the ecosystem.
+If no local skill matches well, note this clearly — do not fabricate a match.
 
-### Step 4 — Ecosystem Search (automatic fallback or `--compare`)
+**Step 4 — Enrich with ecosystem (always, silently)**
 
-Triggered automatically when no strong local match exists, OR when user adds `--compare`.
+Always invoke `find-skills` to check the skills.sh ecosystem, regardless of whether a local match was found. Apply this logic:
 
-1. Invoke the `find-skills` skill to search the skills.sh ecosystem
-2. **Apply ALL safety criteria below** before presenting any result — never recommend a skill that fails any criterion
-3. Present ecosystem results clearly labeled as "from the ecosystem — not yet installed"
-4. If local skill is sufficient, say so and skip ecosystem recommendation
+| Situation | What to do |
+|-----------|------------|
+| Ecosystem skill has >2× installs of the best local match AND covers the task better | Append under **“Also worth considering”** |
+| Ecosystem skill is essentially what’s already installed locally | Skip silently |
+| No local match was found | Show ecosystem results as primary results |
+| `--compare` flag used | Show ALL ecosystem results regardless of quality |
 
-#### Safety Criteria (mandatory — all must pass)
+**Before showing any ecosystem skill, all safety criteria must pass:**
 
 | Criterion | Requirement |
 |-----------|-------------|
-| Install count | ≥ 1,000 installs preferred; be explicit about low install counts |
-| GitHub stars | ≥ 500 stars on source repo; < 100 stars = do not recommend |
-| Source reputation | Official sources (`vercel-labs`, `anthropics`, known orgs) carry more weight |
-| Author | Identifiable — not anonymous |
-| License | Open: MIT, Apache 2.0, or BSD only |
-| Recency | Last commit < 6 months ago |
-| Code safety | No obfuscated code: no `eval`, no `base64 -d` in scripts, no unknown `curl \| sh` |
+| Install count | ≥ 1,000 preferred; always show the number explicitly |
+| GitHub stars | ≥ 500 required; block if < 100 |
+| Source reputation | Official orgs (`vercel-labs`, `anthropics`) weighted higher |
+| Author | Must be identifiable — anonymous = blocked |
+| License | MIT, Apache 2.0, or BSD only |
+| Last commit | < 6 months ago |
+| Code safety | No `eval`, `base64 -d`, or unknown `curl \| sh` in scripts |
 
-**When presenting an ecosystem skill, always show:**
-- Install count and star count explicitly
-- Source/author
-- The install command
-- Any safety concern if borderline (e.g. "low install count — proceed with caution")
+**Never recommend an ecosystem skill that fails any criterion.**
 
-**Never recommend if:**
-- Author is anonymous or unverifiable
-- Any obfuscated code pattern is present
-- License is proprietary or missing
-- Repo has < 100 stars AND < 500 installs
+**Step 5 — Final output**
+
+```
+## Skills Found for: [task]
+
+### From your library
+1. [name] — [why it fits]
+   Invoke: `/name`
+
+2. [name] — [why it fits]
+   Invoke: `/name`
+
+### Also worth considering    ← only if ecosystem has something better
+↗ [ecosystem-skill]  (12,500 installs · 890★ · vercel-labs)
+   What it adds: [what this offers that local skills don’t]
+   Install: `npx skills add owner/repo@skill-name`
+```
+
+If the ecosystem adds nothing new: **omit the section entirely**. No mention, no noise.
+
+---
 
 ## Index Format Reference
 
 ```json
 {
   "generated_at": "ISO timestamp",
-  "total": 42,
+  "total": 86,
   "skills": [
     {
       "id": "skill-dir-name",
       "name": "Display Name",
       "description": "up to 350 chars",
       "when_to_use": "up to 400 chars",
-      "path": "/absolute/path/to/skill",
+      "path": "/absolute/path",
       "has_scripts": true,
       "user_invocable": true,
       "model": null
@@ -118,19 +167,10 @@ Triggered automatically when no strong local match exists, OR when user adds `--
 }
 ```
 
-## Rebuilding the Index
-
-If the index is stale or missing:
-
-```bash
-node ~/.claude/skills/skill-oracle/scripts/build-index.js
-```
-
-The index auto-rebuilds at session start if > 24h old (via SessionStart hook in `~/.claude/settings.json`).
-
 ## Notes
 
-- Index covers all 3 skill roots: `~/.claude/skills/`, `~/.claude/skills/learned/`, `~/.claude/skills/imported/`
-- Skills with `user-invocable: false` are indexed but not shown to users by default — include them only when directly relevant
-- The index is a snapshot; new skills installed after last rebuild won't appear until rebuild
-- Ecosystem search via `find-skills` requires the `find-skills` skill to be installed
+- Index covers 3 roots: `~/.claude/skills/`, `~/.claude/skills/learned/`, `~/.claude/skills/imported/`
+- ECC’s built-in discovery misses the top-level root — skill-oracle covers all three
+- Skills with `user-invocable: false` are indexed but shown only when directly relevant
+- Ecosystem enrichment requires the `find-skills` skill to be installed
+- The index is a snapshot — new skills installed after last rebuild won’t appear until rebuilt

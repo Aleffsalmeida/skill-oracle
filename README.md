@@ -1,32 +1,43 @@
 # skill-oracle
 
-Claude Code can only see ~32 skills at session start. If you have hundreds installed, most are invisible — Claude can't invoke what it can't see.
-
-skill-oracle fixes that. It indexes every skill you have installed and lets Claude find the right one for any task through semantic matching — not keyword search, not menus.
-
 <p align="center">
   <img src="assets/demo.svg" alt="skill-oracle demo" width="760"/>
 </p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/platform-Claude%20Code-orange?style=flat-square" alt="platform"/>
+  <img src="https://img.shields.io/badge/license-MIT-22863a?style=flat-square" alt="license"/>
+  <img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen?style=flat-square" alt="node"/>
+  <img src="https://img.shields.io/badge/zero%20dependencies-pure%20Node.js-blue?style=flat-square" alt="deps"/>
+</p>
+
+Claude Code loads around 32 skills at session start. If you have hundreds installed, most are invisible — Claude can’t invoke what it can’t see.
+
+**skill-oracle breaks that limit.** It builds a searchable index of every skill you have — across all 3 skill roots — and lets Claude find the right one through semantic matching. It also silently checks the skills.sh ecosystem in parallel, surfacing alternatives only when they’re genuinely better than what you already have.
+
+---
+
 ## How it works
 
-The moment a session starts, skill-oracle checks whether your index is fresh. If it's been more than 24 hours since the last build, it silently rebuilds it in the background. No configuration. No commands to remember.
+**1. At session start** — `auto-rebuild.js` checks if your index is over 24 hours old. If so, it rebuilds silently in the background. Nothing interrupts your work.
 
-When you ask "is there a skill for X?" or invoke `/skill-oracle`, Claude reads the full index — all 3 skill roots, every installed skill — and reasons semantically about which ones fit. A skill about "React performance" surfaces for "why is my component re-rendering". A skill about "code review" surfaces for "check my PR before merging".
+**2. When you ask** — Claude reads the full index and matches semantically. Not by keyword. Not by exact name. By understanding what each skill *does* and whether it fits your task.
 
-**If no local skill matches**, skill-oracle automatically falls back to searching the [skills.sh](https://skills.sh) ecosystem via `find-skills` — without you having to ask. Every ecosystem result goes through a mandatory safety check before being recommended.
+**3. In parallel** — `find-skills` checks the skills.sh ecosystem at the same time. If it finds something with meaningfully more installs or better coverage, it appears under “Also worth considering”. If not, nothing extra is shown — no noise.
 
-Add `--compare` to force the ecosystem search even when a local match exists.
+---
 
 ## Installation
 
-### Claude Code
+### Step 1 — Install the skill files
 
 ```bash
 npx skills add Aleffsalmeida/skill-oracle
 ```
 
-Then add the SessionStart hook to `~/.claude/settings.json`:
+### Step 2 — Add the auto-rebuild hook *(one-time setup, ~30 seconds)*
+
+Open `~/.claude/settings.json` and add the following inside your `"hooks"` section:
 
 ```json
 {
@@ -48,83 +59,107 @@ Then add the SessionStart hook to `~/.claude/settings.json`:
 }
 ```
 
-### Manual
+This keeps your index fresh automatically every 24 hours. Without this hook, skill-oracle still works — you’ll just need to rebuild the index manually (Step 3) whenever you install new skills.
+
+### Step 3 — Build the index for the first time
 
 ```bash
-git clone https://github.com/Aleffsalmeida/skill-oracle ~/.claude/skills/skill-oracle
 node ~/.claude/skills/skill-oracle/scripts/build-index.js
 ```
 
-Then add the hook above to `~/.claude/settings.json`.
+Expected output: `skill-oracle: indexed 86 skills → ~/.claude/skill-index.json`
 
-> **Note:** Ecosystem fallback requires the `find-skills` skill to be installed.
+---
+
+> **Ecosystem enrichment** (the parallel search) requires the `find-skills` skill to be installed. Without it, skill-oracle still works — it just searches your local library only.
+
+---
 
 ## Usage
 
+Ask naturally — no special syntax needed:
+
 ```
-/skill-oracle deploy a Next.js app to Vercel
-/skill-oracle fix a memory leak in React
-/skill-oracle --compare set up a CI/CD pipeline
+is there a skill for deploying to Vercel?
+do you have something for React testing?
+what skill should I use to debug a memory leak?
 ```
 
-Or just ask Claude naturally — *"is there a skill for X?"* and skill-oracle activates.
+Or invoke directly:
+
+```
+/skill-oracle deploy a Next.js app
+/skill-oracle fix a memory leak in React
+/skill-oracle --compare set up CI/CD pipeline
+/skill-oracle --list
+/skill-oracle --stats
+/skill-oracle --rebuild
+```
+
+---
+
+## Flags
+
+| Flag | What it does |
+|------|--------------|
+| *(none)* | Search local library + silently enrich with ecosystem |
+| `--compare` | Show **all** ecosystem results, not just the ones better than local |
+| `--list` | List every indexed skill, grouped by root directory |
+| `--stats` | Show total count, breakdown by root, and when the index was last built |
+| `--rebuild` | Rebuild the index right now, without restarting the session |
+
+---
 
 ## What gets indexed
 
 | Root | What lives here |
-|------|----------------|
-| `~/.claude/skills/` | Your primary skills |
-| `~/.claude/skills/learned/` | Skills learned from sessions |
+|------|-----------------|
+| `~/.claude/skills/` | Your primary installed skills |
+| `~/.claude/skills/learned/` | Skills learned and saved from sessions |
 | `~/.claude/skills/imported/` | Skills imported from external sources |
 
-ECC's built-in discovery misses the top-level root. skill-oracle covers all three.
+Claude Code’s built-in discovery misses the top-level root. skill-oracle covers all three.
 
-## Ecosystem safety criteria
+---
 
-When falling back to the ecosystem (automatic or via `--compare`), every result must pass **all** of the following before being recommended:
+## Ecosystem safety
 
-| Criterion | Requirement |
-|-----------|-------------|
-| Install count | ≥ 1,000 installs preferred; low counts shown explicitly |
-| GitHub stars | ≥ 500 stars; < 100 stars = blocked |
-| Source reputation | Official orgs (`vercel-labs`, `anthropics`, etc.) weighted higher |
-| Author | Must be identifiable — anonymous sources blocked |
+When `find-skills` returns results, every skill is filtered before it’s shown to you. A skill only appears if it passes **all** of the following:
+
+| Check | Requirement |
+|-------|-------------|
+| Install count | ≥ 1,000 preferred — always shown explicitly |
+| GitHub stars | ≥ 500 required; blocked below 100 |
+| Source | Official orgs (`vercel-labs`, `anthropics`) weighted higher |
+| Author | Must be identifiable — anonymous is blocked |
 | License | MIT, Apache 2.0, or BSD only |
-| Recency | Last commit < 6 months ago |
-| Code safety | No `eval`, `base64 -d`, or unknown `curl \| sh` in scripts |
+| Last commit | Less than 6 months ago |
+| Code | No `eval`, `base64 -d`, or unknown `curl \| sh` |
 
-Every recommendation shows install count, star count, author, and the install command. Borderline results include an explicit warning.
+A skill only appears under “Also worth considering” if it clears all checks **and** offers something your local skills don’t already cover.
 
-## Zero dependencies
+---
 
-Pure Node.js. No `npm install`. YAML frontmatter parsed with regex. Works on macOS, Linux, and Windows.
+## Compatibility
 
-## Index format
+| Platform | Status |
+|----------|--------|
+| Claude Code | ✅ Full support |
+| Gemini CLI | ⚠️ Scripts work — no SKILL.md integration yet |
+| GitHub Copilot CLI | ⚠️ Scripts work — no plugin integration yet |
+| Any Node.js ≥ 18 | ✅ `build-index.js` runs anywhere |
 
-```json
-{
-  "generated_at": "2026-01-01T00:00:00.000Z",
-  "total": 86,
-  "skills": [
-    {
-      "id": "skill-dir-name",
-      "name": "Display Name",
-      "description": "up to 350 chars",
-      "when_to_use": "up to 400 chars",
-      "path": "/absolute/path/to/skill",
-      "has_scripts": true,
-      "user_invocable": true,
-      "model": null
-    }
-  ]
-}
-```
+The indexer and auto-rebuild scripts are pure Node.js with zero dependencies — they run on macOS, Linux, and Windows. The `/skill-oracle` slash command is currently Claude Code native.
+
+---
 
 ## Rebuilding manually
 
 ```bash
 node ~/.claude/skills/skill-oracle/scripts/build-index.js
 ```
+
+---
 
 ## License
 
