@@ -10,7 +10,9 @@ The moment a session starts, skill-oracle checks whether your index is fresh. If
 
 When you ask "is there a skill for X?" or invoke `/skill-oracle`, Claude reads the full index — all 3 skill roots, every installed skill — and reasons semantically about which ones fit. A skill about "React performance" surfaces for "why is my component re-rendering". A skill about "code review" surfaces for "check my PR before merging".
 
-If you add `--compare`, it goes further: searches the [skills.sh](https://skills.sh) ecosystem and applies safety criteria before recommending anything from the internet.
+**If no local skill matches**, skill-oracle automatically falls back to searching the [skills.sh](https://skills.sh) ecosystem via `find-skills` — without you having to ask. Every ecosystem result goes through a mandatory safety check before being recommended.
+
+Add `--compare` to force the ecosystem search even when a local match exists.
 
 ## Installation
 
@@ -51,6 +53,8 @@ node ~/.claude/skills/skill-oracle/scripts/build-index.js
 
 Then add the hook above to `~/.claude/settings.json`.
 
+> **Note:** Ecosystem fallback requires the `find-skills` skill to be installed.
+
 ## Usage
 
 ```
@@ -73,13 +77,19 @@ ECC's built-in discovery misses the top-level root. skill-oracle covers all thre
 
 ## Ecosystem safety criteria
 
-When using `--compare`, only skills that pass all of these get recommended:
+When falling back to the ecosystem (automatic or via `--compare`), every result must pass **all** of the following before being recommended:
 
-- ≥ 500 GitHub stars on the source repo
-- Open license (MIT, Apache 2.0, BSD)
-- Author identifiable (not anonymous)
-- Last commit < 6 months ago
-- No obfuscated code (`eval`, `base64 -d`, unknown `curl | sh`)
+| Criterion | Requirement |
+|-----------|-------------|
+| Install count | ≥ 1,000 installs preferred; low counts shown explicitly |
+| GitHub stars | ≥ 500 stars; < 100 stars = blocked |
+| Source reputation | Official orgs (`vercel-labs`, `anthropics`, etc.) weighted higher |
+| Author | Must be identifiable — anonymous sources blocked |
+| License | MIT, Apache 2.0, or BSD only |
+| Recency | Last commit < 6 months ago |
+| Code safety | No `eval`, `base64 -d`, or unknown `curl \| sh` in scripts |
+
+Every recommendation shows install count, star count, author, and the install command. Borderline results include an explicit warning.
 
 ## Zero dependencies
 
