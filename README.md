@@ -4,7 +4,9 @@ Claude Code can only see ~32 skills at session start. If you have hundreds insta
 
 skill-oracle fixes that. It indexes every skill you have installed and lets Claude find the right one for any task through semantic matching — not keyword search, not menus.
 
-![demo](assets/demo.svg)
+<p align="center">
+  <img src="assets/demo.svg" alt="skill-oracle demo" width="760"/>
+</p>
 
 ## How it works
 
