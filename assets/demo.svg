@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" width="760" height="420">
+<style>
+  .term { font-family: 'Courier New', Courier, monospace; font-size: 13.5px; }
+  .prompt { fill: #7ee787; }
+  .cmd    { fill: #e6edf3; }
+  .dim    { fill: #8b949e; }
+  .accent { fill: #79c0ff; }
+  .green  { fill: #7ee787; }
+  .yellow { fill: #e3b341; }
+  .head   { fill: #cae8ff; font-weight: bold; }
+
+  .l1  { animation: up .3s  .4s  both; }
+  .l2  { animation: up .3s 1.4s  both; }
+  .l3  { animation: up .3s 2.1s  both; }
+  .l4  { animation: up .3s 2.5s  both; }
+  .l5  { animation: up .3s 2.8s  both; }
+  .l6  { animation: up .3s 3.2s  both; }
+  .l7  { animation: up .3s 3.5s  both; }
+  .l8  { animation: up .3s 3.9s  both; }
+  .l9  { animation: up .3s 4.2s  both; }
+  .l10 { animation: up .3s 4.7s  both; }
+  .l11 { animation: up .3s 5.0s  both; }
+
+  @keyframes up {
+    from { opacity:0; transform:translateY(6px); }
+    to   { opacity:1; transform:translateY(0);   }
+  }
+  .cur { animation: blink 1s 5s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+</style>
+
+<!-- window bg -->
+<rect width="760" height="420" fill="#0d1117" rx="10"/>
+
+<!-- title bar -->
+<rect width="760" height="42" fill="#161b22" rx="10"/>
+<rect y="28" width="760" height="14" fill="#161b22"/>
+<line x1="0" y1="42" x2="760" y2="42" stroke="#30363d" stroke-width="1"/>
+
+<!-- traffic lights -->
+<circle cx="22" cy="21" r="6" fill="#ff5f56"/>
+<circle cx="42" cy="21" r="6" fill="#ffbd2e"/>
+<circle cx="62" cy="21" r="6" fill="#27c93f"/>
+
+<!-- title -->
+<text x="380" y="26" class="term dim" font-size="12" text-anchor="middle">skill-oracle</text>
+
+<!-- L1: user types query -->
+<g class="l1">
+  <text x="22" y="76"  class="term prompt">❯</text>
+  <text x="38" y="76"  class="term cmd">is there a skill for deploying to Vercel?</text>
+</g>
+
+<!-- L2: scanning -->
+<g class="l2">
+  <text x="38" y="104" class="term dim">skill-oracle — scanning 86 skills...</text>
+</g>
+
+<!-- L3: header -->
+<g class="l3">
+  <text x="22" y="138" class="term head">Skills Found for: deploy to Vercel</text>
+</g>
+
+<!-- result 1 -->
+<g class="l4">
+  <text x="22" y="166" class="term yellow">  1. vercel</text>
+  <text x="118" y="166" class="term dim">  — deployment config, domains, preview URLs</text>
+</g>
+<g class="l5">
+  <text x="38" y="184" class="term dim">     invoke: </text>
+  <text x="108" y="184" class="term green">/vercel</text>
+  <text x="158" y="184" class="term dim">  or  </text>
+  <text x="190" y="184" class="term green">Skill("vercel")</text>
+</g>
+
+<!-- result 2 -->
+<g class="l6">
+  <text x="22" y="214" class="term yellow">  2. gsd-ship</text>
+  <text x="130" y="214" class="term dim">  — PR creation, review, and deploy pipeline</text>
+</g>
+<g class="l7">
+  <text x="38" y="232" class="term dim">     invoke: </text>
+  <text x="108" y="232" class="term green">/gsd-ship</text>
+</g>
+
+<!-- result 3 -->
+<g class="l8">
+  <text x="22" y="262" class="term yellow">  3. vercel-performance-optimizer</text>
+  <text x="280" y="262" class="term dim">  — Core Web Vitals, caching, edge</text>
+</g>
+<g class="l9">
+  <text x="38" y="280" class="term dim">     invoke: </text>
+  <text x="108" y="280" class="term green">/vercel-performance-optimizer</text>
+</g>
+
+<!-- separator -->
+<g class="l10">
+  <line x1="22" y1="302" x2="738" y2="302" stroke="#21262d" stroke-width="1"/>
+</g>
+
+<!-- fallback hint -->
+<g class="l10">
+  <text x="22" y="322" class="term dim">  No match? Add </text>
+  <text x="142" y="322" class="term accent">--compare</text>
+  <text x="224" y="322" class="term dim"> to also search the skills.sh ecosystem</text>
+</g>
+
+<!-- ecosystem safety note -->
+<g class="l11">
+  <text x="22" y="342" class="term dim">  Ecosystem results are filtered: ≥500 ⭐ · open license · no obfuscated code</text>
+</g>
+
+<!-- next prompt + cursor -->
+<g class="l11">
+  <text x="22" y="390" class="term prompt">❯</text>
+  <rect x="38" y="376" width="8" height="15" fill="#7ee787" class="cur"/>
+</g>
+
+</svg>

@@ -4,6 +4,8 @@ Claude Code can only see ~32 skills at session start. If you have hundreds insta
 
 skill-oracle fixes that. It indexes every skill you have installed and lets Claude find the right one for any task through semantic matching — not keyword search, not menus.
 
+![demo](assets/demo.svg)
+
 ## How it works
 
 The moment a session starts, skill-oracle checks whether your index is fresh. If it's been more than 24 hours since the last build, it silently rebuilds it in the background. No configuration. No commands to remember.
