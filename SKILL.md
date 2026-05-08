@@ -8,7 +8,7 @@ allowed-tools: Read, Bash
 
 # Skill Oracle
 
-Finds the best locally installed skill for any task using semantic matching against the local skill index.
+Finds the best locally installed skill for any task using semantic matching against the local skill index. Falls back to ecosystem search when no local skill matches.
 
 ## When to Use
 
@@ -55,28 +55,47 @@ Present the **top 3–5 matches** in this format:
 
 ### 1. [skill name]
 **Match reason:** [why this fits — 1 sentence]
-**Invocation:** `[/skill-name]` or `Skill("[skill-id]")`
+**Invocation:** `/skill-name` or `Skill("skill-id")`
 **Path:** [skill path]
 
 ### 2. [skill name]
 ...
 ```
 
-If no skills match well, say so clearly and offer to help directly.
+**If no local skills match well** (confidence is low or none are clearly relevant), proceed to Step 4 automatically. Do NOT tell the user "no skill found" before searching the ecosystem.
 
-### Step 4 — Ecosystem Check (Optional)
+### Step 4 — Ecosystem Search (automatic fallback or `--compare`)
 
-If the user adds `--compare` or asks "is there something better out there":
+Triggered automatically when no strong local match exists, OR when user adds `--compare`.
 
-1. Invoke `find-skills` to search the skills.sh ecosystem
-2. Apply **safety criteria** before recommending any ecosystem skill:
-   - ≥ 500 GitHub stars on source repo
-   - Open license (MIT, Apache 2.0, BSD)
-   - Author identifiable (not anonymous)
-   - Last commit < 6 months ago
-   - No obfuscated code (`eval`, `base64 -d` in scripts, unknown `curl | sh`)
-3. If ecosystem skill passes criteria AND offers meaningfully more than local options, recommend it with install command
-4. If local skill is sufficient, say so — don't push ecosystem installs unnecessarily
+1. Invoke the `find-skills` skill to search the skills.sh ecosystem
+2. **Apply ALL safety criteria below** before presenting any result — never recommend a skill that fails any criterion
+3. Present ecosystem results clearly labeled as "from the ecosystem — not yet installed"
+4. If local skill is sufficient, say so and skip ecosystem recommendation
+
+#### Safety Criteria (mandatory — all must pass)
+
+| Criterion | Requirement |
+|-----------|-------------|
+| Install count | ≥ 1,000 installs preferred; be explicit about low install counts |
+| GitHub stars | ≥ 500 stars on source repo; < 100 stars = do not recommend |
+| Source reputation | Official sources (`vercel-labs`, `anthropics`, known orgs) carry more weight |
+| Author | Identifiable — not anonymous |
+| License | Open: MIT, Apache 2.0, or BSD only |
+| Recency | Last commit < 6 months ago |
+| Code safety | No obfuscated code: no `eval`, no `base64 -d` in scripts, no unknown `curl \| sh` |
+
+**When presenting an ecosystem skill, always show:**
+- Install count and star count explicitly
+- Source/author
+- The install command
+- Any safety concern if borderline (e.g. "low install count — proceed with caution")
+
+**Never recommend if:**
+- Author is anonymous or unverifiable
+- Any obfuscated code pattern is present
+- License is proprietary or missing
+- Repo has < 100 stars AND < 500 installs
 
 ## Index Format Reference
 
@@ -114,3 +133,4 @@ The index auto-rebuilds at session start if > 24h old (via SessionStart hook in 
 - Index covers all 3 skill roots: `~/.claude/skills/`, `~/.claude/skills/learned/`, `~/.claude/skills/imported/`
 - Skills with `user-invocable: false` are indexed but not shown to users by default — include them only when directly relevant
 - The index is a snapshot; new skills installed after last rebuild won't appear until rebuild
+- Ecosystem search via `find-skills` requires the `find-skills` skill to be installed
