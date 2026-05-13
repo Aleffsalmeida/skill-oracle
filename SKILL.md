@@ -1,176 +1,271 @@
 ---
 name: skill-oracle
-description: Find the best skill for any task — searches your full local library (all 3 skill roots) AND silently checks the skills.sh ecosystem in parallel, surfacing only the best options from both. Use when you need to find the right skill, or when the user asks "is there a skill for X".
-argument-hint: "[task description] [--compare | --list | --stats | --rebuild]"
+description: Universal Dynamic Orchestrator for Skills, Agents, Plugins, and MCP servers. Single entry point that indexes the full Claude Code ecosystem (5000+ assets), routes user tasks to domain Master Agents, debates ambiguous matches, suggests related domains proactively, and falls back to find-skills when no local match exists. Use as the FIRST step before any non-trivial task; replaces the legacy local-only skill matcher.
+argument-hint: "[task description] [--rebuild | --optimize | --stats | --list-domains | --no-debate]"
 user-invocable: true
-allowed-tools: Read, Bash
+allowed-tools: Read, Bash, Task, Glob
 ---
 
-# Skill Oracle
+# Skill Oracle — Universal Dynamic Orchestrator
 
-Finds the best skill for any task by searching your full local library and the skills.sh ecosystem simultaneously. Shows local results first, appends ecosystem options only when they offer something meaningfully better.
+You are the **single entry point** for all asset discovery in Claude Code. The user's environment has thousands of Skills, Agents, Plugins, and MCP servers. Loading them all at boot is impossible. Your job:
 
-## When to Use
+1. Keep a fresh **unified index** of every asset.
+2. **Route** the user's task to the right **Master Agent** (one per domain).
+3. Let each Master Agent **debate internally** and return only the top 3-5 picks.
+4. **Synthesize** picks across multiple domains when the task spans them.
+5. **Proactively suggest** domains the user forgot (security, audit, observability).
+6. **Fall back** to `find-skills` when no local asset matches.
 
-- User asks "is there a skill for X?" or "do you have a tool for X?"
-- You want to verify the best skill before starting a complex task
-- User asks "what skills do you have?" or "what can you do?"
-- User says `/skill-oracle [task description]`
+---
+
+## When to Invoke
+
+- User asks "is there a skill / tool / agent / plugin for X?"
+- Before any non-trivial task — discover the best available asset before doing the work manually.
+- User says `/skill-oracle <task>` or `/skill-oracle` alone (general status).
+- Another agent calls `Skill("skill-oracle")`.
+
+---
 
 ## Flags
 
-| Flag | What it does |
-|------|--------------|
-| *(none)* | Search local + silently enrich with ecosystem |
-| `--compare` | Show ALL ecosystem results, not just better ones |
-| `--list` | List every indexed skill grouped by root |
-| `--stats` | Total count, breakdown by root, last rebuild date |
-| `--rebuild` | Force rebuild the index right now |
+| Flag | Purpose |
+|------|---------|
+| *(none)* | Standard: route task to master agents and return picks |
+| `--rebuild` | Force re-scan + re-classify; produces fresh `oracle-index.json` |
+| `--optimize` | Run environment optimizer (lazy-loading) — dry-run by default; pass `--apply` to write |
+| `--stats` | Show counts: total assets, by type, by domain, last build time |
+| `--list-domains` | List all 20 domains with asset counts and master agent names |
+| `--no-debate` | Skip Step 3 debate; return ranked candidates as-is (cheapest path) |
 
 ---
 
-## Execution
+## Procedure
 
-### `--rebuild`
+### Step 0 — Bootstrap detection
 
-Run:
+Check whether `~/.claude/oracle-index.json` exists. Path on Windows: `C:\Users\<user>\.claude\oracle-index.json`.
+
+**If missing or `--rebuild`:**
+
+Run the full bootstrap pipeline:
+
 ```bash
-node ~/.claude/skills/skill-oracle/scripts/build-index.js
-```
-Report how many skills were indexed.
-
-### `--stats`
-
-Read `~/.claude/skill-index.json` and report:
-- Total skills indexed
-- Count per root (`~/.claude/skills/`, `learned/`, `imported/`)
-- `generated_at` timestamp and how many hours ago that was
-
-### `--list`
-
-Read `~/.claude/skill-index.json` and list every skill grouped by root:
-```
-~/.claude/skills/ (42 skills)
-  • brainstorming — [description snippet]
-  • gsd-ship — [description snippet]
-  ...
-
-~/.claude/skills/learned/ (12 skills)
-  ...
+node ~/.claude/skills/skill-oracle/scripts/scanner.js     # builds index
+node ~/.claude/skills/skill-oracle/scripts/classifier.js  # assigns domains + masters
+node ~/.claude/skills/skill-oracle/scripts/gen-masters.js # regenerates agent .md files
 ```
 
-### Standard search (default)
+Then copy `agents/*.md` to `~/.claude/agents/` so the Task tool can discover them:
 
-**Step 1 — Load the index**
-
-Read `~/.claude/skill-index.json`.
-On Windows: `C:\Users\<username>\.claude\skill-index.json`
-
-If the file is missing, tell the user to run:
 ```bash
-node ~/.claude/skills/skill-oracle/scripts/build-index.js
+node ~/.claude/skills/skill-oracle/scripts/install-agents.js
 ```
 
-**Step 2 — Match local skills semantically**
+After bootstrap, **offer optimization**:
 
-For each skill in the index, score relevance by:
-1. `description` — does it describe this type of task?
-2. `when_to_use` — does it explicitly name this scenario?
-3. `name` — does the name suggest this domain?
+> "Index built. Run `/skill-oracle --optimize --apply` to disable non-Oracle SessionStart hooks (lazy-loading mode). Requires a Claude Code restart."
 
-Use **semantic similarity**, not exact keywords. "React performance" matches "why is my component re-rendering". "Code review" matches "check my PR before merging".
+### Step 1 — Delta detection
 
-**Step 3 — Show top local results immediately**
+Index exists. Read its `generated_at`. If > 24h old, silently run `scanner.js` + `classifier.js` in background (or invoke `scripts/auto-rebuild.js`). Continue immediately with whatever data is current — do not block.
 
-Present the top 3–5 matches:
+### Step 2 — Parse the user task
+
+Extract the user's intent. Identify candidate domains using these heuristics:
+
+- **Direct keywords** — match against each domain's `keywords[]` in `oracle-index.json.domains[]`.
+- **Co-occurrence** — tasks like "build website with payments" -> `web-dev` + `finance-billing`.
+- **Implicit needs** — any task that produces or modifies code -> consider `security-audit` + `testing-qa` as proactive suggestions.
+
+Output a short list: `domains = ["web-dev", "finance-billing"]` (1-3 domains, max 5).
+
+### Step 3 — Dispatch to Master Agents (parallel)
+
+For each identified domain `D`, invoke its Master Agent via the **Task tool**:
 
 ```
-## Skills Found for: [task summary]
-
-### From your library
-
-1. [skill name]
-   Why: [one sentence explaining the match]
-   Invoke: `/skill-name` or `Skill("skill-id")`
-
-2. [skill name]
-   ...
+Task(subagent_type="oracle-master-<D>", prompt="<task description>\n\nReturn top 5 best-fit assets from your cluster.")
 ```
 
-If no local skill matches well, note this clearly — do not fabricate a match.
+**Invoke all masters in parallel** — single response with multiple `Task` calls.
 
-**Step 4 — Enrich with ecosystem (always, silently)**
+Each master returns its top 3-5 picks following the structure defined in `oracle-master-<D>.md`.
 
-Always invoke `find-skills` to check the skills.sh ecosystem, regardless of whether a local match was found. Apply this logic:
+### Step 4 — Synthesize
 
-| Situation | What to do |
-|-----------|------------|
-| Ecosystem skill has >2× installs of the best local match AND covers the task better | Append under **“Also worth considering”** |
-| Ecosystem skill is essentially what’s already installed locally | Skip silently |
-| No local match was found | Show ecosystem results as primary results |
-| `--compare` flag used | Show ALL ecosystem results regardless of quality |
+Collect all picks. Deduplicate by `asset.id`. Re-rank by:
+- Score returned by master
+- Cross-domain reinforcement (asset that appeared in 2+ masters wins)
+- Type preference: `skill` > `agent` > `plugin` > `mcp` for declarative tasks; reverse for exploratory tasks
 
-**Before showing any ecosystem skill, all safety criteria must pass:**
+Present **top 5 final** with invocation guidance:
+
+```
+## Oracle picks for: <task summary>
+
+### Direct matches
+1. **<name>** — <type> · score <n> · domain <D>
+   Why: <one sentence>
+   Invoke: <Skill("id") / Task(subagent_type="x") / mcp__server__tool>
+
+2. ...
+```
+
+### Step 5 — Proactive consulting (gap analysis)
+
+After main picks, scan for **forgotten domains**:
+
+| If task involves | Suggest |
+|------------------|---------|
+| Code changes / new feature | `security-audit`, `testing-qa` |
+| User-facing UI | `design-ui`, `data-analytics` |
+| Production deploy | `observability`, `devops-infra` |
+| Data handling | `database-data`, `security-audit` (privacy) |
+| Payments / billing | `security-audit` (PCI), `finance-billing` |
+| Multi-step automation | `tooling-meta`, `productivity` |
+
+Output as:
+
+```
+### You may also want
+> `security-audit` (oracle-master-security) — your task touches auth flows; recommend a review pass.
+> `testing-qa` (oracle-master-testing) — new code without tests usually regresses.
+```
+
+Each suggestion is **one line + ask if the user wants it included**. Don't dispatch automatically.
+
+### Step 6 — Fallback to ecosystem search
+
+If **no master returned a strong match** (all scores below threshold), invoke the `find-skills` skill automatically:
+
+```
+Skill("find-skills") with the task description
+```
+
+Apply the same safety criteria the legacy oracle used:
 
 | Criterion | Requirement |
 |-----------|-------------|
-| Install count | ≥ 1,000 preferred; always show the number explicitly |
-| GitHub stars | ≥ 500 required; block if < 100 |
-| Source reputation | Official orgs (`vercel-labs`, `anthropics`) weighted higher |
-| Author | Must be identifiable — anonymous = blocked |
-| License | MIT, Apache 2.0, or BSD only |
-| Last commit | < 6 months ago |
-| Code safety | No `eval`, `base64 -d`, or unknown `curl \| sh` in scripts |
+| Install count | >= 1,000 preferred; show explicitly |
+| GitHub stars | >= 500 required; < 100 blocked |
+| License | MIT, Apache 2.0, BSD only |
+| Last commit | < 6 months |
+| Code safety | No `eval`, `base64 -d`, no unknown `curl \| sh` |
+| Author | Identifiable (not anonymous) |
 
-**Never recommend an ecosystem skill that fails any criterion.**
+When a found-skills result passes all checks AND the user accepts, **auto-index it**:
 
-**Step 5 — Final output**
-
-```
-## Skills Found for: [task]
-
-### From your library
-1. [name] — [why it fits]
-   Invoke: `/name`
-
-2. [name] — [why it fits]
-   Invoke: `/name`
-
-### Also worth considering    ← only if ecosystem has something better
-↗ [ecosystem-skill]  (12,500 installs · 890★ · vercel-labs)
-   What it adds: [what this offers that local skills don’t]
-   Install: `npx skills add owner/repo@skill-name`
+```bash
+node ~/.claude/skills/skill-oracle/scripts/scanner.js
+node ~/.claude/skills/skill-oracle/scripts/classifier.js
 ```
 
-If the ecosystem adds nothing new: **omit the section entirely**. No mention, no noise.
+The new asset is immediately available in future invocations.
 
 ---
 
-## Index Format Reference
+## Flag handlers (shortcut paths)
 
-```json
+### `--stats`
+
+Read `oracle-index.json`. Report:
+
+```
+Oracle index: <total> assets indexed at <generated_at> (<ago>)
+  by type: <skills> skills, <agents> agents, <plugins> plugins, <mcp> mcp
+  top 8 domains:
+    <domain>: <count>
+    ...
+```
+
+### `--list-domains`
+
+Read `oracle-index.json.domains[]`. Print all 20 in a table: `id | label | master_agent | asset_count`.
+
+### `--rebuild`
+
+Run Step 0 bootstrap pipeline. Confirm new counts.
+
+### `--optimize`
+
+Run the optimizer:
+
+```bash
+node ~/.claude/skills/skill-oracle/scripts/optimizer.js          # dry-run
+node ~/.claude/skills/skill-oracle/scripts/optimizer.js --apply  # write changes
+```
+
+If user passes `--apply`, the optimizer creates `settings.json.oracle-<UTC>.bak` and moves non-Oracle SessionStart hooks to `_oracle_disabled_hooks[]` for safe reversal. Tell the user to **restart Claude Code**.
+
+### `--no-debate`
+
+Pass `constraints: { no_debate: true }` when invoking master agents. They skip Step 3 (debate) and return ranked top-5 directly. Cheaper, less precise.
+
+---
+
+## Index Schema Reference
+
+```jsonc
 {
-  "generated_at": "ISO timestamp",
-  "total": 86,
-  "skills": [
+  "version": 2,
+  "generated_at": "ISO-8601",
+  "stats": {
+    "total": 5152,
+    "by_type": { "skill": 4184, "agent": 384, "plugin": 573, "mcp": 11 },
+    "by_domain": { "web-dev": 412 },
+    "by_master": { "oracle-master-web": 412 }
+  },
+  "domains": [
+    { "id": "web-dev", "label": "Web Development", "master_agent": "oracle-master-web", "asset_count": 412 }
+  ],
+  "assets": [
     {
-      "id": "skill-dir-name",
-      "name": "Display Name",
-      "description": "up to 350 chars",
-      "when_to_use": "up to 400 chars",
-      "path": "/absolute/path",
-      "has_scripts": true,
+      "id": "skill:<plugin>/<name>",
+      "type": "skill | agent | plugin | mcp",
+      "name": "...",
+      "description": "<= 400 chars",
+      "path": "<absolute>",
+      "source": "user:* | plugin:* | settings.json#mcpServers",
+      "hash": "<12-char sha256 prefix — delta detection>",
       "user_invocable": true,
-      "model": null
+      "model": null,
+      "domain": "web-dev",
+      "master_agent": "oracle-master-web",
+      "keywords": ["react", "nextjs"],
+      "last_seen": "ISO-8601"
     }
   ]
 }
 ```
 
+---
+
+## Failure Modes
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Index missing | First run | Run `--rebuild` |
+| Master agent not found | `agents/` not synced | Re-run `install-agents.js`; manually copy `agents/oracle-master-*.md` to `~/.claude/agents/` |
+| No domain matched | Niche task | Falls back to `find-skills` (Step 6) |
+| Index stale (> 24h) | auto-rebuild hook missing | Add the auto-rebuild SessionStart hook (see README) |
+| Optimization rolled back | Wrong hook disabled | Restore from `settings.json.oracle-<UTC>.bak`, edit `KEEP_HOOK_PATTERNS` in `scripts/optimizer.js` |
+
+---
+
+## Scope Discipline
+
+- **Oracle never executes the user task.** It selects and dispatches.
+- **Never read full SKILL.md content** of every asset — read only those returned in top-5 if depth is requested.
+- **Cap final output at 2000 tokens** — concise picks with paths and invocation hints only.
+- **One master per domain, one domain per asset** — no overlap, no duplication.
+
+---
+
 ## Notes
 
-- Index covers 3 roots: `~/.claude/skills/`, `~/.claude/skills/learned/`, `~/.claude/skills/imported/`
-- ECC’s built-in discovery misses the top-level root — skill-oracle covers all three
-- Skills with `user-invocable: false` are indexed but shown only when directly relevant
-- Ecosystem enrichment requires the `find-skills` skill to be installed
-- The index is a snapshot — new skills installed after last rebuild won’t appear until rebuilt
+- The Oracle replaces the legacy `build-index.js` (skill-only, schema v1). The new pipeline is `scanner.js` -> `classifier.js` -> master agents.
+- `build-index.js` is kept for backward compatibility but is deprecated.
+- Bootstrap detection makes the Oracle self-installing: invoking `/skill-oracle` on a fresh checkout builds everything needed on first run.
+- For the find-skills ecosystem fallback to work, install the `find-skills` skill separately.
