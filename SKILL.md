@@ -144,6 +144,13 @@ If **no master returned a strong match** (all scores below threshold), invoke th
 Skill("find-skills") with the task description
 ```
 
+**If `find-skills` is not installed**, tell the user exactly this (do not invent paths or commands):
+
+> The `find-skills` skill is not installed locally. Install it from the official Vercel Labs repository so Oracle can search the ecosystem:
+> **https://github.com/vercel-labs/skills**
+>
+> After installing, re-run your last query and Oracle will fall back automatically.
+
 Apply the same safety criteria the legacy oracle used:
 
 | Criterion | Requirement |
