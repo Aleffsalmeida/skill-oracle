@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 480" width="760" height="480">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 520" width="760" height="520">
 <defs>
   <filter id="glow" x="-10%" y="-30%" width="120%" height="160%">
     <feGaussianBlur stdDeviation="2.5" result="blur"/>
@@ -12,159 +12,146 @@
 <style>
   .mn { font-family: 'Courier New', Courier, monospace; }
 
-  /* fade-up */
   .u0  { animation: u .3s  .2s both; }
-  .u1  { animation: u .3s 3.3s both; }
-  .u2  { animation: u .3s 3.7s both; }
-  .u3  { animation: u .3s 3.9s both; }
-  .u4  { animation: u .3s 4.3s both; }
-  .u5  { animation: u .3s 4.5s both; }
-  .u6  { animation: u .3s 4.9s both; }
-  .u7  { animation: u .3s 5.1s both; }
-  .u8  { animation: u .3s 5.5s both; }
-  .u9  { animation: u .3s 5.8s both; }
-  .u10 { animation: u .3s 6.3s both; }
+  .uScan { animation: u .3s 2.4s both; }
+  .uRoute { animation: u .3s 3.4s both; }
+  .u1  { animation: u .3s 4.5s both; }
+  .u2  { animation: u .3s 4.8s both; }
+  .u3  { animation: u .3s 5.0s both; }
+  .u4  { animation: u .3s 5.4s both; }
+  .u5  { animation: u .3s 5.6s both; }
+  .u6  { animation: u .3s 6.0s both; }
+  .u7  { animation: u .3s 6.2s both; }
+  .u8  { animation: u .3s 6.6s both; }
+  .u9  { animation: u .3s 6.9s both; }
   @keyframes u { from{opacity:0;transform:translateY(7px)} to{opacity:1;transform:translateY(0)} }
 
-  /* scan section */
-  .scan { animation: u .3s 2.4s both; }
-
-  /* progress bar */
   .pbar { animation: pbar 1.1s 2.6s ease-out both; }
   @keyframes pbar { from{width:0} to{width:294px} }
 
-  /* skill name flicker during scan */
-  .flick { animation: flick 0.13s 2.6s 16 alternate ease-in-out both; opacity:0; }
-  @keyframes flick { from{opacity:0} to{opacity:0.45} }
+  .flick { animation: flick 0.11s 2.6s 18 alternate ease-in-out both; opacity:0; }
+  @keyframes flick { from{opacity:0} to{opacity:0.5} }
 
-  /* pulse dot */
   .pdot { animation: pdot .7s 2.6s 5; }
   @keyframes pdot { 0%{opacity:1} 50%{opacity:.15} 100%{opacity:1} }
 
-  /* cursor */
-  .cur { animation: cur 1s 7.2s infinite; }
+  .dpulse { animation: dpulse .8s 3.6s 3; }
+  @keyframes dpulse { 0%{opacity:1} 50%{opacity:.3} 100%{opacity:1} }
+
+  .cur { animation: cur 1s 8.0s infinite; }
   @keyframes cur { 0%,100%{opacity:1} 50%{opacity:0} }
 
-  /* prompt 3 */
-  .p3 { animation: u .3s 7.0s both; }
+  .p3 { animation: u .3s 7.8s both; }
 </style>
 
-<!-- background -->
-<rect width="760" height="480" fill="#0d1117" rx="12"/>
+<rect width="760" height="520" fill="#0d1117" rx="12"/>
 
-<!-- title bar -->
 <rect width="760" height="46" fill="url(#bg-grad)" rx="12"/>
 <rect y="34" width="760" height="12" fill="#161b22"/>
 <line x1="0" y1="46" x2="760" y2="46" stroke="#30363d" stroke-width="1"/>
 
-<!-- traffic lights -->
 <circle cx="22" cy="23" r="6" fill="#ff5f56"/>
 <circle cx="42" cy="23" r="6" fill="#ffbd2e"/>
 <circle cx="62" cy="23" r="6" fill="#27c93f"/>
 
-<!-- window title -->
-<text x="380" y="28" class="mn" fill="#7d8590" font-size="11" text-anchor="middle" letter-spacing="3">SKILL-ORACLE</text>
+<text x="380" y="28" class="mn" fill="#7d8590" font-size="11" text-anchor="middle" letter-spacing="3">SKILL-ORACLE &#xB7; v2 UNIVERSAL ORCHESTRATOR</text>
 
-<!-- == PROMPT 1 == -->
 <g class="u0">
   <text x="18" y="77" class="mn" fill="#7ee787" font-size="14">&#x276F;</text>
 </g>
-
-<!-- query text (always present, revealed by cover rect moving right) -->
-<text x="36" y="77" class="mn" fill="#e6edf3" font-size="14">is there a skill for deploying to Vercel?</text>
-<!-- cover rect slides right to reveal text (typing effect) -->
+<text x="36" y="77" class="mn" fill="#e6edf3" font-size="14">deploy a Next.js app with Stripe checkout and audit</text>
 <rect x="36" y="60" width="760" height="23" fill="#0d1117">
   <animate attributeName="x" from="36" to="800" dur="2s" begin="0.5s" fill="freeze"/>
 </rect>
 
-<!-- == SCANNING SECTION == -->
-<g class="scan">
-  <!-- pulse dot -->
+<g class="uScan">
   <circle cx="26" cy="107" r="4" fill="#7ee787" class="pdot"/>
-
-  <!-- scan text revealed -->
-  <text x="40" y="111" class="mn" fill="#8b949e" font-size="13">skill-oracle  &#xB7;  scanning 86 skills...</text>
+  <text x="40" y="111" class="mn" fill="#8b949e" font-size="13">oracle  &#xB7;  scanning 5153 assets across 20 domains...</text>
   <rect x="40" y="96" width="760" height="20" fill="#0d1117">
     <animate attributeName="x" from="40" to="800" dur="0.7s" begin="2.6s" fill="freeze"/>
   </rect>
 
-  <!-- flickering skill names -->
-  <text x="40" y="129" class="mn flick" fill="#3d444d" font-size="11">vercel &#xB7; gsd-ship &#xB7; brainstorming &#xB7; tdd-guide &#xB7; impeccable &#xB7; systematic-debugging &#xB7; react-specialist &#xB7; gsd-debug</text>
+  <text x="40" y="129" class="mn flick" fill="#3d444d" font-size="11">vercel &#xB7; stripe &#xB7; nextjs &#xB7; gsd-ship &#xB7; security-review &#xB7; pci-dss &#xB7; tdd &#xB7; auth &#xB7; webhook &#xB7; klaviyo</text>
 
-  <!-- progress bar track -->
   <rect x="40" y="138" width="294" height="4" fill="#21262d" rx="2"/>
-  <!-- progress bar fill -->
   <rect x="40" y="138" height="4" fill="#238636" rx="2" class="pbar"/>
-  <!-- count badge -->
-  <text x="346" y="143" class="mn" fill="#3fb950" font-size="11">86 skills indexed</text>
+  <text x="346" y="143" class="mn" fill="#3fb950" font-size="11">5,153 assets &#xB7; 20 domains</text>
 </g>
 
-<!-- separator -->
+<g class="uRoute">
+  <circle cx="26" cy="167" r="4" fill="#a371f7" class="dpulse"/>
+  <text x="40" y="171" class="mn" fill="#a371f7" font-size="12">routing &#x2192; dispatching 3 master agents in parallel:</text>
+
+  <g>
+    <rect x="40"  y="180" width="155" height="22" fill="#1f2937" stroke="#79c0ff" stroke-width="1" rx="4"/>
+    <text x="118" y="195" class="mn" fill="#79c0ff" font-size="11" text-anchor="middle">oracle-master-web</text>
+
+    <rect x="205" y="180" width="170" height="22" fill="#1f2937" stroke="#ffa657" stroke-width="1" rx="4"/>
+    <text x="290" y="195" class="mn" fill="#ffa657" font-size="11" text-anchor="middle">oracle-master-finance</text>
+
+    <rect x="385" y="180" width="180" height="22" fill="#1f2937" stroke="#f85149" stroke-width="1" rx="4"/>
+    <text x="475" y="195" class="mn" fill="#f85149" font-size="11" text-anchor="middle">oracle-master-security</text>
+  </g>
+</g>
+
 <g class="u1">
-  <line x1="18" y1="162" x2="742" y2="162" stroke="#21262d" stroke-width="1"/>
+  <line x1="18" y1="218" x2="742" y2="218" stroke="#21262d" stroke-width="1"/>
 </g>
 
-<!-- results header -->
 <g class="u1">
-  <text x="18" y="181" class="mn" fill="#cae8ff" font-size="14" font-weight="bold" filter="url(#glow)">Skills Found for: deploy to Vercel</text>
+  <text x="18" y="237" class="mn" fill="#cae8ff" font-size="14" font-weight="bold" filter="url(#glow)">Oracle picks (top 3 of 5,153)</text>
+  <text x="320" y="237" class="mn" fill="#636e7b" font-size="11">3 masters &#xB7; 8 candidates &#xB7; no debate needed</text>
 </g>
 
-<!-- CARD 1 (green border) -->
 <g class="u2">
-  <rect x="18" y="191" width="724" height="65" fill="#161b22" rx="6"/>
-  <rect x="18" y="191" width="3"   height="65" fill="#7ee787" rx="2"/>
+  <rect x="18" y="247" width="724" height="68" fill="#161b22" rx="6"/>
+  <rect x="18" y="247" width="3"   height="68" fill="#79c0ff" rx="2"/>
 </g>
 <g class="u3">
-  <text x="34" y="209" class="mn" fill="#ffa657" font-size="13" font-weight="bold">vercel</text>
-  <text x="95"  y="209" class="mn" fill="#8b949e" font-size="13">  &#x2014;  deployment &#xB7; domains &#xB7; preview URLs &#xB7; edge config</text>
-  <text x="34" y="227" class="mn" fill="#636e7b" font-size="12">invoke: </text>
-  <text x="90" y="227" class="mn" fill="#7ee787" font-size="12">/vercel</text>
-  <text x="148" y="227" class="mn" fill="#3d444d" font-size="12">  &#xB7;  Skill("vercel")</text>
-  <text x="34" y="245" class="mn" fill="#3d444d" font-size="11">~/.claude/skills/vercel</text>
+  <text x="34" y="266" class="mn" fill="#ffa657" font-size="13" font-weight="bold">vercel:nextjs</text>
+  <text x="148" y="266" class="mn" fill="#8b949e" font-size="13">  &#x2014;  App Router, edge runtime, ISR &#xB7; chosen by web-dev</text>
+  <text x="34" y="284" class="mn" fill="#636e7b" font-size="12">invoke: </text>
+  <text x="90" y="284" class="mn" fill="#7ee787" font-size="12">Skill("vercel:nextjs")</text>
+  <text x="34" y="304" class="mn" fill="#3d444d" font-size="11">domain: web-dev  &#xB7;  type: skill  &#xB7;  source: plugin:vercel</text>
 </g>
 
-<!-- CARD 2 (blue border) -->
 <g class="u4">
-  <rect x="18" y="264" width="724" height="65" fill="#161b22" rx="6"/>
-  <rect x="18" y="264" width="3"   height="65" fill="#79c0ff" rx="2"/>
+  <rect x="18" y="323" width="724" height="68" fill="#161b22" rx="6"/>
+  <rect x="18" y="323" width="3"   height="68" fill="#ffa657" rx="2"/>
 </g>
 <g class="u5">
-  <text x="34" y="282" class="mn" fill="#ffa657" font-size="13" font-weight="bold">gsd-ship</text>
-  <text x="110" y="282" class="mn" fill="#8b949e" font-size="13">  &#x2014;  PR creation &#xB7; code review &#xB7; deploy pipeline</text>
-  <text x="34" y="300" class="mn" fill="#636e7b" font-size="12">invoke: </text>
-  <text x="90" y="300" class="mn" fill="#7ee787" font-size="12">/gsd-ship</text>
-  <text x="34" y="318" class="mn" fill="#3d444d" font-size="11">~/.claude/skills/gsd-ship</text>
+  <text x="34" y="342" class="mn" fill="#ffa657" font-size="13" font-weight="bold">stripe:stripe-projects</text>
+  <text x="220" y="342" class="mn" fill="#8b949e" font-size="13">  &#x2014;  checkout, webhooks, refunds &#xB7; chosen by finance</text>
+  <text x="34" y="360" class="mn" fill="#636e7b" font-size="12">invoke: </text>
+  <text x="90" y="360" class="mn" fill="#7ee787" font-size="12">Skill("stripe:stripe-projects")</text>
+  <text x="34" y="380" class="mn" fill="#3d444d" font-size="11">domain: finance-billing  &#xB7;  type: skill  &#xB7;  source: plugin:stripe</text>
 </g>
 
-<!-- CARD 3 (orange border) -->
 <g class="u6">
-  <rect x="18" y="337" width="724" height="65" fill="#161b22" rx="6"/>
-  <rect x="18" y="337" width="3"   height="65" fill="#ffa657" rx="2"/>
+  <rect x="18" y="399" width="724" height="68" fill="#161b22" rx="6"/>
+  <rect x="18" y="399" width="3"   height="68" fill="#f85149" rx="2"/>
 </g>
 <g class="u7">
-  <text x="34" y="355" class="mn" fill="#ffa657" font-size="13" font-weight="bold">vercel-performance-optimizer</text>
-  <text x="270" y="355" class="mn" fill="#8b949e" font-size="13">  &#x2014;  Core Web Vitals &#xB7; caching &#xB7; edge</text>
-  <text x="34" y="373" class="mn" fill="#636e7b" font-size="12">invoke: </text>
-  <text x="90" y="373" class="mn" fill="#7ee787" font-size="12">/vercel-performance-optimizer</text>
-  <text x="34" y="391" class="mn" fill="#3d444d" font-size="11">~/.claude/plugins/vercel/...</text>
+  <text x="34" y="418" class="mn" fill="#ffa657" font-size="13" font-weight="bold">security-review</text>
+  <text x="170" y="418" class="mn" fill="#8b949e" font-size="13">  &#x2014;  OWASP, PCI gates, auth audit &#xB7; chosen by security</text>
+  <text x="34" y="436" class="mn" fill="#636e7b" font-size="12">invoke: </text>
+  <text x="90" y="436" class="mn" fill="#7ee787" font-size="12">Skill("security-review")</text>
+  <text x="34" y="456" class="mn" fill="#3d444d" font-size="11">domain: security-audit  &#xB7;  type: skill  &#xB7;  proactive suggestion</text>
 </g>
 
-<!-- separator -->
 <g class="u8">
-  <line x1="18" y1="414" x2="742" y2="414" stroke="#21262d" stroke-width="1"/>
+  <line x1="18" y1="479" x2="742" y2="479" stroke="#21262d" stroke-width="1"/>
 </g>
 
-<!-- hint -->
 <g class="u9">
-  <text x="18" y="430" class="mn" fill="#636e7b" font-size="12">No match? Add </text>
-  <text x="118" y="430" class="mn" fill="#79c0ff" font-size="12">--compare</text>
-  <text x="200" y="430" class="mn" fill="#636e7b" font-size="12"> to search skills.sh  &#xB7;  Safety: &#x2265;500&#x2605; &#xB7; open license &#xB7; no obfuscated code</text>
+  <text x="18" y="496" class="mn" fill="#636e7b" font-size="12">No match? Auto-fallback to </text>
+  <text x="200" y="496" class="mn" fill="#79c0ff" font-size="12">find-skills</text>
+  <text x="278" y="496" class="mn" fill="#636e7b" font-size="12"> ecosystem &#xB7; safety filters applied</text>
 </g>
 
-<!-- prompt 3 + blinking cursor -->
 <g class="p3">
-  <text x="18" y="461" class="mn" fill="#7ee787" font-size="14">&#x276F;</text>
-  <rect x="36" y="447" width="8" height="16" fill="#7ee787" rx="1" class="cur"/>
+  <text x="18" y="516" class="mn" fill="#7ee787" font-size="14">&#x276F;</text>
+  <rect x="36" y="503" width="8" height="16" fill="#7ee787" rx="1" class="cur"/>
 </g>
 
 </svg>

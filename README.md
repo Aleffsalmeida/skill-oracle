@@ -246,7 +246,14 @@ Edit `scripts/classifier.js` to refine domain rules.
 
 ## Ecosystem fallback
 
-When no master returns a strong match, the Oracle invokes `find-skills` automatically and applies safety filters:
+When no master returns a strong match, the Oracle invokes `find-skills` automatically and applies safety filters.
+
+> **Don't have `find-skills` installed?** Oracle will tell you to install it from the official Vercel Labs repo before falling back:
+> **https://github.com/vercel-labs/skills**
+>
+> Once installed, the fallback path activates automatically — no extra configuration.
+
+Safety filters applied to every ecosystem result:
 
 | Criterion | Requirement |
 |---|---|
