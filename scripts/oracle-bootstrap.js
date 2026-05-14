@@ -59,6 +59,8 @@ function isIndexFresh() {
   if (!fs.existsSync(INDEX_PATH)) return false;
   const idx = readJson(INDEX_PATH, null);
   if (!idx || !idx.generated_at) return false;
+  if (!Array.isArray(idx.assets) || !idx.assets.length) return false;
+  if (!Array.isArray(idx.domains) || idx.domains.length !== REQUIRED_MASTER_COUNT) return false;
   const ageMs = Date.now() - Date.parse(idx.generated_at);
   return Number.isFinite(ageMs) && ageMs <= MAX_AGE_MS;
 }

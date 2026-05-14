@@ -26,6 +26,12 @@ const CASES = [
     expectedPickNames: ['design-system', 'refactoring-ui'],
   },
   {
+    name: 'electron-shortcuts-ui',
+    task: 'quero uma skill para atalhos de tabela e interface electron',
+    expectedDomains: ['web-dev', 'design-ui'],
+    expectedPickNames: ['design-taste-frontend', 'frontend-design', 'impeccable'],
+  },
+  {
     name: 'fullstack-billing-tests',
     task: 'build a React dashboard with Stripe billing and Playwright tests',
     expectedDomains: ['web-dev', 'finance-billing', 'testing-qa'],

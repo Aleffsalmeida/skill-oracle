@@ -29,8 +29,11 @@ const PREFERRED_SKILLS = new Set([
   'imagegen-frontend-mobile',
   'high-end-visual-design',
   'design-taste-frontend',
+  'frontend-design',
+  'impeccable',
   'react:components',
 ]);
+const GENERIC_QUERY_TOKENS = new Set(['app', 'skill', 'plugin', 'agent', 'tool', 'tools']);
 const STOPWORDS = new Set([
   'a', 'an', 'and', 'as', 'at', 'be', 'by', 'for', 'from', 'in', 'into',
   'of', 'on', 'or', 'the', 'to', 'with', 'without', 'using', 'use',
@@ -218,7 +221,9 @@ function loadIndex(indexPath) {
   }
   const idx = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
   if (!Array.isArray(idx.assets)) throw new Error('Malformed index: missing assets[]');
-  if (!Array.isArray(idx.domains)) throw new Error('Malformed index: missing domains[]');
+  if (!Array.isArray(idx.domains) || idx.domains.length !== 20) {
+    throw new Error('Malformed index: missing domains[] or incomplete domain classification. Run --rebuild first.');
+  }
   return idx;
 }
 
@@ -243,6 +248,16 @@ function buildTokenSet(text) {
 
 function isMeaningfulToken(token) {
   return token.length >= MIN_TOKEN_LENGTH || SHORT_TOKEN_ALLOWLIST.has(token);
+}
+
+function intentBoosts(task) {
+  const text = normalize(task);
+  return {
+    branding: /\b(logo|icone|icon|simbolo|simbolo|brand|branding|identidade visual|identidade)\b/.test(text),
+    ui: /\b(interface|ui|ux|visual|layout|botao|botao|botoes|botoes|tabela|table)\b/.test(text),
+    desktop: /\b(electron|desktop|taskbar|topbar|janela|barra do windows)\b/.test(text),
+    shortcuts: /\b(atalho|shortcut|hotkey)\b/.test(text),
+  };
 }
 
 function scoreDomainText(task, domain) {
@@ -334,6 +349,7 @@ function scoreAsset(asset, taskTokens) {
 
   for (const token of taskTokens) {
     if (!isMeaningfulToken(token)) continue;
+    if (GENERIC_QUERY_TOKENS.has(token)) continue;
     let tokenScore = 0;
     if (nameTokens.has(token)) tokenScore += 6;
     if (descTokens.has(token)) tokenScore += 3;
@@ -349,8 +365,13 @@ function scoreAsset(asset, taskTokens) {
   }
 
   const sourceText = normalize(asset.source || '');
+  const assetName = normalize(asset.name);
+  const intents = intentBoosts(taskTokens.join(' '));
   if (STRONG_AUTHOR_SOURCES.some((prefix) => sourceText.startsWith(prefix))) score *= 1.12;
   if (PREFERRED_SKILLS.has(asset.name)) score *= 1.18;
+  if (intents.branding && /brandkit|logo|brand|visual|design/.test(assetName)) score *= 1.18;
+  if ((intents.ui || intents.shortcuts) && /frontend|design-taste|impeccable|ui-toolkit|design/.test(assetName)) score *= 1.16;
+  if (intents.desktop && /electron|frontend|ui|design/.test(assetName)) score *= 1.12;
   if (asset.user_invocable) score *= 1.2;
   if (asset.type === 'skill') score *= 1.1;
   return { score, matched: Array.from(new Set(matched)).slice(0, 8) };
@@ -369,6 +390,54 @@ function invocationHint(asset) {
   if (asset.type === 'agent') return `Task(subagent_type="${asset.name}")`;
   if (asset.type === 'mcp') return `mcp__${asset.name}__*`;
   return `plugin:${asset.name}`;
+}
+
+function buildRecommendedBundle(domainReports, picks, task) {
+  const intents = intentBoosts(task);
+  const bundle = [];
+  const seen = new Set();
+
+  const preferredByIntent = [];
+  if (intents.branding) preferredByIntent.push(['brandkit', 'impeccable', 'high-end-visual-design']);
+  if (intents.ui || intents.shortcuts) preferredByIntent.push(['design-taste-frontend', 'frontend-design', 'ui-toolkit/web', 'react:components']);
+  if (intents.desktop) preferredByIntent.push(['design-taste-frontend', 'frontend-design', 'zoom-meeting-sdk-electron']);
+
+  for (const names of preferredByIntent) {
+    for (const name of names) {
+      const asset = picks.find((candidate) => candidate.name === name)
+        || domainReports.flatMap((report) => report.top || []).find((candidate) => candidate.name === name);
+      if (asset && !seen.has(canonicalAssetKey(asset))) {
+        bundle.push(asset);
+        seen.add(canonicalAssetKey(asset));
+        break;
+      }
+    }
+  }
+
+  for (const report of domainReports.slice(0, 3)) {
+    const asset = (report.top || [])[0];
+    if (asset && !seen.has(canonicalAssetKey(asset))) {
+      bundle.push(asset);
+      seen.add(canonicalAssetKey(asset));
+    }
+  }
+
+  return bundle.slice(0, 4);
+}
+
+function mergeBundleIntoPicks(bundle, picks, limit) {
+  const merged = [];
+  const seen = new Set();
+
+  for (const asset of [...bundle, ...picks]) {
+    const key = canonicalAssetKey(asset);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(asset);
+    if (merged.length >= limit) break;
+  }
+
+  return merged;
 }
 
 function selectAssets(idx, task, options = {}) {
@@ -422,10 +491,12 @@ function selectAssets(idx, task, options = {}) {
     }
   }
 
-  const picks = Array.from(byKey.values())
+  const rankedPicks = Array.from(byKey.values())
     .filter((asset) => asset.score >= STRONG_MATCH_THRESHOLD)
     .sort((a, b) => b.score - a.score)
     .slice(0, options.limit || DEFAULT_LIMIT);
+  const bundle = buildRecommendedBundle(domainReports, rankedPicks, task);
+  const picks = mergeBundleIntoPicks(bundle, rankedPicks, options.limit || DEFAULT_LIMIT);
 
   const complexity = estimateComplexity(task, domainIds, picks);
   const modelHints = recommendedModels(complexity);
@@ -434,6 +505,7 @@ function selectAssets(idx, task, options = {}) {
     task,
     domains: domainIds,
     picks,
+    bundle,
     domainReports,
     suggestions: proactiveSuggestions(task, domainIds, idx),
     fallbackRecommended: picks.length === 0,
@@ -499,6 +571,13 @@ function formatResult(result) {
   if (!result.picks.length) {
     lines.push('No strong local match. Recommend fallback to find-skills ecosystem search.');
   } else {
+    if (result.bundle && result.bundle.length) {
+      lines.push('Recommended bundle:');
+      result.bundle.forEach((asset, index) => {
+        lines.push(`  ${index + 1}. ${asset.name} (${asset.domain}) -> ${asset.invoke}`);
+      });
+      lines.push('');
+    }
     result.picks.forEach((asset, index) => {
       lines.push(`${index + 1}. ${asset.name} - ${asset.type} - score ${asset.score} - ${asset.domain}`);
       lines.push(`   Why: matched ${asset.matched.join(', ') || 'task context'}`);
