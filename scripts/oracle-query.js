@@ -446,6 +446,7 @@ async function main(argv = process.argv.slice(2)) {
       } else {
         console.log(`Oracle preflight: ${preflight.preflight.ready ? 'ready' : 'attention needed'}`);
         console.log(`Runtime: ${preflight.preflight.runtime}`);
+        console.log(`Executor: ${preflight.preflight.executor?.name || 'unknown'} (${preflight.preflight.executor?.kind || 'unknown'})`);
         console.log(`Index: ${preflight.preflight.index_exists ? 'present' : 'missing'}${preflight.preflight.index_fresh ? ' / fresh' : ' / stale'}`);
         console.log(`Masters: ${preflight.preflight.masters_installed}/${preflight.preflight.masters_expected}`);
         console.log(`Session hook: ${preflight.preflight.session_hook_installed ? 'installed' : 'missing'}`);

@@ -78,6 +78,40 @@ function detectRuntime() {
   return 'unknown';
 }
 
+function detectExecutor(runtime) {
+  const mapping = {
+    'claude-code': {
+      name: 'Task',
+      kind: 'subagent',
+      dispatch: 'oracle-master-*.md via Claude Code Task',
+      availability: 'inferred',
+      source: 'runtime-hints',
+    },
+    overclock: {
+      name: 'pane_spawn',
+      kind: 'visible-pane',
+      dispatch: 'visible panes via Overclock pane_spawn',
+      availability: 'inferred',
+      source: 'runtime-hints',
+    },
+    codex: {
+      name: 'oracle-query.js',
+      kind: 'local-runner',
+      dispatch: 'local ranked selection only',
+      availability: 'available',
+      source: 'runtime-hints',
+    },
+  };
+
+  return mapping[runtime] || {
+    name: 'none',
+    kind: 'unknown',
+    dispatch: 'local warning only',
+    availability: 'unavailable',
+    source: 'runtime-hints',
+  };
+}
+
 function countInstalledMasters() {
   try {
     return fs.readdirSync(path.join(CLAUDE_ROOT, 'agents'))
@@ -92,6 +126,7 @@ function buildPreflightReport() {
   const settingsExists = fs.existsSync(SETTINGS_PATH);
   const settings = settingsExists ? readJson(SETTINGS_PATH, null) : null;
   const runtime = detectRuntime();
+  const executor = detectExecutor(runtime);
   const remoteManifest = readJson(LOCAL_MANIFEST_PATH, null);
   const mastersInstalled = countInstalledMasters();
   const hookInstalled = settings ? sessionHookExists(settings) : false;
@@ -99,6 +134,7 @@ function buildPreflightReport() {
 
   return {
     runtime,
+    executor,
     index_exists: indexExists,
     index_fresh: indexFresh,
     settings_exists: settingsExists,

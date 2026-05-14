@@ -58,6 +58,13 @@ node ~/.claude/skills/skill-oracle/scripts/oracle-query.js "<task description>"
 
 The local runner reads `~/.claude/oracle-index.json`, detects domains, ranks assets directly, prints the top picks, and exits with code `2` when no strong local match exists. Treat exit code `2` as the signal to use the `find-skills` fallback.
 
+The bootstrap preflight should report the detected executor explicitly:
+
+- `Task` for Claude Code
+- `pane_spawn` for Overclock
+- `oracle-query.js` for Codex/local
+- `none` when the host does not expose a dispatch path
+
 ### Step 0 — Bootstrap detection
 
 Before any routing, run the Oracle bootstrap:

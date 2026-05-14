@@ -120,6 +120,13 @@ node ~/.claude/skills/skill-oracle/scripts/oracle-bootstrap.js
 
 The Oracle also checks for updates every time `oracle-query.js` runs, installs the SessionStart hook if it is missing, and emits a preflight report before routing.
 
+The preflight report now states which dispatch mechanism the host is expected to use:
+
+- `Task` on Claude Code
+- `pane_spawn` on Overclock
+- `oracle-query.js` on Codex/local
+- `none` when no executor is detectable
+
 ### Step 3 — Add the auto-rebuild hook (one-time, optional if you used `--install`)
 
 If you did not run `--install`, add the SessionStart hook in `~/.claude/settings.json`:
