@@ -8,11 +8,13 @@ allowed-tools: Read, Bash, Task, Glob
 
 # Skill Oracle — Universal Dynamic Orchestrator
 
-You are the **single entry point** for all asset discovery in Claude Code. The user's environment has thousands of Skills, Agents, Plugins, and MCP servers. Loading them all at boot is impossible. Your job:
+You are the **single entry point** for all asset discovery in Claude Code and Codex-compatible local runtimes. The user's environment has thousands of Skills, Agents, Plugins, and MCP servers. Loading them all at boot is impossible. Your job:
 
 1. Keep a fresh **unified index** of every asset.
-2. **Route** the user's task to the right **Master Agent** (one per domain).
-3. Let each Master Agent **debate internally** and return only the top 3-5 picks.
+2. **Route** the user's task to the right domain.
+3. Use the runtime's native selection path:
+   - **Claude Code:** dispatch to **Master Agents** with the `Task` tool.
+   - **Codex/local:** run `scripts/oracle-query.js` and use its ranked output.
 4. **Synthesize** picks across multiple domains when the task spans them.
 5. **Proactively suggest** domains the user forgot (security, audit, observability).
 6. **Fall back** to `find-skills` when no local asset matches.
@@ -42,6 +44,19 @@ You are the **single entry point** for all asset discovery in Claude Code. The u
 ---
 
 ## Procedure
+
+### Runtime selection
+
+Before routing, identify the current host runtime:
+
+- **Claude Code runtime:** `Task` subagents are available and `~/.claude/agents/oracle-master-*.md` can be discovered. Use the Master Agent procedure below.
+- **Codex or generic local runtime:** `Task(subagent_type=...)` is not available. Do not pretend to dispatch subagents. Use the local runner instead:
+
+```bash
+node ~/.claude/skills/skill-oracle/scripts/oracle-query.js "<task description>"
+```
+
+The local runner reads `~/.claude/oracle-index.json`, detects domains, ranks assets directly, prints the top picks, and exits with code `2` when no strong local match exists. Treat exit code `2` as the signal to use the `find-skills` fallback.
 
 ### Step 0 — Bootstrap detection
 
@@ -83,6 +98,8 @@ Output a short list: `domains = ["web-dev", "finance-billing"]` (1-3 domains, ma
 
 ### Step 3 — Dispatch to Master Agents (parallel)
 
+**Claude Code only.** If you are in Codex/local runtime, skip this step and run `scripts/oracle-query.js` instead.
+
 For each identified domain `D`, invoke its Master Agent via the **Task tool**:
 
 ```
@@ -92,6 +109,25 @@ Task(subagent_type="oracle-master-<D>", prompt="<task description>\n\nReturn top
 **Invoke all masters in parallel** — single response with multiple `Task` calls.
 
 Each master returns its top 3-5 picks following the structure defined in `oracle-master-<D>.md`.
+
+### Step 3b — Local/Codex selection
+
+Use this path when the host does not provide Claude Code's `Task` dispatcher:
+
+```bash
+node ~/.claude/skills/skill-oracle/scripts/oracle-query.js "<task description>"
+```
+
+Useful local commands:
+
+```bash
+node ~/.claude/skills/skill-oracle/scripts/oracle-query.js --stats
+node ~/.claude/skills/skill-oracle/scripts/oracle-query.js --list-domains
+node ~/.claude/skills/skill-oracle/scripts/oracle-query.js --rebuild
+node ~/.claude/skills/skill-oracle/scripts/oracle-smoke-test.js
+```
+
+When using Codex, summarize the `oracle-query.js` output to the user and then invoke the recommended skill or tool according to Codex's available skill/tool mechanism.
 
 ### Step 4 — Synthesize
 
