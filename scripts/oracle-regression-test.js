@@ -32,6 +32,12 @@ const CASES = [
     expectedPickNames: ['design-taste-frontend', 'frontend-design', 'impeccable'],
   },
   {
+    name: 'oracle-multi-skill-composition',
+    task: 'preciso que o oracle junte as melhores skills para interface electron com identidade visual e atalhos do app',
+    expectedDomains: ['tooling-meta', 'web-dev', 'design-ui'],
+    expectedPickNames: ['skill-oracle', 'brandkit', 'design-taste-frontend'],
+  },
+  {
     name: 'fullstack-billing-tests',
     task: 'build a React dashboard with Stripe billing and Playwright tests',
     expectedDomains: ['web-dev', 'finance-billing', 'testing-qa'],
@@ -50,11 +56,14 @@ function checkCase(idx, testCase) {
     testCase.expectedPickNames.some((name) => pickNames.has(name)),
     `[${testCase.name}] expected one of ${testCase.expectedPickNames.join(', ')} in picks, got ${Array.from(pickNames).join(', ')}`
   );
+  assertCheck(result.bundle.length > 0, `[${testCase.name}] expected non-empty bundle`);
+  assertCheck(result.virtualMasters.length > 0, `[${testCase.name}] expected virtual masters report`);
 
   return {
     name: testCase.name,
     domains: result.domains,
     picks: result.picks.map((pick) => pick.name),
+    bundle: result.bundle.map((pick) => pick.name),
   };
 }
 
@@ -62,7 +71,7 @@ function main() {
   const idx = loadIndex(DEFAULT_INDEX);
   const reports = CASES.map((testCase) => checkCase(idx, testCase));
   for (const report of reports) {
-    console.log(`ok - ${report.name}: ${report.domains.join(', ')} -> ${report.picks.join(', ')}`);
+    console.log(`ok - ${report.name}: ${report.domains.join(', ')} -> picks ${report.picks.join(', ')} | bundle ${report.bundle.join(', ')}`);
   }
   console.log(`\nOracle regression test passed: ${reports.length} cases.`);
 }

@@ -35,7 +35,19 @@ const PLUGIN_CACHE = path.join(PLUGINS_ROOT, 'cache');
 const PLUGIN_REGISTRY = path.join(PLUGINS_ROOT, 'installed_plugins.json');
 const SETTINGS_PATH = path.join(CLAUDE_ROOT, 'settings.json');
 
-const HEAD_BYTES = 4096; // read first 4KB of each .md — enough for frontmatter + heading
+const HEAD_BYTES = 24576; // enough for frontmatter + meaningful workflow sections without indexing full files
+const PREVIEW_CHARS = 1200;
+const SUMMARY_CHARS = 320;
+const MAX_TERMS = 24;
+const STOPWORDS = new Set([
+  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'before', 'by', 'for', 'from', 'if', 'in', 'into',
+  'is', 'it', 'of', 'on', 'or', 'that', 'the', 'their', 'this', 'to', 'use', 'using', 'when',
+  'with', 'without', 'you', 'your',
+  'o', 'os', 'a', 'as', 'ao', 'aos', 'da', 'das', 'de', 'do', 'dos', 'e', 'em', 'na', 'nas',
+  'no', 'nos', 'para', 'por', 'que', 'se', 'sem', 'ser', 'uma', 'um', 'uns', 'umas', 'quando',
+  'como', 'com', 'ou', 'sua', 'seu', 'suas', 'seus',
+]);
+const HEADING_PRIORITY = /(when|use|invoke|procedure|workflow|process|checklist|steps|implementation|guidance|approach|constraints|guardrails|overview|summary|usage|how)/i;
 
 function hashShort(s) {
   return crypto.createHash('sha256').update(s).digest('hex').slice(0, 12);
@@ -73,6 +85,132 @@ function parseFrontmatter(content) {
   return out;
 }
 
+function normalize(s) {
+  return String(s || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function tokenize(s) {
+  return normalize(s)
+    .split(/[^a-z0-9+#./:-]+/)
+    .filter(Boolean)
+    .filter((token) => token.length >= 3)
+    .filter((token) => !STOPWORDS.has(token));
+}
+
+function stripFrontmatter(content) {
+  return String(content || '').replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '');
+}
+
+function cleanText(text) {
+  return String(text || '')
+    .replace(/`{1,3}[^`]*`{1,3}/g, ' ')
+    .replace(/\[[^\]]+\]\([^)]+\)/g, ' ')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\r/g, '')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function truncate(text, maxChars) {
+  const value = cleanText(text);
+  if (value.length <= maxChars) return value;
+  return `${value.slice(0, Math.max(0, maxChars - 1)).trim()}…`;
+}
+
+function splitSections(content) {
+  const body = stripFrontmatter(content);
+  const lines = body.split(/\r?\n/);
+  const sections = [];
+  let current = { heading: 'overview', lines: [] };
+
+  for (const line of lines) {
+    const match = line.match(/^(#{1,6})\s+(.+?)\s*$/);
+    if (match) {
+      if (current.lines.length || current.heading !== 'overview') sections.push(current);
+      current = { heading: match[2].trim(), lines: [] };
+      continue;
+    }
+    current.lines.push(line);
+  }
+
+  if (current.lines.length || current.heading !== 'overview') sections.push(current);
+  return sections
+    .map((section) => ({
+      heading: section.heading,
+      text: cleanText(section.lines.join('\n')),
+    }))
+    .filter((section) => section.text || section.heading !== 'overview');
+}
+
+function topTermsFromTexts(texts, limit = MAX_TERMS) {
+  const freq = new Map();
+  for (const text of texts) {
+    for (const token of tokenize(text)) {
+      freq.set(token, (freq.get(token) || 0) + 1);
+    }
+  }
+  return Array.from(freq.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([token]) => token);
+}
+
+function summarizeBody(body, fallback = '') {
+  const text = cleanText(body);
+  if (!text) return truncate(fallback, SUMMARY_CHARS);
+  const paragraphs = text.split(/\n{2,}/).map((part) => part.trim()).filter(Boolean);
+  if (!paragraphs.length) return truncate(fallback, SUMMARY_CHARS);
+  const preferred = paragraphs.find((part) => HEADING_PRIORITY.test(part)) || paragraphs[0];
+  return truncate(preferred, SUMMARY_CHARS);
+}
+
+function collectSectionText(sections, pattern, limit = 2) {
+  return sections
+    .filter((section) => pattern.test(normalize(section.heading)))
+    .slice(0, limit)
+    .map((section) => truncate(section.text, PREVIEW_CHARS / 2))
+    .filter(Boolean);
+}
+
+function buildSemanticProfile(content, frontmatter = {}) {
+  const sections = splitSections(content);
+  const body = stripFrontmatter(content);
+  const overview = sections.find((section) => section.heading === 'overview')?.text || '';
+  const useWhen = [
+    frontmatter.description || '',
+    ...collectSectionText(sections, /(when|invoke|use|applies|fit|trigger)/i, 3),
+  ].filter(Boolean);
+  const workflow = collectSectionText(sections, /(procedure|workflow|process|checklist|steps|implementation|flow)/i, 3);
+  const constraints = collectSectionText(sections, /(constraints|guardrails|rules|policy|anti-pattern|safety)/i, 3);
+  const headings = sections.map((section) => section.heading).filter(Boolean).slice(0, 12);
+  const capabilityTerms = topTermsFromTexts([
+    frontmatter.name || '',
+    frontmatter.description || '',
+    overview,
+    ...useWhen,
+    ...workflow,
+    ...constraints,
+    ...headings,
+  ]);
+  const workflowTerms = topTermsFromTexts(workflow, 16);
+
+  return {
+    content_summary: summarizeBody(body, frontmatter.description || ''),
+    content_preview: truncate(body, PREVIEW_CHARS),
+    use_when: useWhen.slice(0, 3),
+    workflow_terms: workflowTerms,
+    capability_terms: capabilityTerms,
+    section_keywords: topTermsFromTexts(headings, 12),
+    constraint_terms: topTermsFromTexts(constraints, 12),
+  };
+}
+
 function walkSync(root, opts = {}) {
   const maxDepth = opts.maxDepth ?? 6;
   const filter = opts.filter ?? (() => true);
@@ -104,6 +242,7 @@ function walkSync(root, opts = {}) {
 function buildSkillAsset(skillMdPath, source) {
   const head = safeRead(skillMdPath, HEAD_BYTES);
   const fm = parseFrontmatter(head);
+  const semantic = buildSemanticProfile(head, fm);
   const dir = path.dirname(skillMdPath);
   return {
     id: `skill:${path.basename(dir)}`,
@@ -115,6 +254,13 @@ function buildSkillAsset(skillMdPath, source) {
     hash: hashShort(head),
     user_invocable: fm['user-invocable'] !== 'false',
     model: fm.model || null,
+    content_summary: semantic.content_summary,
+    content_preview: semantic.content_preview,
+    use_when: semantic.use_when,
+    workflow_terms: semantic.workflow_terms,
+    capability_terms: semantic.capability_terms,
+    section_keywords: semantic.section_keywords,
+    constraint_terms: semantic.constraint_terms,
     last_seen: null,
   };
 }
@@ -122,6 +268,7 @@ function buildSkillAsset(skillMdPath, source) {
 function buildAgentAsset(agentMdPath, source) {
   const head = safeRead(agentMdPath, HEAD_BYTES);
   const fm = parseFrontmatter(head);
+  const semantic = buildSemanticProfile(head, fm);
   const name = fm.name || path.basename(agentMdPath, '.md');
   return {
     id: `agent:${name}`,
@@ -133,6 +280,13 @@ function buildAgentAsset(agentMdPath, source) {
     hash: hashShort(head),
     user_invocable: true,
     model: fm.model || null,
+    content_summary: semantic.content_summary,
+    content_preview: semantic.content_preview,
+    use_when: semantic.use_when,
+    workflow_terms: semantic.workflow_terms,
+    capability_terms: semantic.capability_terms,
+    section_keywords: semantic.section_keywords,
+    constraint_terms: semantic.constraint_terms,
     last_seen: null,
   };
 }

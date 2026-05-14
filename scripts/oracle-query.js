@@ -165,6 +165,8 @@ const INTENT_PATTERNS = [
   { re: /\b(claude code|codex|oracle|plugin|skill|hook|setup)\b/, domains: ['tooling-meta'] },
 ];
 
+const TYPE_PRIORITY = { skill: 4, agent: 3, mcp: 2, plugin: 1 };
+
 function usage() {
   return [
     'Usage:',
@@ -260,6 +262,31 @@ function intentBoosts(task) {
   };
 }
 
+function semanticSegments(asset) {
+  return {
+    summary: normalize(asset.content_summary || ''),
+    preview: normalize(asset.content_preview || ''),
+    useWhen: Array.isArray(asset.use_when) ? asset.use_when.map(normalize) : [],
+    workflow: Array.isArray(asset.workflow_terms) ? asset.workflow_terms.map(normalize) : [],
+    capability: Array.isArray(asset.capability_terms) ? asset.capability_terms.map(normalize) : [],
+    headings: Array.isArray(asset.section_keywords) ? asset.section_keywords.map(normalize) : [],
+    constraints: Array.isArray(asset.constraint_terms) ? asset.constraint_terms.map(normalize) : [],
+  };
+}
+
+function buildAssetSemanticTokens(asset) {
+  const segments = semanticSegments(asset);
+  return {
+    summary: buildTokenSet(segments.summary),
+    preview: buildTokenSet(segments.preview),
+    useWhen: new Set(segments.useWhen.flatMap((text) => tokenize(text))),
+    workflow: new Set(segments.workflow.flatMap((text) => tokenize(text))),
+    capability: new Set(segments.capability.flatMap((text) => tokenize(text))),
+    headings: new Set(segments.headings.flatMap((text) => tokenize(text))),
+    constraints: new Set(segments.constraints.flatMap((text) => tokenize(text))),
+  };
+}
+
 function scoreDomainText(task, domain) {
   const text = normalize(task);
   const taskTokens = buildTokenSet(text);
@@ -340,10 +367,12 @@ function recommendedModels(complexity) {
 function scoreAsset(asset, taskTokens) {
   const nameText = normalize(`${asset.name} ${asset.id}`);
   const descText = normalize(asset.description);
+  const segments = semanticSegments(asset);
   const keywordText = Array.isArray(asset.keywords) ? asset.keywords.map(normalize) : [];
   const nameTokens = buildTokenSet(nameText.replace(/[:/]/g, ' '));
   const descTokens = buildTokenSet(descText);
   const keywordTokens = new Set(keywordText.flatMap((kw) => tokenize(kw)));
+  const semanticTokens = buildAssetSemanticTokens(asset);
   let score = 0;
   const matched = [];
 
@@ -354,9 +383,17 @@ function scoreAsset(asset, taskTokens) {
     if (nameTokens.has(token)) tokenScore += 6;
     if (descTokens.has(token)) tokenScore += 3;
     if (keywordTokens.has(token)) tokenScore += 2;
+    if (semanticTokens.useWhen.has(token)) tokenScore += 4;
+    if (semanticTokens.capability.has(token)) tokenScore += 4;
+    if (semanticTokens.workflow.has(token)) tokenScore += 3;
+    if (semanticTokens.headings.has(token)) tokenScore += 2;
+    if (semanticTokens.summary.has(token)) tokenScore += 2;
+    if (semanticTokens.preview.has(token)) tokenScore += 1;
     if (!tokenScore && token.length >= 5) {
       if (nameText.includes(token)) tokenScore += 2;
       if (descText.includes(token)) tokenScore += 1;
+      if (segments.summary.includes(token)) tokenScore += 2;
+      if (segments.preview.includes(token)) tokenScore += 1;
     }
     if (tokenScore > 0) {
       score += tokenScore;
@@ -377,6 +414,33 @@ function scoreAsset(asset, taskTokens) {
   return { score, matched: Array.from(new Set(matched)).slice(0, 8) };
 }
 
+function enrichRankedAsset(asset, domain, result) {
+  const segments = semanticSegments(asset);
+  return {
+    id: asset.id,
+    name: asset.name,
+    type: asset.type,
+    domain: domain.id,
+    master_agent: domain.master_agent,
+    score: Number(result.score.toFixed(2)),
+    matched: result.matched,
+    description: asset.description || '',
+    content_summary: asset.content_summary || '',
+    use_when: Array.isArray(asset.use_when) ? asset.use_when : [],
+    workflow_terms: Array.isArray(asset.workflow_terms) ? asset.workflow_terms : [],
+    capability_terms: Array.isArray(asset.capability_terms) ? asset.capability_terms : [],
+    section_keywords: Array.isArray(asset.section_keywords) ? asset.section_keywords : [],
+    semantic_strength: {
+      use_when: segments.useWhen.length,
+      workflow: segments.workflow.length,
+      capability: segments.capability.length,
+    },
+    path: asset.path,
+    source: asset.source,
+    invoke: invocationHint(asset),
+  };
+}
+
 function canonicalAssetKey(asset) {
   return [
     normalize(asset.type),
@@ -392,15 +456,98 @@ function invocationHint(asset) {
   return `plugin:${asset.name}`;
 }
 
+function scoreSupportingFit(asset, domainId, intents) {
+  let score = 0;
+  if (asset.type === 'skill') score += 3;
+  else if (asset.type === 'agent') score += 2;
+  else score += 1;
+
+  score += Math.min(asset.workflow_terms?.length || 0, 6) * 0.3;
+  score += Math.min(asset.capability_terms?.length || 0, 6) * 0.25;
+
+  const name = normalize(asset.name);
+  if (domainId === 'design-ui' && /brand|design|frontend|ui|visual/.test(name)) score += 2;
+  if (domainId === 'web-dev' && /frontend|react|electron|playwright|shadcn|component/.test(name)) score += 2;
+  if (intents.desktop && /electron|desktop/.test(name)) score += 1.5;
+  if (intents.shortcuts && /frontend|design|component|react/.test(name)) score += 1.5;
+  if (intents.branding && /brand|logo|visual|design/.test(name)) score += 1.5;
+  return score;
+}
+
+function buildVirtualMasterReport(domain, ranked, task) {
+  const intents = intentBoosts(task);
+  const primary = ranked[0] || null;
+  const supporting = [];
+  const seen = new Set(primary ? [canonicalAssetKey(primary)] : []);
+
+  for (const asset of ranked
+    .map((candidate) => ({ candidate, fit: scoreSupportingFit(candidate, domain.id, intents) }))
+    .sort((a, b) => (b.candidate.score + b.fit) - (a.candidate.score + a.fit))) {
+    const key = canonicalAssetKey(asset.candidate);
+    if (seen.has(key)) continue;
+    supporting.push(asset.candidate);
+    seen.add(key);
+    if (supporting.length >= 2) break;
+  }
+
+  const matchedCapabilities = Array.from(new Set(
+    ranked.slice(0, 5).flatMap((asset) => [
+      ...(asset.matched || []),
+      ...(asset.capability_terms || []).slice(0, 3),
+      ...(asset.workflow_terms || []).slice(0, 2),
+    ])
+  )).slice(0, 10);
+
+  const thesisParts = [];
+  if (primary) thesisParts.push(`${primary.name} lidera`);
+  if (supporting.length) thesisParts.push(`apoios: ${supporting.map((asset) => asset.name).join(', ')}`);
+  if (matchedCapabilities.length) thesisParts.push(`sinais: ${matchedCapabilities.slice(0, 4).join(', ')}`);
+
+  return {
+    domain: domain.id,
+    master_agent: domain.master_agent,
+    asset_count: ranked.length,
+    matches: ranked.length,
+    top: ranked.slice(0, 5),
+    bundle: [primary, ...supporting].filter(Boolean).slice(0, 3),
+    matchedCapabilities,
+    thesis: thesisParts.join(' | '),
+  };
+}
+
 function buildRecommendedBundle(domainReports, picks, task) {
   const intents = intentBoosts(task);
   const bundle = [];
   const seen = new Set();
+  const taskText = normalize(task);
 
   const preferredByIntent = [];
   if (intents.branding) preferredByIntent.push(['brandkit', 'impeccable', 'high-end-visual-design']);
   if (intents.ui || intents.shortcuts) preferredByIntent.push(['design-taste-frontend', 'frontend-design', 'ui-toolkit/web', 'react:components']);
   if (intents.desktop) preferredByIntent.push(['design-taste-frontend', 'frontend-design', 'zoom-meeting-sdk-electron']);
+  if (/\boracle\b/.test(taskText) || (/\bskill/.test(taskText) && /\bjunt/.test(taskText))) {
+    preferredByIntent.unshift(['skill-oracle', 'workspace-surface-audit', 'plugin-structure']);
+  }
+
+  for (const report of domainReports) {
+    const primary = (report.bundle || [])[0];
+    if (!primary) continue;
+    const key = canonicalAssetKey(primary);
+    if (seen.has(key)) continue;
+    bundle.push(primary);
+    seen.add(key);
+    if (bundle.length >= 4) return bundle.slice(0, 4);
+  }
+
+  for (const report of domainReports) {
+    for (const asset of (report.bundle || []).slice(1)) {
+      const key = canonicalAssetKey(asset);
+      if (seen.has(key)) continue;
+      bundle.push(asset);
+      seen.add(key);
+      if (bundle.length >= 4) return bundle.slice(0, 4);
+    }
+  }
 
   for (const names of preferredByIntent) {
     for (const name of names) {
@@ -454,31 +601,17 @@ function selectAssets(idx, task, options = {}) {
     const ranked = assets
       .map((asset) => {
         const result = scoreAsset(asset, taskTokens);
-        return {
-          id: asset.id,
-          name: asset.name,
-          type: asset.type,
-          domain: domain.id,
-          master_agent: domain.master_agent,
-          score: Number(result.score.toFixed(2)),
-          matched: result.matched,
-          description: asset.description || '',
-          path: asset.path,
-          source: asset.source,
-          invoke: invocationHint(asset),
-        };
+        return enrichRankedAsset(asset, domain, result);
       })
       .filter((asset) => asset.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 8);
+      .sort((a, b) => {
+        const typeDelta = (TYPE_PRIORITY[b.type] || 0) - (TYPE_PRIORITY[a.type] || 0);
+        if (Math.abs(b.score - a.score) < 0.75 && typeDelta !== 0) return typeDelta;
+        return b.score - a.score;
+      })
+      .slice(0, 10);
 
-    domainReports.push({
-      domain: domain.id,
-      master_agent: domain.master_agent,
-      asset_count: assets.length,
-      matches: ranked.length,
-      top: ranked.slice(0, 5),
-    });
+    domainReports.push(buildVirtualMasterReport(domain, ranked, task));
 
     for (const asset of ranked) {
       const key = canonicalAssetKey(asset);
@@ -507,6 +640,12 @@ function selectAssets(idx, task, options = {}) {
     picks,
     bundle,
     domainReports,
+    virtualMasters: domainReports.map((report) => ({
+      domain: report.domain,
+      master_agent: report.master_agent,
+      thesis: report.thesis,
+      bundle: (report.bundle || []).map((asset) => asset.name),
+    })),
     suggestions: proactiveSuggestions(task, domainIds, idx),
     fallbackRecommended: picks.length === 0,
     modelHints,
@@ -575,6 +714,13 @@ function formatResult(result) {
       lines.push('Recommended bundle:');
       result.bundle.forEach((asset, index) => {
         lines.push(`  ${index + 1}. ${asset.name} (${asset.domain}) -> ${asset.invoke}`);
+      });
+      lines.push('');
+    }
+    if (result.virtualMasters && result.virtualMasters.length) {
+      lines.push('Virtual masters:');
+      result.virtualMasters.forEach((report) => {
+        lines.push(`  - ${report.domain} via ${report.master_agent}: ${report.thesis}`);
       });
       lines.push('');
     }

@@ -106,15 +106,30 @@ function tokenize(s) {
     .toLowerCase();
 }
 
+function semanticText(asset) {
+  return tokenize([
+    asset.description,
+    asset.content_summary,
+    asset.content_preview,
+    ...(Array.isArray(asset.use_when) ? asset.use_when : []),
+    ...(Array.isArray(asset.workflow_terms) ? asset.workflow_terms : []),
+    ...(Array.isArray(asset.capability_terms) ? asset.capability_terms : []),
+    ...(Array.isArray(asset.section_keywords) ? asset.section_keywords : []),
+    ...(Array.isArray(asset.constraint_terms) ? asset.constraint_terms : []),
+  ].join(' '));
+}
+
 function scoreDomain(asset, domain) {
   if (!domain.kw.length) return { score: 0, matched: [] };
   const nameText = tokenize(`${asset.name} ${asset.id}`);
   const descText = tokenize(asset.description);
+  const semText = semanticText(asset);
   let score = 0;
   const matched = [];
   for (const kw of domain.kw) {
     if (nameText.includes(kw)) { score += 3; matched.push(kw); }
-    else if (descText.includes(kw)) { score += 1; matched.push(kw); }
+    else if (descText.includes(kw)) { score += 2; matched.push(kw); }
+    else if (semText.includes(kw)) { score += 2; matched.push(kw); }
   }
   return { score, matched };
 }
