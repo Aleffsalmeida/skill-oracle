@@ -21,6 +21,16 @@ const MAX_DOMAINS = 5;
 const DEFAULT_LIMIT = 5;
 const MIN_TOKEN_LENGTH = 3;
 const SHORT_TOKEN_ALLOWLIST = new Set(['ai', 'ml', 'ui', 'ux', 'qa', '3d']);
+const STRONG_AUTHOR_SOURCES = ['agents:', 'codex:', 'user:'];
+const PREFERRED_SKILLS = new Set([
+  'brandkit',
+  'skill-oracle',
+  'imagegen-frontend-web',
+  'imagegen-frontend-mobile',
+  'high-end-visual-design',
+  'design-taste-frontend',
+  'react:components',
+]);
 const STOPWORDS = new Set([
   'a', 'an', 'and', 'as', 'at', 'be', 'by', 'for', 'from', 'in', 'into',
   'of', 'on', 'or', 'the', 'to', 'with', 'without', 'using', 'use',
@@ -51,7 +61,7 @@ const DOMAIN_KEYWORDS = [
   {
     id: 'web-dev',
     proactive: ['testing-qa', 'security-audit'],
-    kw: ['react', 'nextjs', 'next.js', 'vercel', 'frontend', 'tailwind', 'vue', 'svelte', 'astro', 'remix', 'vite', 'webpack', 'turbopack', 'shadcn', 'html', 'css', 'browser', 'spa', 'ssr', 'dashboard'],
+    kw: ['react', 'nextjs', 'next.js', 'vercel', 'frontend', 'tailwind', 'vue', 'svelte', 'astro', 'remix', 'vite', 'webpack', 'turbopack', 'shadcn', 'html', 'css', 'browser', 'spa', 'ssr', 'dashboard', 'electron', 'shortcut', 'atalho', 'botoes', 'botões'],
   },
   {
     id: 'backend-api',
@@ -86,7 +96,7 @@ const DOMAIN_KEYWORDS = [
   {
     id: 'design-ui',
     proactive: ['data-analytics'],
-    kw: ['design-system', 'ui', 'ux', 'figma', 'canva', 'brand', 'branding', 'palette', 'typography', 'wireframe', 'prototype', 'accessibility', 'a11y', 'wcag', 'visual', 'mockup', 'minimalist', 'logo', 'icon', 'icone', 'ícone', 'identidade', 'simbolo', 'símbolo', 'topbar', 'taskbar'],
+    kw: ['design-system', 'ui', 'ux', 'figma', 'canva', 'brand', 'branding', 'palette', 'typography', 'wireframe', 'prototype', 'accessibility', 'a11y', 'wcag', 'visual', 'mockup', 'minimalist', 'logo', 'icon', 'icone', 'ícone', 'identidade', 'simbolo', 'símbolo', 'topbar', 'taskbar', 'botao', 'botão', 'botoes', 'botões', 'shortcut', 'atalho'],
   },
   {
     id: 'mobile',
@@ -143,6 +153,13 @@ const DOMAIN_KEYWORDS = [
     proactive: ['data-analytics'],
     kw: ['crm', 'sales', 'hubspot', 'salesforce', 'pipedrive', 'attio', 'intercom', 'salesloft', 'outreach', 'lead-magnet', 'prospect', 'pipeline-sales', 'apollo'],
   },
+];
+
+const INTENT_PATTERNS = [
+  { re: /\b(logo|icone|icon|simbolo|símbolo|brand|branding|identidade visual)\b/, domains: ['design-ui'] },
+  { re: /\b(atalho|shortcut|hotkey|botoes|botões|botao|botão)\b/, domains: ['web-dev', 'design-ui'] },
+  { re: /\b(electron|janela|taskbar|topbar|barra do windows)\b/, domains: ['web-dev', 'design-ui'] },
+  { re: /\b(claude code|codex|oracle|plugin|skill|hook|setup)\b/, domains: ['tooling-meta'] },
 ];
 
 function usage() {
@@ -230,11 +247,18 @@ function isMeaningfulToken(token) {
 
 function scoreDomainText(task, domain) {
   const text = normalize(task);
+  const taskTokens = buildTokenSet(text);
   let score = 0;
   const matched = [];
   for (const kw of domain.kw) {
-    if (text.includes(kw)) {
-      score += kw.length > 4 ? 3 : 2;
+    const normalizedKw = normalize(kw);
+    if (taskTokens.has(normalizedKw)) {
+      score += normalizedKw.length > 4 ? 4 : 3;
+      matched.push(normalizedKw);
+      continue;
+    }
+    if (text.includes(normalizedKw)) {
+      score += normalizedKw.length > 4 ? 2 : 1;
       matched.push(kw);
     }
   }
@@ -250,6 +274,15 @@ function detectDomains(task, idx, forcedDomains = []) {
 
   const scored = DOMAIN_KEYWORDS
     .map((domain) => scoreDomainText(task, domain))
+    .map((domain) => {
+      const intentBoost = INTENT_PATTERNS
+        .filter((rule) => rule.re.test(normalize(task)) && rule.domains.includes(domain.id))
+        .reduce((sum, _rule) => sum + 4, 0);
+      return {
+        ...domain,
+        score: domain.score + intentBoost,
+      };
+    })
     .filter((d) => d.score > 0)
     .sort((a, b) => b.score - a.score)
     .map((d) => d.id);
@@ -316,9 +349,8 @@ function scoreAsset(asset, taskTokens) {
   }
 
   const sourceText = normalize(asset.source || '');
-  if (sourceText.startsWith('user:') || sourceText.startsWith('codex:') || sourceText.startsWith('agents:')) {
-    score *= 1.08;
-  }
+  if (STRONG_AUTHOR_SOURCES.some((prefix) => sourceText.startsWith(prefix))) score *= 1.12;
+  if (PREFERRED_SKILLS.has(asset.name)) score *= 1.18;
   if (asset.user_invocable) score *= 1.2;
   if (asset.type === 'skill') score *= 1.1;
   return { score, matched: Array.from(new Set(matched)).slice(0, 8) };

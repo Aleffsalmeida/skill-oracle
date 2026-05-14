@@ -12,6 +12,7 @@ const path = require('path');
 const os = require('os');
 const { spawnSync } = require('child_process');
 const { loadIndex, selectAssets, DEFAULT_INDEX } = require('./oracle-query');
+const { main: runRegression } = require('./oracle-regression-test');
 
 const HOME = os.homedir();
 const CLAUDE_ROOT = path.join(HOME, '.claude');
@@ -25,6 +26,7 @@ const REQUIRED_SCRIPTS = [
   'auto-rebuild.js',
   'optimizer.js',
   'oracle-query.js',
+  'oracle-regression-test.js',
 ];
 
 const REQUIRED_ROOT_FILES = [
@@ -82,6 +84,10 @@ function checkAutoRebuild() {
   assertCheck(result.status === 0, `auto-rebuild failed: ${result.stderr || result.stdout}`);
 }
 
+function checkRegression() {
+  runRegression();
+}
+
 function main() {
   const checks = [
     ['scripts present', () => checkScripts()],
@@ -89,6 +95,7 @@ function main() {
     ['master agents installed', () => checkAgents(loadIndex(DEFAULT_INDEX))],
     ['local query works', () => checkQuery(loadIndex(DEFAULT_INDEX))],
     ['preflight works', () => checkPreflight()],
+    ['regression cases pass', () => checkRegression()],
     ['auto-rebuild works', () => checkAutoRebuild()],
   ];
 
