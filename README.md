@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/schema-v2-purple?style=flat-square" alt="schema"/>
 </p>
 
-**Single entry point for 5,000+ Claude Code assets.** Indexes Skills, Agents, Plugins, and MCP servers — then routes any task to the right Master Agent so the LLM never sees more than a handful of candidates at a time.
+**Single entry point for 5,000+ Claude Code and Codex-local assets.** Indexes Skills, Agents, Plugins, and MCP servers — then routes any task to the right Master Agent in Claude Code or to the local deterministic selector in Codex-compatible runtimes.
 
 Loads minutes-of-overhead environments in seconds. Built for Claude Code users who have hundreds of plugins and don't want to pay token cost on every prompt.
 
@@ -24,7 +24,7 @@ Loads minutes-of-overhead environments in seconds. Built for Claude Code users w
 |---|---|---|
 | Asset types | Skills only | Skills + Agents + Plugins + MCP |
 | Index size | ~90 skills | 5,000+ assets typical |
-| Discovery | Read every SKILL.md description on demand | 20 domain Master Agents — one per cluster |
+| Discovery | Read every SKILL.md description on demand | 20 domain Master Agents in Claude Code; local domain selector in Codex |
 | Selection | Single-pass LLM ranking | Deterministic pre-filter + conditional debate |
 | Lazy-loading | None | Optimizer disables non-Oracle SessionStart hooks |
 | Fallback | Manual `--compare` to find-skills | Automatic when no local match exists |
@@ -63,7 +63,7 @@ The old `build-index.js` is preserved for backward compat. New pipeline is `scan
               final answer
 ```
 
-Every asset carries a `domain` and `master_agent` tag in the index. The Oracle dispatches in parallel; each master sees only its own cluster.
+Every asset carries a `domain` and `master_agent` tag in the index. In Claude Code, the Oracle dispatches in parallel and each master sees only its own cluster. In Codex/local runtimes, `scripts/oracle-query.js` reads the same index and ranks assets directly without requiring Claude Code's `Task` dispatcher.
 
 ---
 
@@ -83,6 +83,8 @@ skill-oracle/
     install-agents.js   # copies masters into ~/.claude/agents/
     optimizer.js        # settings.json lazy-loading optimizer
     auto-rebuild.js     # SessionStart hook entry point
+    oracle-query.js     # Codex/local selector; no Task dispatcher required
+    oracle-smoke-test.js # local health check for scripts, index, agents, query
     build-index.js      # legacy v1 builder (kept for backward compat)
 ```
 
@@ -175,6 +177,31 @@ Slash command:
 /skill-oracle --optimize --apply     # apply with backup
 /skill-oracle --no-debate <task>     # cheapest path, no master debate
 ```
+
+### Codex/local usage
+
+Codex does not expose Claude Code's native `Task(subagent_type="...")` dispatcher. Use the local runner instead:
+
+```bash
+node ~/.claude/skills/skill-oracle/scripts/oracle-query.js "build a React dashboard with Stripe billing and Playwright tests"
+```
+
+Useful local commands:
+
+```bash
+node ~/.claude/skills/skill-oracle/scripts/oracle-query.js --stats
+node ~/.claude/skills/skill-oracle/scripts/oracle-query.js --list-domains
+node ~/.claude/skills/skill-oracle/scripts/oracle-query.js --rebuild
+node ~/.claude/skills/skill-oracle/scripts/oracle-smoke-test.js
+```
+
+Exit codes:
+
+| Code | Meaning |
+|---|---|
+| 0 | Query found strong local picks, or a stats/list command succeeded |
+| 1 | Usage, missing index, malformed index, or script error |
+| 2 | Query ran but found no strong local match; fall back to `find-skills` |
 
 ---
 
