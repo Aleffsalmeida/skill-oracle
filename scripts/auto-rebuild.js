@@ -15,14 +15,22 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { spawnSync } = require('child_process');
+const { run: runBootstrap } = require('./oracle-bootstrap');
 
 const ORACLE_INDEX = path.join(os.homedir(), '.claude', 'oracle-index.json');
 const LEGACY_INDEX = path.join(os.homedir(), '.claude', 'skill-index.json');
-const SCANNER = path.join(__dirname, 'scanner.js');
-const CLASSIFIER = path.join(__dirname, 'classifier.js');
-const LEGACY_BUILDER = path.join(__dirname, 'build-index.js');
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const QUIET_MODE = process.env.ORACLE_QUIET_MODE !== '0';
+
+function hasValidIndex(p) {
+  if (!fs.existsSync(p)) return false;
+  try {
+    JSON.parse(fs.readFileSync(p, 'utf8'));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function isStale(p) {
   if (!fs.existsSync(p)) return true;
@@ -35,24 +43,20 @@ function isStale(p) {
   }
 }
 
-function spawn(script) {
-  return spawnSync(process.execPath, [script], { stdio: 'inherit', timeout: 60000 });
-}
+(async () => {
+  try {
+    if (QUIET_MODE && hasValidIndex(ORACLE_INDEX)) {
+      return;
+    }
 
-try {
-  if (isStale(ORACLE_INDEX)) {
-    const a = spawn(SCANNER);
-    if (a.error) process.stderr.write(`[oracle] scanner failed: ${a.error.message}\n`);
-    const b = spawn(CLASSIFIER);
-    if (b.error) process.stderr.write(`[oracle] classifier failed: ${b.error.message}\n`);
+    await runBootstrap({
+      update: true,
+      repair: true,
+      forceRepair: isStale(ORACLE_INDEX),
+      installHook: false,
+      quiet: QUIET_MODE,
+    });
+  } catch (e) {
+    process.stderr.write(`[oracle] auto-rebuild error: ${e.message}\n`);
   }
-
-  if (fs.existsSync(LEGACY_BUILDER) && isStale(LEGACY_INDEX)) {
-    const c = spawn(LEGACY_BUILDER);
-    if (c.error) process.stderr.write(`[oracle] legacy build-index failed: ${c.error.message}\n`);
-  }
-} catch (e) {
-  process.stderr.write(`[oracle] auto-rebuild error: ${e.message}\n`);
-}
-
-process.exit(0);
+})();

@@ -12,7 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { spawnSync } = require('child_process');
+const { run: runBootstrap } = require('./oracle-bootstrap');
 
 const HOME = os.homedir();
 const DEFAULT_INDEX = path.join(HOME, '.claude', 'oracle-index.json');
@@ -133,6 +133,7 @@ function usage() {
     '  node scripts/oracle-query.js --stats',
     '  node scripts/oracle-query.js --list-domains',
     '  node scripts/oracle-query.js --rebuild',
+    '  node scripts/oracle-query.js --preflight',
     '',
     'Options:',
     '  --limit <n>       Number of final picks to print (default: 5)',
@@ -149,6 +150,7 @@ function parseArgs(argv) {
     limit: DEFAULT_LIMIT,
     indexPath: DEFAULT_INDEX,
     json: false,
+    preflight: false,
     stats: false,
     listDomains: false,
     rebuild: false,
@@ -159,6 +161,7 @@ function parseArgs(argv) {
     const arg = argv[i];
     if (arg === '--help' || arg === '-h') out.help = true;
     else if (arg === '--json') out.json = true;
+    else if (arg === '--preflight') out.preflight = true;
     else if (arg === '--stats') out.stats = true;
     else if (arg === '--list-domains') out.listDomains = true;
     else if (arg === '--rebuild') out.rebuild = true;
@@ -351,18 +354,6 @@ function proactiveSuggestions(task, domainIds, idx) {
     });
 }
 
-function runRebuild() {
-  const scripts = ['scanner.js', 'classifier.js', 'gen-masters.js', 'install-agents.js'];
-  const scriptDir = __dirname;
-  for (const script of scripts) {
-    const full = path.join(scriptDir, script);
-    const result = spawnSync(process.execPath, [full], { stdio: 'inherit', timeout: 120000 });
-    if (result.status !== 0) {
-      throw new Error(`${script} failed with exit code ${result.status}`);
-    }
-  }
-}
-
 function formatStats(idx) {
   const byType = idx.stats && idx.stats.by_type ? idx.stats.by_type : {};
   const topDomains = Object.entries((idx.stats && idx.stats.by_domain) || {})
@@ -412,14 +403,28 @@ function formatResult(result) {
   return lines.join('\n');
 }
 
-function main(argv = process.argv.slice(2)) {
+async function main(argv = process.argv.slice(2)) {
   const args = parseArgs(argv);
   if (args.help) {
     console.log(usage());
     return 0;
   }
 
-  if (args.rebuild) runRebuild();
+  const preflight = await runBootstrap({
+    update: true,
+    repair: true,
+    forceRepair: args.rebuild,
+    installHook: true,
+    preflightOnly: args.preflight,
+    quiet: Boolean(args.json),
+  });
+
+  if (preflight.warnings.length && !args.json) {
+    for (const warning of preflight.warnings) {
+      console.error(`[oracle-bootstrap] warning: ${warning}`);
+    }
+  }
+
   const idx = loadIndex(args.indexPath);
 
   if (args.stats) {
@@ -435,6 +440,22 @@ function main(argv = process.argv.slice(2)) {
   }
 
   if (!args.task) {
+    if (args.preflight) {
+      if (args.json) {
+        console.log(JSON.stringify(preflight, null, 2));
+      } else {
+        console.log(`Oracle preflight: ${preflight.preflight.ready ? 'ready' : 'attention needed'}`);
+        console.log(`Runtime: ${preflight.preflight.runtime}`);
+        console.log(`Index: ${preflight.preflight.index_exists ? 'present' : 'missing'}${preflight.preflight.index_fresh ? ' / fresh' : ' / stale'}`);
+        console.log(`Masters: ${preflight.preflight.masters_installed}/${preflight.preflight.masters_expected}`);
+        console.log(`Session hook: ${preflight.preflight.session_hook_installed ? 'installed' : 'missing'}`);
+        if (preflight.preflight.warnings.length) {
+          console.log(`Missing: ${preflight.preflight.warnings.join(' | ')}`);
+        }
+      }
+      return preflight.preflight.ready ? 0 : 1;
+    }
+
     console.log(usage());
     return 1;
   }
@@ -446,12 +467,12 @@ function main(argv = process.argv.slice(2)) {
 }
 
 if (require.main === module) {
-  try {
-    process.exitCode = main();
-  } catch (e) {
+  main().then((code) => {
+    process.exitCode = code;
+  }).catch((e) => {
     console.error(`[oracle-query] error: ${e.message}`);
     process.exitCode = 1;
-  }
+  });
 }
 
 module.exports = {

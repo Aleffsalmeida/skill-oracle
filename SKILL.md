@@ -60,22 +60,25 @@ The local runner reads `~/.claude/oracle-index.json`, detects domains, ranks ass
 
 ### Step 0 — Bootstrap detection
 
-Check whether `~/.claude/oracle-index.json` exists. Path on Windows: `C:\Users\<user>\.claude\oracle-index.json`.
-
-**If missing or `--rebuild`:**
-
-Run the full bootstrap pipeline:
+Before any routing, run the Oracle bootstrap:
 
 ```bash
-node ~/.claude/skills/skill-oracle/scripts/scanner.js     # builds index
-node ~/.claude/skills/skill-oracle/scripts/classifier.js  # assigns domains + masters
-node ~/.claude/skills/skill-oracle/scripts/gen-masters.js # regenerates agent .md files
+node ~/.claude/skills/skill-oracle/scripts/oracle-bootstrap.js
 ```
 
-Then copy `agents/*.md` to `~/.claude/agents/` so the Task tool can discover them:
+It should:
+- check GitHub for a newer release
+- update the local skill files when a newer version exists
+- rebuild the Oracle index if missing, stale, or forced
+- reinstall the generated master agents
+- install the SessionStart hook automatically when asked with `--install`
+- produce a preflight report with runtime, index, hook, and master-agent status
+- warn when any required mechanism is missing
+
+If the user is installing Oracle for the first time, run the same command with `--install` so the SessionStart hook is added automatically:
 
 ```bash
-node ~/.claude/skills/skill-oracle/scripts/install-agents.js
+node ~/.claude/skills/skill-oracle/scripts/oracle-bootstrap.js --install
 ```
 
 After bootstrap, **offer optimization**:
@@ -84,7 +87,7 @@ After bootstrap, **offer optimization**:
 
 ### Step 1 — Delta detection
 
-Index exists. Read its `generated_at`. If > 24h old, silently run `scanner.js` + `classifier.js` in background (or invoke `scripts/auto-rebuild.js`). Continue immediately with whatever data is current — do not block.
+The bootstrap already keeps the index and master agents current. It also emits a preflight report before routing so the user sees what is ready and what is missing. If the local index is older than 24h, the bootstrap refreshes it before routing. Continue immediately with whatever data is current — do not block.
 
 ### Step 2 — Parse the user task
 
@@ -123,6 +126,7 @@ Useful local commands:
 ```bash
 node ~/.claude/skills/skill-oracle/scripts/oracle-query.js --stats
 node ~/.claude/skills/skill-oracle/scripts/oracle-query.js --list-domains
+node ~/.claude/skills/skill-oracle/scripts/oracle-query.js --preflight
 node ~/.claude/skills/skill-oracle/scripts/oracle-query.js --rebuild
 node ~/.claude/skills/skill-oracle/scripts/oracle-smoke-test.js
 ```

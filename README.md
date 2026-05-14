@@ -106,22 +106,23 @@ git clone https://github.com/Aleffsalmeida/skill-oracle ~/.claude/skills/skill-o
 
 ### Step 2 — Bootstrap
 
+Run the Oracle bootstrap once after installation. It checks GitHub for a newer release, updates the local skill files if needed, rebuilds the index, installs the master agents, and can optionally add the SessionStart hook for automatic preflight.
+
 ```bash
-node ~/.claude/skills/skill-oracle/scripts/scanner.js
-node ~/.claude/skills/skill-oracle/scripts/classifier.js
-node ~/.claude/skills/skill-oracle/scripts/gen-masters.js
-node ~/.claude/skills/skill-oracle/scripts/install-agents.js
+node ~/.claude/skills/skill-oracle/scripts/oracle-bootstrap.js --install
 ```
 
-Or invoke the skill once and it will self-bootstrap:
+If you only want to repair the index and agents without changing `settings.json`, run:
 
+```bash
+node ~/.claude/skills/skill-oracle/scripts/oracle-bootstrap.js
 ```
-/skill-oracle --rebuild
-```
 
-### Step 3 — Add the auto-rebuild hook (one-time)
+The Oracle also checks for updates every time `oracle-query.js` runs, installs the SessionStart hook if it is missing, and emits a preflight report before routing.
 
-In `~/.claude/settings.json`:
+### Step 3 — Add the auto-rebuild hook (one-time, optional if you used `--install`)
+
+If you did not run `--install`, add the SessionStart hook in `~/.claude/settings.json`:
 
 ```json
 {
@@ -191,6 +192,7 @@ Useful local commands:
 ```bash
 node ~/.claude/skills/skill-oracle/scripts/oracle-query.js --stats
 node ~/.claude/skills/skill-oracle/scripts/oracle-query.js --list-domains
+node ~/.claude/skills/skill-oracle/scripts/oracle-query.js --preflight
 node ~/.claude/skills/skill-oracle/scripts/oracle-query.js --rebuild
 node ~/.claude/skills/skill-oracle/scripts/oracle-smoke-test.js
 ```

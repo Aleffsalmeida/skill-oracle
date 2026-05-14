@@ -17,6 +17,7 @@ const HOME = os.homedir();
 const CLAUDE_ROOT = path.join(HOME, '.claude');
 const AGENTS_ROOT = path.join(CLAUDE_ROOT, 'agents');
 const REQUIRED_SCRIPTS = [
+  'oracle-bootstrap.js',
   'scanner.js',
   'classifier.js',
   'gen-masters.js',
@@ -24,6 +25,10 @@ const REQUIRED_SCRIPTS = [
   'auto-rebuild.js',
   'optimizer.js',
   'oracle-query.js',
+];
+
+const REQUIRED_ROOT_FILES = [
+  path.join(__dirname, '..', 'oracle-manifest.json'),
 ];
 
 function assertCheck(condition, message) {
@@ -34,6 +39,9 @@ function checkScripts() {
   for (const script of REQUIRED_SCRIPTS) {
     const full = path.join(__dirname, script);
     assertCheck(fs.existsSync(full), `missing script: ${full}`);
+  }
+  for (const file of REQUIRED_ROOT_FILES) {
+    assertCheck(fs.existsSync(file), `missing root file: ${file}`);
   }
 }
 
@@ -61,6 +69,13 @@ function checkQuery(idx) {
   assertCheck(result.picks.length > 0, 'query should return at least one strong pick');
 }
 
+function checkPreflight() {
+  const full = path.join(__dirname, 'oracle-query.js');
+  const result = spawnSync(process.execPath, [full, '--preflight'], { encoding: 'utf8', timeout: 120000 });
+  assertCheck(result.status === 0, `oracle-query preflight failed: ${result.stderr || result.stdout}`);
+  assertCheck(/Oracle preflight: ready/i.test(result.stdout), 'preflight should report ready');
+}
+
 function checkAutoRebuild() {
   const full = path.join(__dirname, 'auto-rebuild.js');
   const result = spawnSync(process.execPath, [full], { encoding: 'utf8', timeout: 120000 });
@@ -73,6 +88,7 @@ function main() {
     ['index valid', () => checkIndex(loadIndex(DEFAULT_INDEX))],
     ['master agents installed', () => checkAgents(loadIndex(DEFAULT_INDEX))],
     ['local query works', () => checkQuery(loadIndex(DEFAULT_INDEX))],
+    ['preflight works', () => checkPreflight()],
     ['auto-rebuild works', () => checkAutoRebuild()],
   ];
 
