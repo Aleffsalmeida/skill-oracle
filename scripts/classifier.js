@@ -50,7 +50,7 @@ const DOMAINS = [
   },
   {
     id: 'design-ui', label: 'Design / UI / UX', master: 'oracle-master-design',
-    kw: ['design-system', 'ui', 'ux', 'figma', 'canva', 'brand', 'palette', 'typography', 'wireframe', 'prototype', 'accessibility', 'a11y', 'wcag', 'visual', 'mockup', 'liquid-glass', 'minimalist', 'industrial-brutalist'],
+    kw: ['design-system', 'ui', 'ux', 'figma', 'canva', 'brand', 'branding', 'palette', 'typography', 'wireframe', 'prototype', 'accessibility', 'a11y', 'wcag', 'visual', 'mockup', 'liquid-glass', 'minimalist', 'industrial-brutalist', 'logo', 'icon', 'icone', 'ícone', 'identidade', 'simbolo', 'símbolo', 'brandkit'],
   },
   {
     id: 'mobile', label: 'Mobile', master: 'oracle-master-mobile',
@@ -100,7 +100,10 @@ const DOMAINS = [
 ];
 
 function tokenize(s) {
-  return (s || '').toLowerCase();
+  return String(s || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 }
 
 function scoreDomain(asset, domain) {

@@ -19,13 +19,19 @@ const DEFAULT_INDEX = path.join(HOME, '.claude', 'oracle-index.json');
 const STRONG_MATCH_THRESHOLD = 5;
 const MAX_DOMAINS = 5;
 const DEFAULT_LIMIT = 5;
+const MIN_TOKEN_LENGTH = 3;
+const SHORT_TOKEN_ALLOWLIST = new Set(['ai', 'ml', 'ui', 'ux', 'qa', '3d']);
 const STOPWORDS = new Set([
   'a', 'an', 'and', 'as', 'at', 'be', 'by', 'for', 'from', 'in', 'into',
   'of', 'on', 'or', 'the', 'to', 'with', 'without', 'using', 'use',
+  'o', 'os', 'a', 'as', 'de', 'da', 'das', 'do', 'dos', 'e', 'em', 'na',
+  'nas', 'no', 'nos', 'para', 'por', 'com', 'sem', 'um', 'uma', 'uns',
+  'umas', 'ao', 'aos', 'que', 'como',
 ]);
 const ACTION_WORDS = new Set([
   'add', 'build', 'change', 'create', 'fix', 'implement', 'make', 'need',
   'setup', 'update', 'write',
+  'melhorar', 'corrigir', 'criar', 'fazer', 'ajustar', 'usar', 'quero',
 ]);
 
 const MODEL_HINTS = {
@@ -80,7 +86,7 @@ const DOMAIN_KEYWORDS = [
   {
     id: 'design-ui',
     proactive: ['data-analytics'],
-    kw: ['design-system', 'ui', 'ux', 'figma', 'canva', 'brand', 'palette', 'typography', 'wireframe', 'prototype', 'accessibility', 'a11y', 'wcag', 'visual', 'mockup', 'minimalist'],
+    kw: ['design-system', 'ui', 'ux', 'figma', 'canva', 'brand', 'branding', 'palette', 'typography', 'wireframe', 'prototype', 'accessibility', 'a11y', 'wcag', 'visual', 'mockup', 'minimalist', 'logo', 'icon', 'icone', 'ícone', 'identidade', 'simbolo', 'símbolo', 'topbar', 'taskbar'],
   },
   {
     id: 'mobile',
@@ -200,7 +206,10 @@ function loadIndex(indexPath) {
 }
 
 function normalize(s) {
-  return String(s || '').toLowerCase();
+  return String(s || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 }
 
 function tokenize(s) {
@@ -209,6 +218,14 @@ function tokenize(s) {
     .filter((token) => token && token.length > 1)
     .filter((token) => !STOPWORDS.has(token))
     .filter((token) => !ACTION_WORDS.has(token));
+}
+
+function buildTokenSet(text) {
+  return new Set(tokenize(text));
+}
+
+function isMeaningfulToken(token) {
+  return token.length >= MIN_TOKEN_LENGTH || SHORT_TOKEN_ALLOWLIST.has(token);
 }
 
 function scoreDomainText(task, domain) {
@@ -276,24 +293,43 @@ function scoreAsset(asset, taskTokens) {
   const nameText = normalize(`${asset.name} ${asset.id}`);
   const descText = normalize(asset.description);
   const keywordText = Array.isArray(asset.keywords) ? asset.keywords.map(normalize) : [];
+  const nameTokens = buildTokenSet(nameText.replace(/[:/]/g, ' '));
+  const descTokens = buildTokenSet(descText);
+  const keywordTokens = new Set(keywordText.flatMap((kw) => tokenize(kw)));
   let score = 0;
   const matched = [];
 
   for (const token of taskTokens) {
-    if (token.length < 2) continue;
+    if (!isMeaningfulToken(token)) continue;
     let tokenScore = 0;
-    if (nameText.includes(token)) tokenScore += 5;
-    if (descText.includes(token)) tokenScore += 2;
-    if (keywordText.some((kw) => kw.includes(token) || token.includes(kw))) tokenScore += 1;
+    if (nameTokens.has(token)) tokenScore += 6;
+    if (descTokens.has(token)) tokenScore += 3;
+    if (keywordTokens.has(token)) tokenScore += 2;
+    if (!tokenScore && token.length >= 5) {
+      if (nameText.includes(token)) tokenScore += 2;
+      if (descText.includes(token)) tokenScore += 1;
+    }
     if (tokenScore > 0) {
       score += tokenScore;
       matched.push(token);
     }
   }
 
+  const sourceText = normalize(asset.source || '');
+  if (sourceText.startsWith('user:') || sourceText.startsWith('codex:') || sourceText.startsWith('agents:')) {
+    score *= 1.08;
+  }
   if (asset.user_invocable) score *= 1.2;
   if (asset.type === 'skill') score *= 1.1;
   return { score, matched: Array.from(new Set(matched)).slice(0, 8) };
+}
+
+function canonicalAssetKey(asset) {
+  return [
+    normalize(asset.type),
+    normalize(asset.name),
+    normalize(asset.invoke),
+  ].join('::');
 }
 
 function invocationHint(asset) {
@@ -306,7 +342,7 @@ function invocationHint(asset) {
 function selectAssets(idx, task, options = {}) {
   const taskTokens = tokenize(task);
   const domainIds = detectDomains(task, idx, options.domains || []);
-  const byId = new Map();
+  const byKey = new Map();
   const domainReports = [];
 
   for (const domainId of domainIds) {
@@ -344,16 +380,17 @@ function selectAssets(idx, task, options = {}) {
     });
 
     for (const asset of ranked) {
-      const existing = byId.get(asset.id);
+      const key = canonicalAssetKey(asset);
+      const existing = byKey.get(key);
       if (!existing || asset.score > existing.score) {
-        byId.set(asset.id, asset);
+        byKey.set(key, asset);
       } else if (existing && asset.domain !== existing.domain) {
         existing.score = Number((existing.score + 1).toFixed(2));
       }
     }
   }
 
-  const picks = Array.from(byId.values())
+  const picks = Array.from(byKey.values())
     .filter((asset) => asset.score >= STRONG_MATCH_THRESHOLD)
     .sort((a, b) => b.score - a.score)
     .slice(0, options.limit || DEFAULT_LIMIT);

@@ -18,12 +18,16 @@ const crypto = require('crypto');
 
 const HOME = os.homedir();
 const CLAUDE_ROOT = path.join(HOME, '.claude');
+const CODEX_ROOT = path.join(HOME, '.codex');
+const USER_AGENTS_ROOT = path.join(HOME, '.agents');
 const INDEX_PATH = path.join(CLAUDE_ROOT, 'oracle-index.json');
 
 const SKILLS_ROOTS = [
   path.join(CLAUDE_ROOT, 'skills'),
   path.join(CLAUDE_ROOT, 'skills', 'learned'),
   path.join(CLAUDE_ROOT, 'skills', 'imported'),
+  path.join(CODEX_ROOT, 'skills'),
+  path.join(USER_AGENTS_ROOT, 'skills'),
 ];
 const AGENTS_ROOT = path.join(CLAUDE_ROOT, 'agents');
 const PLUGINS_ROOT = path.join(CLAUDE_ROOT, 'plugins');
@@ -167,7 +171,13 @@ function discoverSkills() {
         const id = `skill:${e.name}`;
         if (seen.has(id)) continue;
         seen.add(id);
-        out.push(buildSkillAsset(skillMd, `user:${path.relative(CLAUDE_ROOT, root)}`));
+        const relativeToClaude = path.relative(CLAUDE_ROOT, root);
+        const relativeToCodex = path.relative(CODEX_ROOT, root);
+        const relativeToAgents = path.relative(USER_AGENTS_ROOT, root);
+        let source = `user:${relativeToClaude}`;
+        if (!relativeToCodex.startsWith('..')) source = `codex:${relativeToCodex}`;
+        else if (!relativeToAgents.startsWith('..')) source = `agents:${relativeToAgents}`;
+        out.push(buildSkillAsset(skillMd, source));
       }
     }
   }
