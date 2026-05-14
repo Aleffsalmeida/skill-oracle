@@ -58,6 +58,16 @@ node ~/.claude/skills/skill-oracle/scripts/oracle-query.js "<task description>"
 
 The local runner reads `~/.claude/oracle-index.json`, detects domains, ranks assets directly, prints the top picks, and exits with code `2` when no strong local match exists. Treat exit code `2` as the signal to use the `find-skills` fallback.
 
+### Model policy
+
+Use the smallest model that can safely finish the work.
+
+- **simple tasks:** prefer `claude-haiku-4-5` or `gpt-5.4-mini`
+- **medium tasks:** prefer `claude-sonnet-4-6` or `gpt-5.4`
+- **heavy / multi-domain tasks:** prefer `claude-opus-4-7` or `gpt-5.5`
+
+If the task is clearly local and low-risk, do not spend an expensive model on it. Escalate only when the task spans multiple domains, needs deep reasoning, or the cheaper model cannot close the loop cleanly.
+
 The bootstrap preflight should report the detected executor explicitly:
 
 - `Task` for Claude Code

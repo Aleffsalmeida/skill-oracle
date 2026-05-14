@@ -65,6 +65,14 @@ The old `build-index.js` is preserved for backward compat. New pipeline is `scan
 
 Every asset carries a `domain` and `master_agent` tag in the index. In Claude Code, the Oracle dispatches in parallel and each master sees only its own cluster. In Codex/local runtimes, `scripts/oracle-query.js` reads the same index and ranks assets directly without requiring Claude Code's `Task` dispatcher.
 
+The local runner also emits a model hint so simple tasks can stay on a cheaper model by default:
+
+- **simple** -> `claude-haiku-4-5` / `gpt-5.4-mini`
+- **medium** -> `claude-sonnet-4-6` / `gpt-5.4`
+- **heavy** -> `claude-opus-4-7` / `gpt-5.5`
+
+Rule of thumb: start with the smallest model that can safely close the task, and only escalate when the task is multi-domain, long-running, or architecture-heavy.
+
 ---
 
 ## Architecture

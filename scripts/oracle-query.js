@@ -28,6 +28,19 @@ const ACTION_WORDS = new Set([
   'setup', 'update', 'write',
 ]);
 
+const MODEL_HINTS = {
+  claude: {
+    simple: 'claude-haiku-4-5',
+    medium: 'claude-sonnet-4-6',
+    heavy: 'claude-opus-4-7',
+  },
+  codex: {
+    simple: 'gpt-5.4-mini',
+    medium: 'gpt-5.4',
+    heavy: 'gpt-5.5',
+  },
+};
+
 const DOMAIN_KEYWORDS = [
   {
     id: 'web-dev',
@@ -233,6 +246,32 @@ function detectDomains(task, idx, forcedDomains = []) {
   return unique.slice(0, MAX_DOMAINS);
 }
 
+function estimateComplexity(task, domains, picks) {
+  const text = normalize(task);
+  const tokens = tokenize(task);
+  let score = 0;
+
+  if (domains.length >= 3) score += 2;
+  else if (domains.length >= 2) score += 1;
+
+  if (picks.length >= 5) score += 1;
+  if (tokens.length >= 18) score += 1;
+  if (/\b(parallel|architecture|system|migration|refactor|rewrite|end-to-end|multi-step|cross-domain)\b/.test(text)) score += 1;
+  if (/\b(debug|fix|repair|review|audit|test|validate)\b/.test(text)) score += 1;
+
+  if (score <= 1) return 'simple';
+  if (score <= 3) return 'medium';
+  return 'heavy';
+}
+
+function recommendedModels(complexity) {
+  return {
+    complexity,
+    claude: MODEL_HINTS.claude[complexity],
+    codex: MODEL_HINTS.codex[complexity],
+  };
+}
+
 function scoreAsset(asset, taskTokens) {
   const nameText = normalize(`${asset.name} ${asset.id}`);
   const descText = normalize(asset.description);
@@ -319,6 +358,9 @@ function selectAssets(idx, task, options = {}) {
     .sort((a, b) => b.score - a.score)
     .slice(0, options.limit || DEFAULT_LIMIT);
 
+  const complexity = estimateComplexity(task, domainIds, picks);
+  const modelHints = recommendedModels(complexity);
+
   return {
     task,
     domains: domainIds,
@@ -326,6 +368,7 @@ function selectAssets(idx, task, options = {}) {
     domainReports,
     suggestions: proactiveSuggestions(task, domainIds, idx),
     fallbackRecommended: picks.length === 0,
+    modelHints,
   };
 }
 
@@ -379,6 +422,9 @@ function formatResult(result) {
   const lines = [];
   lines.push(`Oracle local picks for: ${result.task}`);
   lines.push(`Domains: ${result.domains.join(', ')}`);
+  if (result.modelHints) {
+    lines.push(`Model hint: ${result.modelHints.complexity} | Claude=${result.modelHints.claude} | Codex=${result.modelHints.codex}`);
+  }
   lines.push('');
 
   if (!result.picks.length) {
