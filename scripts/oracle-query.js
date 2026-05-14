@@ -403,6 +403,27 @@ function formatResult(result) {
   return lines.join('\n');
 }
 
+function formatBlockingPreflight(preflight) {
+  const lines = [];
+  lines.push('Oracle blocked: the host is not ready for routing.');
+  lines.push(`Runtime: ${preflight.preflight.runtime}`);
+  lines.push(`Executor: ${preflight.preflight.executor?.name || 'unknown'} (${preflight.preflight.executor?.kind || 'unknown'})`);
+  lines.push(`Index: ${preflight.preflight.index_exists ? 'present' : 'missing'}${preflight.preflight.index_fresh ? ' / fresh' : ' / stale'}`);
+  lines.push(`Masters: ${preflight.preflight.masters_installed}/${preflight.preflight.masters_expected}`);
+  lines.push(`Session hook: ${preflight.preflight.session_hook_installed ? 'installed' : 'missing'}`);
+
+  const actions = preflight.preflight.required_actions || preflight.preflight.warnings || [];
+  if (actions.length) {
+    lines.push('What to do:');
+    for (const action of actions) {
+      lines.push(`- ${action}`);
+    }
+  }
+
+  lines.push('Run `node ~/.claude/skills/skill-oracle/scripts/oracle-bootstrap.js --install` to repair local configuration when the host supports it.');
+  return lines.join('\n');
+}
+
 async function main(argv = process.argv.slice(2)) {
   const args = parseArgs(argv);
   if (args.help) {
@@ -423,6 +444,15 @@ async function main(argv = process.argv.slice(2)) {
     for (const warning of preflight.warnings) {
       console.error(`[oracle-bootstrap] warning: ${warning}`);
     }
+  }
+
+  if (!preflight.preflight.ready) {
+    if (args.json) {
+      console.log(JSON.stringify({ blocked: true, preflight }, null, 2));
+    } else {
+      console.error(formatBlockingPreflight(preflight));
+    }
+    return 1;
   }
 
   const idx = loadIndex(args.indexPath);

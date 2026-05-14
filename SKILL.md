@@ -65,6 +65,8 @@ The bootstrap preflight should report the detected executor explicitly:
 - `oracle-query.js` for Codex/local
 - `none` when the host does not expose a dispatch path
 
+If the preflight is not ready, Oracle must stop before routing and print the exact actions needed to repair the host or local installation.
+
 ### Step 0 — Bootstrap detection
 
 Before any routing, run the Oracle bootstrap:

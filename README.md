@@ -127,6 +127,8 @@ The preflight report now states which dispatch mechanism the host is expected to
 - `oracle-query.js` on Codex/local
 - `none` when no executor is detectable
 
+When preflight is not ready, Oracle stops before routing and prints the exact repair steps instead of trying to continue with a broken host setup.
+
 ### Step 3 — Add the auto-rebuild hook (one-time, optional if you used `--install`)
 
 If you did not run `--install`, add the SessionStart hook in `~/.claude/settings.json`:

@@ -131,6 +131,17 @@ function buildPreflightReport() {
   const mastersInstalled = countInstalledMasters();
   const hookInstalled = settings ? sessionHookExists(settings) : false;
   const indexFresh = isIndexFresh();
+  const runtimeKnown = runtime !== 'unknown';
+  const executorReady = executor.name !== 'none' && executor.kind !== 'unknown';
+  const requiredActions = [
+    !runtimeKnown ? 'Set up the host runtime so Oracle can identify Claude Code, Overclock, or Codex/local.' : null,
+    !executorReady ? `Expose a supported executor (${executor.dispatch}).` : null,
+    !indexExists ? 'Run Oracle bootstrap to build the unified index.' : null,
+    indexExists && !indexFresh ? 'Run Oracle bootstrap to refresh the unified index.' : null,
+    !settingsExists ? 'Create ~/.claude/settings.json or run Oracle with --install to generate the SessionStart hook.' : null,
+    settingsExists && !hookInstalled ? 'Run Oracle bootstrap with --install so the SessionStart hook is installed.' : null,
+    mastersInstalled < REQUIRED_MASTER_COUNT ? `Install the missing Oracle master agents (${mastersInstalled}/${REQUIRED_MASTER_COUNT} present).` : null,
+  ].filter(Boolean);
 
   return {
     runtime,
@@ -142,7 +153,8 @@ function buildPreflightReport() {
     masters_installed: mastersInstalled,
     masters_expected: REQUIRED_MASTER_COUNT,
     manifest_version: remoteManifest?.version || '0.0.0',
-    ready: indexExists && indexFresh && hookInstalled && mastersInstalled >= REQUIRED_MASTER_COUNT,
+    ready: runtimeKnown && executorReady && indexExists && indexFresh && hookInstalled && mastersInstalled >= REQUIRED_MASTER_COUNT,
+    required_actions: requiredActions,
     warnings: [
       !indexExists ? 'Oracle index is missing.' : null,
       !indexFresh ? 'Oracle index is stale or invalid.' : null,
@@ -150,6 +162,7 @@ function buildPreflightReport() {
       settingsExists && !hookInstalled ? 'Oracle SessionStart hook is missing.' : null,
       mastersInstalled < REQUIRED_MASTER_COUNT ? `Only ${mastersInstalled}/${REQUIRED_MASTER_COUNT} Oracle master agents are installed.` : null,
       runtime === 'unknown' ? 'Runtime could not be identified from local environment hints.' : null,
+      executorReady ? null : `No supported executor is available for ${runtime}.`,
     ].filter(Boolean),
   };
 }
