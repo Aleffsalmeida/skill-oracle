@@ -11,13 +11,17 @@ const CLAUDE_ROOT = path.join(HOME, '.claude');
 const INDEX_PATH = path.join(CLAUDE_ROOT, 'oracle-index.json');
 const SETTINGS_PATH = path.join(CLAUDE_ROOT, 'settings.json');
 const LOCAL_MANIFEST_PATH = path.join(REPO_ROOT, 'oracle-manifest.json');
+const GITHUB_REPO = 'Aleffsalmeida/skill-oracle';
+const GITHUB_BRANCH = 'main';
 const REMOTE_MANIFEST_URL = 'https://raw.githubusercontent.com/Aleffsalmeida/skill-oracle/main/oracle-manifest.json';
 const REMOTE_RAW_BASE = 'https://raw.githubusercontent.com/Aleffsalmeida/skill-oracle/main';
+const REMOTE_API_BASE = `https://api.github.com/repos/${GITHUB_REPO}/contents`;
 const BOOTSTRAP_SCRIPTS = ['scanner.js', 'classifier.js', 'gen-masters.js', 'install-agents.js'];
 const SESSION_HOOK_COMMAND = 'node ~/.claude/skills/skill-oracle/scripts/auto-rebuild.js';
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 10000;
 const REQUIRED_MASTER_COUNT = 20;
+const GH_AUTH_CACHE = { checked: false, available: false };
 
 function readJson(filePath, fallback = null) {
   try {
@@ -166,6 +170,52 @@ async function fetchText(url) {
   return res.text();
 }
 
+function getGitHubToken() {
+  return process.env.ORACLE_GITHUB_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
+}
+
+function ghAvailable() {
+  if (GH_AUTH_CACHE.checked) {
+    return GH_AUTH_CACHE.available;
+  }
+
+  const token = getGitHubToken();
+  if (token) {
+    GH_AUTH_CACHE.checked = true;
+    GH_AUTH_CACHE.available = true;
+    return true;
+  }
+
+  const result = spawnSync('gh', ['auth', 'status'], { encoding: 'utf8', timeout: 8000 });
+  GH_AUTH_CACHE.checked = true;
+  GH_AUTH_CACHE.available = result.status === 0;
+  return GH_AUTH_CACHE.available;
+}
+
+function ghApiContent(relativePath) {
+  const safePath = relativePath.replace(/\\/g, '/').replace(/^\/+/, '');
+  const endpoint = `repos/${GITHUB_REPO}/contents/${safePath}?ref=${GITHUB_BRANCH}`;
+  const args = ['api', endpoint, '-H', 'Accept: application/vnd.github.raw'];
+  if (getGitHubToken()) {
+    args.unshift('--silent');
+  }
+  const env = { ...process.env };
+  if (getGitHubToken()) {
+    env.GITHUB_TOKEN = getGitHubToken();
+    env.GH_TOKEN = getGitHubToken();
+  }
+  const result = spawnSync('gh', args, {
+    encoding: 'utf8',
+    timeout: FETCH_TIMEOUT_MS,
+    env,
+  });
+  if (result.status !== 0) {
+    const stderr = String(result.stderr || '').trim();
+    throw new Error(stderr || `gh api failed for ${safePath}`);
+  }
+  return result.stdout;
+}
+
 function scriptPath(name) {
   return path.join(__dirname, name);
 }
@@ -184,11 +234,15 @@ function runScript(name, args = []) {
 async function downloadManifestFile(relativePath) {
   const safePath = relativePath.replace(/\\/g, '/').replace(/^\/+/, '');
   const localPath = path.join(REPO_ROOT, safePath);
-  const remoteUrl = `${REMOTE_RAW_BASE}/${safePath}`;
-  const content = await fetchText(remoteUrl);
+  const content = ghAvailable()
+    ? ghApiContent(safePath)
+    : await fetchText(`${REMOTE_RAW_BASE}/${safePath}`);
   ensureDir(localPath);
   fs.writeFileSync(localPath, content, 'utf8');
-  return { path: localPath, url: remoteUrl };
+  return {
+    path: localPath,
+    url: ghAvailable() ? `gh api ${GITHUB_REPO}/contents/${safePath}` : `${REMOTE_RAW_BASE}/${safePath}`,
+  };
 }
 
 async function syncRemoteManifest(manifest) {
@@ -237,8 +291,15 @@ function ensureSessionHook() {
 
 async function fetchRemoteManifestSafe(warnings) {
   try {
-    return { manifest: await fetchJson(REMOTE_MANIFEST_URL), error: null };
+    if (ghAvailable()) {
+      return { manifest: JSON.parse(ghApiContent('oracle-manifest.json')), error: null, source: 'gh' };
+    }
+    return { manifest: await fetchJson(REMOTE_MANIFEST_URL), error: null, source: 'raw' };
   } catch (error) {
+    const ghHint = ghAvailable() ? '' : ' Authenticate GitHub with `gh auth login` or set `ORACLE_GITHUB_TOKEN`/`GITHUB_TOKEN` for private repos.';
+    if (Array.isArray(warnings) && ghHint) {
+      warnings.push(`Oracle remote manifest fetch failed.${ghHint}`);
+    }
     return { manifest: null, error: error.message };
   }
 }
