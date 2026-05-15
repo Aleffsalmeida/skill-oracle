@@ -7,6 +7,10 @@
  * subagent dispatcher. It reads ~/.claude/oracle-index.json, detects relevant
  * domains from a natural-language task, ranks assets directly, and prints the
  * top picks. It is intentionally deterministic and dependency-free.
+ *
+ * When oracle-embeddings.json exists and an API key is configured, semantic
+ * embedding similarity is used to augment keyword-based domain detection and
+ * asset scoring (hybrid: keyword score + embedding bonus).
  */
 
 const fs = require('fs');
@@ -16,6 +20,7 @@ const { run: runBootstrap } = require('./oracle-bootstrap');
 
 const HOME = os.homedir();
 const DEFAULT_INDEX = path.join(HOME, '.claude', 'oracle-index.json');
+const EMBED_INDEX = path.join(HOME, '.claude', 'oracle-embeddings.json');
 const STRONG_MATCH_THRESHOLD = 5;
 const MAX_DOMAINS = 5;
 const DEFAULT_LIMIT = 5;
@@ -167,6 +172,21 @@ const INTENT_PATTERNS = [
 
 const TYPE_PRIORITY = { skill: 4, agent: 3, mcp: 2, plugin: 1 };
 
+// Lazy-load embedding modules — silently skipped if not installed
+let _embedMods = null;
+function getEmbedMods() {
+  if (_embedMods !== null) return _embedMods;
+  try {
+    _embedMods = {
+      config: require('./embed-config'),
+      embed: require('./embeddings'),
+    };
+  } catch (_) {
+    _embedMods = false;
+  }
+  return _embedMods;
+}
+
 function usage() {
   return [
     'Usage:',
@@ -181,6 +201,7 @@ function usage() {
     '  --domain <id>     Force one or more domains; repeatable',
     '  --json            Print machine-readable JSON',
     '  --index <path>    Use a custom oracle-index.json',
+    '  --no-embed        Disable embedding enhancement for this query',
   ].join('\n');
 }
 
@@ -196,6 +217,7 @@ function parseArgs(argv) {
     listDomains: false,
     rebuild: false,
     help: false,
+    noEmbed: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -206,6 +228,7 @@ function parseArgs(argv) {
     else if (arg === '--stats') out.stats = true;
     else if (arg === '--list-domains') out.listDomains = true;
     else if (arg === '--rebuild') out.rebuild = true;
+    else if (arg === '--no-embed') out.noEmbed = true;
     else if (arg === '--limit') out.limit = Number(argv[++i] || DEFAULT_LIMIT);
     else if (arg === '--domain') out.domains.push(argv[++i]);
     else if (arg === '--index') out.indexPath = path.resolve(argv[++i]);
@@ -232,7 +255,7 @@ function loadIndex(indexPath) {
 function normalize(s) {
   return String(s || '')
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .toLowerCase();
 }
 
@@ -587,13 +610,53 @@ function mergeBundleIntoPicks(bundle, picks, limit) {
   return merged;
 }
 
-function selectAssets(idx, task, options = {}) {
-  const taskTokens = tokenize(task);
+async function selectAssets(idx, task, options = {}) {
+  // Keyword-based domain detection (baseline)
   const domainIds = detectDomains(task, idx, options.domains || []);
+  const taskTokens = tokenize(task);
+
+  // Embedding enhancement: load pre-built vectors and embed the query
+  let queryVector = null;
+  let embedData = null;
+  if (!options.noEmbed) {
+    const mods = getEmbedMods();
+    if (mods && fs.existsSync(EMBED_INDEX)) {
+      try {
+        embedData = JSON.parse(fs.readFileSync(EMBED_INDEX, 'utf8'));
+        const apiConfig = mods.config.getApiKey();
+        if (apiConfig) {
+          const [v] = await mods.embed.embedTexts([task.slice(0, 512)], apiConfig);
+          queryVector = v;
+        }
+      } catch (_) {
+        embedData = null;
+        queryVector = null;
+      }
+    }
+  }
+
+  // Augment domain detection with centroid similarity when embedding is available
+  let finalDomainIds = domainIds;
+  if (queryVector && embedData && embedData.domain_centroids) {
+    const { cosineSimilarity } = getEmbedMods().embed;
+    const embScored = DOMAIN_KEYWORDS
+      .map((d) => ({
+        id: d.id,
+        sim: embedData.domain_centroids[d.id]
+          ? cosineSimilarity(queryVector, embedData.domain_centroids[d.id])
+          : 0,
+      }))
+      .sort((a, b) => b.sim - a.sim);
+    // Merge top embedding domains with keyword domains (embedding adds missing domains)
+    const topEmbDomains = embScored.slice(0, 3).filter((d) => d.sim > 0.35).map((d) => d.id);
+    const merged = [...new Set([...topEmbDomains, ...domainIds])].slice(0, MAX_DOMAINS);
+    if (merged.length) finalDomainIds = merged;
+  }
+
   const byKey = new Map();
   const domainReports = [];
 
-  for (const domainId of domainIds) {
+  for (const domainId of finalDomainIds) {
     const domain = idx.domains.find((d) => d.id === domainId);
     if (!domain) continue;
 
@@ -601,7 +664,19 @@ function selectAssets(idx, task, options = {}) {
     const ranked = assets
       .map((asset) => {
         const result = scoreAsset(asset, taskTokens);
-        return enrichRankedAsset(asset, domain, result);
+        let { score } = result;
+
+        // Additive embedding bonus: semantically similar assets get a boost
+        if (queryVector && embedData && embedData.assets) {
+          const assetEmbed = embedData.assets.find((e) => e.id === asset.name);
+          if (assetEmbed) {
+            const sim = getEmbedMods().embed.cosineSimilarity(queryVector, assetEmbed.vector);
+            // Bonus up to +18 for sim=1.0 (threshold at 0.4 to avoid noise)
+            if (sim > 0.4) score += (sim - 0.4) * 30;
+          }
+        }
+
+        return enrichRankedAsset(asset, domain, { score, matched: result.matched });
       })
       .filter((asset) => asset.score > 0)
       .sort((a, b) => {
@@ -631,12 +706,13 @@ function selectAssets(idx, task, options = {}) {
   const bundle = buildRecommendedBundle(domainReports, rankedPicks, task);
   const picks = mergeBundleIntoPicks(bundle, rankedPicks, options.limit || DEFAULT_LIMIT);
 
-  const complexity = estimateComplexity(task, domainIds, picks);
+  const complexity = estimateComplexity(task, finalDomainIds, picks);
   const modelHints = recommendedModels(complexity);
 
   return {
     task,
-    domains: domainIds,
+    domains: finalDomainIds,
+    embeddingUsed: queryVector !== null,
     picks,
     bundle,
     domainReports,
@@ -646,7 +722,7 @@ function selectAssets(idx, task, options = {}) {
       thesis: report.thesis,
       bundle: (report.bundle || []).map((asset) => asset.name),
     })),
-    suggestions: proactiveSuggestions(task, domainIds, idx),
+    suggestions: proactiveSuggestions(task, finalDomainIds, idx),
     fallbackRecommended: picks.length === 0,
     modelHints,
   };
@@ -702,6 +778,7 @@ function formatResult(result) {
   const lines = [];
   lines.push(`Oracle local picks for: ${result.task}`);
   lines.push(`Domains: ${result.domains.join(', ')}`);
+  if (result.embeddingUsed) lines.push('Mode: semantic (keyword + embedding hybrid)');
   if (result.modelHints) {
     lines.push(`Model hint: ${result.modelHints.complexity} | Claude=${result.modelHints.claude} | Codex=${result.modelHints.codex}`);
   }
@@ -831,7 +908,7 @@ async function main(argv = process.argv.slice(2)) {
     return 1;
   }
 
-  const result = selectAssets(idx, args.task, args);
+  const result = await selectAssets(idx, args.task, args);
   if (args.json) console.log(JSON.stringify(result, null, 2));
   else console.log(formatResult(result));
   return result.fallbackRecommended ? 2 : 0;
