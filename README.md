@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/schema-v2-purple?style=flat-square" alt="schema"/>
 </p>
 
-**Single entry point for 5,000+ Claude Code and Codex-local assets.** Indexes Skills, Agents, Plugins, and MCP servers — then routes any task to the right Master Agent in Claude Code or to the local deterministic selector in Codex-compatible runtimes.
+**Single entry point for 5,000+ Claude Code and Codex-local assets.** Indexes Skills, Agents, Plugins, and MCP servers — then routes any task to the right Master Agent in Claude Code or to the local semantic selector in Codex-compatible runtimes.
 
 Loads minutes-of-overhead environments in seconds. Built for Claude Code users who have hundreds of plugins and don't want to pay token cost on every prompt.
 
@@ -25,7 +25,7 @@ Loads minutes-of-overhead environments in seconds. Built for Claude Code users w
 | Asset types | Skills only | Skills + Agents + Plugins + MCP |
 | Index size | ~90 skills | 5,000+ assets typical |
 | Discovery | Read every SKILL.md description on demand | 20 domain Master Agents in Claude Code; local domain selector in Codex |
-| Selection | Single-pass LLM ranking | Deterministic pre-filter + conditional debate |
+| Selection | Master-agent dispatch + debate | Semantic local selector over enriched skill content |
 | Lazy-loading | None | Optimizer disables non-Oracle SessionStart hooks |
 | Fallback | Manual `--compare` to find-skills | Automatic when no local match exists |
 
@@ -63,7 +63,15 @@ The old `build-index.js` is preserved for backward compat. New pipeline is `scan
               final answer
 ```
 
-Every asset carries a `domain` and `master_agent` tag in the index. In Claude Code, the Oracle dispatches in parallel and each master sees only its own cluster. In Codex/local runtimes, `scripts/oracle-query.js` reads the same index and ranks assets directly without requiring Claude Code's `Task` dispatcher.
+Every asset carries a `domain` and `master_agent` tag in the index. In Claude Code, the Oracle dispatches in parallel and each master sees only its own cluster. In Codex/local runtimes, `scripts/oracle-query.js` reads the same index, evaluates enriched semantic fields extracted from each `SKILL.md`, and ranks assets deterministically without requiring Claude Code's `Task` dispatcher.
+
+The local path is not a per-domain LLM orchestration layer. It is a semantic selector that approximates the master-agent bundle by combining:
+
+- `name`, `description`, and classification keywords
+- extracted `content_summary`, `use_when`, `workflow_terms`, and `capability_terms`
+- intent boosts for UI, desktop, branding, shortcuts, and tooling tasks
+
+This keeps the local runner fast and deterministic while still preserving most of the signal hidden inside the skill content.
 
 The local runner also emits a model hint so simple tasks can stay on a cheaper model by default:
 
@@ -96,7 +104,7 @@ skill-oracle/
     install-agents.js   # copies masters into ~/.claude/agents/
     optimizer.js        # settings.json lazy-loading optimizer
     auto-rebuild.js     # SessionStart hook entry point
-    oracle-query.js     # Codex/local selector; no Task dispatcher required
+    oracle-query.js     # Codex/local semantic selector; no Task dispatcher required
     oracle-smoke-test.js # local health check for scripts, index, agents, query
     build-index.js      # legacy v1 builder (kept for backward compat)
 ```
