@@ -36,6 +36,7 @@ const CASES = [
     task: 'preciso que o oracle junte as melhores skills para interface electron com identidade visual e atalhos do app',
     expectedDomains: ['tooling-meta', 'web-dev', 'design-ui'],
     expectedPickNames: ['skill-oracle', 'brandkit', 'design-taste-frontend'],
+    expectSynthesisUsed: true,
   },
   {
     name: 'fullstack-billing-tests',
@@ -58,6 +59,9 @@ async function checkCase(idx, testCase) {
   );
   assertCheck(result.bundle.length > 0, `[${testCase.name}] expected non-empty bundle`);
   assertCheck(result.virtualMasters.length > 0, `[${testCase.name}] expected virtual masters report`);
+  if (testCase.expectSynthesisUsed) {
+    assertCheck(result.synthesisUsed, `[${testCase.name}] expected synthesisUsed=true`);
+  }
 
   return {
     name: testCase.name,

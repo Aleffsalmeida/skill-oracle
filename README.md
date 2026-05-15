@@ -73,6 +73,8 @@ The local path is not a per-domain LLM orchestration layer. It is a semantic sel
 
 This keeps the local runner fast and deterministic while still preserving most of the signal hidden inside the skill content.
 
+When an OpenAI API key and the embedding index are available, ambiguous multi-domain queries may also trigger a synthesis pass via the OpenAI Responses API. That pass does not replace the local selector; it only reorders and compresses the bundle when the task clearly benefits from a higher-level synthesis step.
+
 The local runner also emits a model hint so simple tasks can stay on a cheaper model by default:
 
 - **simple** -> `claude-haiku-4-5` / `gpt-5.4-mini`

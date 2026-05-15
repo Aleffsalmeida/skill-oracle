@@ -21,6 +21,7 @@ const { run: runBootstrap } = require('./oracle-bootstrap');
 const HOME = os.homedir();
 const DEFAULT_INDEX = path.join(HOME, '.claude', 'oracle-index.json');
 const EMBED_INDEX = path.join(HOME, '.claude', 'oracle-embeddings.json');
+const SYNTHESIS_MODEL = process.env.ORACLE_SYNTHESIS_MODEL || 'gpt-5.4-mini';
 const STRONG_MATCH_THRESHOLD = 5;
 const MAX_DOMAINS = 5;
 const DEFAULT_LIMIT = 5;
@@ -185,6 +186,134 @@ function getEmbedMods() {
     _embedMods = false;
   }
   return _embedMods;
+}
+
+function getEmbeddingLookup(embedData) {
+  const byAsset = new Map();
+  const byDomain = new Map();
+  const byChunkAsset = new Map();
+
+  for (const asset of embedData.assets || []) {
+    if (asset && asset.id && asset.vector) {
+      byAsset.set(asset.id, asset);
+    }
+  }
+
+  for (const chunk of embedData.chunks || []) {
+    if (!chunk || !chunk.asset_id || !chunk.vector) continue;
+    if (!byChunkAsset.has(chunk.asset_id)) byChunkAsset.set(chunk.asset_id, []);
+    byChunkAsset.get(chunk.asset_id).push(chunk.vector);
+  }
+
+  for (const [domain, vector] of Object.entries(embedData.domain_centroids || {})) {
+    if (vector) byDomain.set(domain, vector);
+  }
+
+  return { byAsset, byDomain, byChunkAsset };
+}
+
+function scoreEmbeddingVector(queryVector, vector, cosineSimilarity) {
+  if (!queryVector || !vector) return 0;
+  return cosineSimilarity(queryVector, vector);
+}
+
+async function synthesizeBundleWithOpenAI({ task, domainReports, picks, bundle, domains, apiConfig }) {
+  if (!apiConfig || apiConfig.provider !== 'openai' || !apiConfig.key) return null;
+
+  const prompt = [
+    'Return only JSON with keys bundle_names, reasoning, caution.',
+    'bundle_names must contain at most 5 canonical asset names only, with no domain prefixes, ids, markdown, bullets, or extra text.',
+    'Choose the best cross-domain bundle for the task. Prefer the smallest set that covers the intent well.',
+    `Task: ${task}`,
+    `Domains: ${domains.join(', ')}`,
+    'Candidates:',
+    ...domainReports.slice(0, 4).map((report) => {
+      const names = (report.bundle || report.top || []).slice(0, 3).map((asset) => asset.name).join(', ');
+      return `- ${report.domain}: ${names}`;
+    }),
+  ].join('\n');
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 25000);
+  try {
+    const res = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiConfig.key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: SYNTHESIS_MODEL,
+        input: prompt,
+      }),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const textParts = [];
+    if (typeof data.output_text === 'string' && data.output_text.trim()) {
+      textParts.push(data.output_text.trim());
+    }
+    if (Array.isArray(data.output)) {
+      for (const item of data.output) {
+        if (!item || !Array.isArray(item.content)) continue;
+        for (const content of item.content) {
+          if (content && typeof content.text === 'string' && content.text.trim()) {
+            textParts.push(content.text.trim());
+          }
+        }
+      }
+    }
+    const text = textParts.join('\n').trim();
+    if (!text) return null;
+    const jsonText = text.match(/\{[\s\S]*\}/)?.[0] || text;
+    const parsed = JSON.parse(jsonText);
+    if (!Array.isArray(parsed.bundle_names)) return null;
+    if (Array.isArray(parsed.caution)) {
+      parsed.caution = parsed.caution.join(' | ');
+    }
+    return parsed;
+  } catch (_error) {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function registerLookup(lookup, asset) {
+  if (!asset) return;
+  const keys = new Set();
+  if (asset.id) keys.add(String(asset.id));
+  if (asset.name) keys.add(String(asset.name));
+  if (asset.invoke && typeof asset.invoke === 'string') {
+    const match = asset.invoke.match(/["']([^"']+)["']/);
+    if (match && match[1]) keys.add(match[1]);
+  }
+  if (asset.domain && asset.name) {
+    keys.add(`${asset.domain}.${asset.name}`);
+    keys.add(`${asset.domain}/${asset.name}`);
+    keys.add(`${asset.domain}:${asset.name}`);
+  }
+  if (asset.id && asset.id.includes(':')) {
+    keys.add(asset.id.split(':').pop());
+  }
+  if (asset.id && asset.id.includes('/')) {
+    keys.add(asset.id.split('/').pop());
+  }
+  if (asset.name && asset.name.includes('.')) {
+    keys.add(asset.name.split('.').pop());
+  }
+  for (const key of keys) {
+    lookup.set(normalize(key), asset);
+  }
+}
+
+function buildSynthesisLookup(picks, rankedPicks, domainReports) {
+  const lookup = new Map();
+  for (const asset of [...picks, ...rankedPicks, ...domainReports.flatMap((report) => report.top || [])]) {
+    registerLookup(lookup, asset);
+  }
+  return lookup;
 }
 
 function usage() {
@@ -618,12 +747,15 @@ async function selectAssets(idx, task, options = {}) {
   // Embedding enhancement: load pre-built vectors and embed the query
   let queryVector = null;
   let embedData = null;
+  let embedLookup = null;
+  let apiConfig = null;
   if (!options.noEmbed) {
     const mods = getEmbedMods();
     if (mods && fs.existsSync(EMBED_INDEX)) {
       try {
         embedData = JSON.parse(fs.readFileSync(EMBED_INDEX, 'utf8'));
-        const apiConfig = mods.config.getApiKey();
+        embedLookup = getEmbeddingLookup(embedData);
+        apiConfig = mods.config.getApiKey();
         if (apiConfig) {
           const [v] = await mods.embed.embedTexts([task.slice(0, 512)], apiConfig);
           queryVector = v;
@@ -644,8 +776,8 @@ async function selectAssets(idx, task, options = {}) {
     const centroidScores = new Map(
       DOMAIN_KEYWORDS.map((d) => [
         d.id,
-        embedData.domain_centroids[d.id]
-          ? cosineSimilarity(queryVector, embedData.domain_centroids[d.id])
+        embedLookup.byDomain.get(d.id)
+          ? scoreEmbeddingVector(queryVector, embedLookup.byDomain.get(d.id), cosineSimilarity)
           : 0,
       ]),
     );
@@ -679,13 +811,16 @@ async function selectAssets(idx, task, options = {}) {
         let { score } = result;
 
         // Additive embedding bonus: semantically similar assets get a boost
-        if (queryVector && embedData && embedData.assets) {
-          const assetEmbed = embedData.assets.find((e) => e.id === asset.name);
-          if (assetEmbed) {
-            const sim = getEmbedMods().embed.cosineSimilarity(queryVector, assetEmbed.vector);
-            // Bonus up to +27.5 for sim=1.0 (threshold at 0.45 to cut noise)
-            if (sim > 0.45) score += (sim - 0.45) * 50;
-          }
+        if (queryVector && embedLookup) {
+          const assetEmbed = embedLookup.byAsset.get(asset.name);
+          const chunkVectors = embedLookup.byChunkAsset.get(asset.name) || [];
+          const cosine = getEmbedMods().embed.cosineSimilarity;
+          const sims = [];
+          if (assetEmbed && assetEmbed.vector) sims.push(scoreEmbeddingVector(queryVector, assetEmbed.vector, cosine));
+          for (const vec of chunkVectors) sims.push(scoreEmbeddingVector(queryVector, vec, cosine));
+          const sim = sims.length ? Math.max(...sims) : 0;
+          // Bonus up to +27.5 for sim=1.0 (threshold at 0.45 to cut noise)
+          if (sim > 0.45) score += (sim - 0.45) * 50;
         }
 
         return enrichRankedAsset(asset, domain, { score, matched: result.matched });
@@ -718,6 +853,33 @@ async function selectAssets(idx, task, options = {}) {
   const bundle = buildRecommendedBundle(domainReports, rankedPicks, task);
   const picks = mergeBundleIntoPicks(bundle, rankedPicks, options.limit || DEFAULT_LIMIT);
 
+  let synthesis = null;
+  const topGap = rankedPicks.length >= 2 ? rankedPicks[0].score - rankedPicks[1].score : Infinity;
+  const ambiguous = finalDomainIds.length >= 2 && (topGap < 4 || picks.length >= 3 || /\boracle\b|\bjunt|bundle|compo/i.test(normalize(task)));
+  if (ambiguous) {
+    synthesis = await synthesizeBundleWithOpenAI({
+      task,
+      domainReports,
+      picks,
+      bundle,
+      domains: finalDomainIds,
+      apiConfig,
+    });
+  }
+
+  if (synthesis && Array.isArray(synthesis.bundle_names) && synthesis.bundle_names.length) {
+    const lookup = buildSynthesisLookup(picks, rankedPicks, domainReports);
+    const llmBundle = synthesis.bundle_names
+      .map((name) => lookup.get(normalize(name)))
+      .filter(Boolean);
+    if (llmBundle.length) {
+      synthesis.bundle = llmBundle.map((asset) => asset.name);
+      synthesis.bundle_names = llmBundle.map((asset) => asset.name);
+      synthesis.resolved_bundle = llmBundle;
+      picks.splice(0, picks.length, ...mergeBundleIntoPicks(llmBundle, rankedPicks, options.limit || DEFAULT_LIMIT));
+    }
+  }
+
   const complexity = estimateComplexity(task, finalDomainIds, picks);
   const modelHints = recommendedModels(complexity);
 
@@ -734,6 +896,8 @@ async function selectAssets(idx, task, options = {}) {
       thesis: report.thesis,
       bundle: (report.bundle || []).map((asset) => asset.name),
     })),
+    synthesis,
+    synthesisUsed: Boolean(synthesis),
     suggestions: proactiveSuggestions(task, finalDomainIds, idx),
     fallbackRecommended: picks.length === 0,
     modelHints,
@@ -793,6 +957,13 @@ function formatResult(result) {
   if (result.embeddingUsed) lines.push('Mode: semantic (keyword + embedding hybrid)');
   if (result.modelHints) {
     lines.push(`Model hint: ${result.modelHints.complexity} | Claude=${result.modelHints.claude} | Codex=${result.modelHints.codex}`);
+  }
+  if (result.synthesis && result.synthesis.reasoning) {
+    lines.push(`LLM synthesis: ${result.synthesis.reasoning}`);
+    if (result.synthesis.caution) {
+      lines.push(`Caution: ${result.synthesis.caution}`);
+    }
+    lines.push('');
   }
   lines.push('');
 
