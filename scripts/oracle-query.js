@@ -635,22 +635,34 @@ async function selectAssets(idx, task, options = {}) {
     }
   }
 
-  // Augment domain detection with centroid similarity when embedding is available
+  // Embedding-enhanced domain selection: filter false positives + add missed domains
   let finalDomainIds = domainIds;
   if (queryVector && embedData && embedData.domain_centroids) {
     const { cosineSimilarity } = getEmbedMods().embed;
-    const embScored = DOMAIN_KEYWORDS
-      .map((d) => ({
-        id: d.id,
-        sim: embedData.domain_centroids[d.id]
+
+    // Score every domain against the query vector
+    const centroidScores = new Map(
+      DOMAIN_KEYWORDS.map((d) => [
+        d.id,
+        embedData.domain_centroids[d.id]
           ? cosineSimilarity(queryVector, embedData.domain_centroids[d.id])
           : 0,
-      }))
-      .sort((a, b) => b.sim - a.sim);
-    // Merge top embedding domains with keyword domains (embedding adds missing domains)
-    const topEmbDomains = embScored.slice(0, 3).filter((d) => d.sim > 0.35).map((d) => d.id);
-    const merged = [...new Set([...topEmbDomains, ...domainIds])].slice(0, MAX_DOMAINS);
-    if (merged.length) finalDomainIds = merged;
+      ]),
+    );
+
+    // Filter keyword-detected domains: drop those with low centroid similarity (false positives)
+    const filteredKeyword = domainIds.filter((id) => (centroidScores.get(id) || 0) >= 0.25);
+
+    // Add high-confidence embedding-only domains the keywords missed
+    const embOnly = [...centroidScores.entries()]
+      .filter(([id, sim]) => sim >= 0.5 && !filteredKeyword.includes(id))
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 2)
+      .map(([id]) => id);
+
+    const merged = [...new Set([...filteredKeyword, ...embOnly])].slice(0, MAX_DOMAINS);
+    // Fallback: if filtering removed everything, keep top keyword domain
+    finalDomainIds = merged.length > 0 ? merged : domainIds.slice(0, 1);
   }
 
   const byKey = new Map();
@@ -671,8 +683,8 @@ async function selectAssets(idx, task, options = {}) {
           const assetEmbed = embedData.assets.find((e) => e.id === asset.name);
           if (assetEmbed) {
             const sim = getEmbedMods().embed.cosineSimilarity(queryVector, assetEmbed.vector);
-            // Bonus up to +18 for sim=1.0 (threshold at 0.4 to avoid noise)
-            if (sim > 0.4) score += (sim - 0.4) * 30;
+            // Bonus up to +27.5 for sim=1.0 (threshold at 0.45 to cut noise)
+            if (sim > 0.45) score += (sim - 0.45) * 50;
           }
         }
 
