@@ -1,6 +1,6 @@
 {
-  "version": "2.2.0",
-  "updated_at": "2026-05-14T01:00:00Z",
+  "version": "2.3.0",
+  "updated_at": "2026-05-14T21:00:00Z",
   "paths": [
     "SKILL.md",
     "README.md",
@@ -8,7 +8,10 @@
     "assets/demo.svg",
     "scripts/auto-rebuild.js",
     "scripts/build-index.js",
+    "scripts/build-embeddings.js",
     "scripts/classifier.js",
+    "scripts/embed-config.js",
+    "scripts/embeddings.js",
     "scripts/gen-masters.js",
     "scripts/install-agents.js",
     "scripts/optimizer.js",
@@ -16,6 +19,7 @@
     "scripts/oracle-query.js",
     "scripts/oracle-smoke-test.js",
     "scripts/scanner.js",
+    "scripts/setup.js",
     "agents/oracle-master-ai.md",
     "agents/oracle-master-analytics.md",
     "agents/oracle-master-backend.md",

@@ -360,6 +360,19 @@ function getLocalManifest() {
   return manifest && manifest.version ? manifest : { version: '0.0.0', paths: [] };
 }
 
+function tryBuildEmbeddings(quiet) {
+  try {
+    const embedConfig = require('./embed-config');
+    const apiConfig = embedConfig.getApiKey();
+    if (!apiConfig) return { built: false, reason: 'no-api-key' };
+    if (!quiet) process.stdout.write('[oracle-bootstrap] Building embedding index...\n');
+    runScript('build-embeddings.js');
+    return { built: true };
+  } catch (_) {
+    return { built: false, reason: 'skipped' };
+  }
+}
+
 async function run(options = {}) {
   const {
     update = true,
@@ -375,6 +388,7 @@ async function run(options = {}) {
     updated: false,
     repaired: false,
     hookInstalled: false,
+    embeddingsBuilt: false,
     updateFrom: null,
     updateTo: null,
     remoteFetchError: null,
@@ -400,6 +414,9 @@ async function run(options = {}) {
     for (const script of BOOTSTRAP_SCRIPTS) {
       runScript(script);
     }
+    // Build embedding index when API key is configured
+    const embedResult = tryBuildEmbeddings(quiet);
+    actions.embeddingsBuilt = embedResult.built;
     actions.repaired = true;
   }
 
@@ -454,6 +471,9 @@ if (require.main === module) {
       }
       if (out.actions.updated) {
         process.stdout.write(`[oracle-bootstrap] updated from ${out.actions.updateFrom} to ${out.actions.updateTo}\n`);
+      }
+      if (out.actions.embeddingsBuilt) {
+        process.stdout.write('[oracle-bootstrap] embedding index built\n');
       }
       if (out.actions.hookInstalled) {
         process.stdout.write(`[oracle-bootstrap] installed SessionStart hook${out.actions.backupPath ? ` (backup: ${out.actions.backupPath})` : ''}\n`);
