@@ -105,7 +105,7 @@ const DOMAIN_KEYWORDS = [
   {
     id: 'design-ui',
     proactive: ['data-analytics'],
-    kw: ['design-system', 'ui', 'ux', 'figma', 'canva', 'brand', 'branding', 'palette', 'typography', 'wireframe', 'prototype', 'accessibility', 'a11y', 'wcag', 'visual', 'mockup', 'minimalist', 'logo', 'icon', 'icone', 'ícone', 'identidade', 'simbolo', 'símbolo', 'topbar', 'taskbar', 'botao', 'botão', 'botoes', 'botões', 'shortcut', 'atalho'],
+    kw: ['design-system', 'ui', 'ux', 'figma', 'canva', 'brand', 'branding', 'palette', 'typography', 'wireframe', 'prototype', 'accessibility', 'a11y', 'wcag', 'visual', 'mockup', 'minimalist', 'logo', 'icon', 'icone', 'ícone', 'identidade', 'simbolo', 'símbolo', 'topbar', 'taskbar', 'botao', 'botão', 'botoes', 'botões', 'shortcut', 'atalho', 'remotion', 'stitch-design', 'stitch', 'imagegen', 'image-gen', 'image-direction', 'motion-design', 'animation', 'frontend-design', 'design-taste', 'taste-design', 'high-end-visual', 'polish', 'impeccable', 'image-to-code', 'visual-design', 'emil-design', 'component-design', 'ui-design', 'interface-design', 'hyperframe', 'hyperframes', 'video', 'motion', 'lottie', 'gsap', 'animejs', 'composition', 'render', 'liquid-glass', 'industrial-brutalist', 'brandkit'],
   },
   {
     id: 'mobile',
