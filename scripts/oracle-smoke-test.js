@@ -62,9 +62,9 @@ function checkAgents(idx) {
   assertCheck(missing.length === 0, `missing master agents: ${missing.join(', ')}`);
 }
 
-function checkQuery(idx) {
+async function checkQuery(idx) {
   const task = 'build a React dashboard with Stripe billing and Playwright tests';
-  const result = selectAssets(idx, task, { limit: 5 });
+  const result = await selectAssets(idx, task, { limit: 5 });
   for (const domain of ['web-dev', 'testing-qa', 'finance-billing']) {
     assertCheck(result.domains.includes(domain), `query should include domain ${domain}`);
   }
@@ -84,11 +84,11 @@ function checkAutoRebuild() {
   assertCheck(result.status === 0, `auto-rebuild failed: ${result.stderr || result.stdout}`);
 }
 
-function checkRegression() {
-  runRegression();
+async function checkRegression() {
+  await runRegression();
 }
 
-function main() {
+async function main() {
   const checks = [
     ['scripts present', () => checkScripts()],
     ['index valid', () => checkIndex(loadIndex(DEFAULT_INDEX))],
@@ -101,7 +101,7 @@ function main() {
 
   const passed = [];
   for (const [label, fn] of checks) {
-    fn();
+    await fn();
     passed.push(label);
     console.log(`ok - ${label}`);
   }
@@ -113,7 +113,10 @@ function main() {
 
 if (require.main === module) {
   try {
-    main();
+    main().catch((e) => {
+      console.error(`[oracle-smoke-test] failed: ${e.message}`);
+      process.exitCode = 1;
+    });
   } catch (e) {
     console.error(`[oracle-smoke-test] failed: ${e.message}`);
     process.exitCode = 1;

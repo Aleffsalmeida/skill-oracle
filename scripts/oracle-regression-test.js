@@ -45,8 +45,8 @@ const CASES = [
   },
 ];
 
-function checkCase(idx, testCase) {
-  const result = selectAssets(idx, testCase.task, { limit: 8 });
+async function checkCase(idx, testCase) {
+  const result = await selectAssets(idx, testCase.task, { limit: 8 });
   for (const domain of testCase.expectedDomains) {
     assertCheck(result.domains.includes(domain), `[${testCase.name}] expected domain ${domain}, got ${result.domains.join(', ')}`);
   }
@@ -67,9 +67,12 @@ function checkCase(idx, testCase) {
   };
 }
 
-function main() {
+async function main() {
   const idx = loadIndex(DEFAULT_INDEX);
-  const reports = CASES.map((testCase) => checkCase(idx, testCase));
+  const reports = [];
+  for (const testCase of CASES) {
+    reports.push(await checkCase(idx, testCase));
+  }
   for (const report of reports) {
     console.log(`ok - ${report.name}: ${report.domains.join(', ')} -> picks ${report.picks.join(', ')} | bundle ${report.bundle.join(', ')}`);
   }
@@ -78,7 +81,10 @@ function main() {
 
 if (require.main === module) {
   try {
-    main();
+    main().catch((error) => {
+      console.error(`[oracle-regression-test] failed: ${error.message}`);
+      process.exitCode = 1;
+    });
   } catch (error) {
     console.error(`[oracle-regression-test] failed: ${error.message}`);
     process.exitCode = 1;
