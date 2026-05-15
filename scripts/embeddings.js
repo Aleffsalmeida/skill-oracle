@@ -1,6 +1,7 @@
 'use strict';
 
 const FETCH_TIMEOUT_MS = 30000;
+const GEMINI_PARALLEL = 20; // max concurrent embedContent requests
 
 async function embedOpenAI(texts, apiKey) {
   const BATCH = 2048;
@@ -28,34 +29,37 @@ async function embedOpenAI(texts, apiKey) {
   return all;
 }
 
+async function embedOneGemini(text, apiKey, model) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  let res;
+  try {
+    res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: { parts: [{ text }] } }),
+        signal: ctrl.signal,
+      },
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  return data.embedding.values;
+}
+
 async function embedGemini(texts, apiKey) {
-  const BATCH = 100;
+  const model = 'gemini-embedding-2';
   const all = [];
-  for (let i = 0; i < texts.length; i += BATCH) {
-    const batch = texts.slice(i, i + BATCH);
-    const requests = batch.map((text) => ({
-      model: 'models/text-embedding-004',
-      content: { parts: [{ text }] },
-    }));
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
-    let res;
-    try {
-      res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:batchEmbedContents?key=${encodeURIComponent(apiKey)}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ requests }),
-          signal: ctrl.signal,
-        },
-      );
-    } finally {
-      clearTimeout(timer);
-    }
-    if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
-    const data = await res.json();
-    all.push(...data.embeddings.map((e) => e.values));
+  for (let i = 0; i < texts.length; i += GEMINI_PARALLEL) {
+    const batch = texts.slice(i, i + GEMINI_PARALLEL);
+    const vectors = await Promise.all(batch.map((text) => embedOneGemini(text, apiKey, model)));
+    all.push(...vectors);
+    // Brief pause between batches to respect rate limits
+    if (i + GEMINI_PARALLEL < texts.length) await new Promise((r) => setTimeout(r, 200));
   }
   return all;
 }
