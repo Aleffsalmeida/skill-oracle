@@ -135,6 +135,13 @@ Run the Oracle bootstrap once after installation. It checks GitHub for a newer r
 node ~/.claude/skills/skill-oracle/scripts/oracle-bootstrap.js --install
 ```
 
+Recommended minimum setup for best Codex results:
+
+- keep the OpenAI API key configured so embeddings and synthesis can run
+- run `--install` once, then confirm `--preflight` is ready
+- rebuild embeddings after major skill, plugin, or agent changes
+- run `oracle-smoke-test.js` after updates before relying on the Oracle
+
 If you only want to repair the index and agents without changing `settings.json`, run:
 
 ```bash

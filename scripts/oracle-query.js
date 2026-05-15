@@ -959,7 +959,8 @@ function formatResult(result) {
     lines.push(`Model hint: ${result.modelHints.complexity} | Claude=${result.modelHints.claude} | Codex=${result.modelHints.codex}`);
   }
   if (result.synthesis && result.synthesis.reasoning) {
-    lines.push(`LLM synthesis: ${result.synthesis.reasoning}`);
+    lines.push('LLM synthesis: active');
+    lines.push(`Synthesis: ${result.synthesis.reasoning}`);
     if (result.synthesis.caution) {
       lines.push(`Caution: ${result.synthesis.caution}`);
     }
@@ -972,23 +973,22 @@ function formatResult(result) {
   } else {
     if (result.bundle && result.bundle.length) {
       lines.push('Recommended bundle:');
-      result.bundle.forEach((asset, index) => {
+      result.bundle.slice(0, 4).forEach((asset, index) => {
         lines.push(`  ${index + 1}. ${asset.name} (${asset.domain}) -> ${asset.invoke}`);
       });
       lines.push('');
     }
     if (result.virtualMasters && result.virtualMasters.length) {
       lines.push('Virtual masters:');
-      result.virtualMasters.forEach((report) => {
+      result.virtualMasters.slice(0, 3).forEach((report) => {
         lines.push(`  - ${report.domain} via ${report.master_agent}: ${report.thesis}`);
       });
       lines.push('');
     }
-    result.picks.forEach((asset, index) => {
+    result.picks.slice(0, 5).forEach((asset, index) => {
       lines.push(`${index + 1}. ${asset.name} - ${asset.type} - score ${asset.score} - ${asset.domain}`);
       lines.push(`   Why: matched ${asset.matched.join(', ') || 'task context'}`);
       lines.push(`   Invoke: ${asset.invoke}`);
-      lines.push(`   Path: ${asset.path}`);
     });
   }
 
