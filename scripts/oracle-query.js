@@ -30,13 +30,20 @@ const SHORT_TOKEN_ALLOWLIST = new Set(['ai', 'ml', 'ui', 'ux', 'qa', '3d']);
 const STRONG_AUTHOR_SOURCES = ['agents:', 'codex:', 'user:'];
 const PREFERRED_SKILLS = new Set([
   'skill-oracle',
+  'awesome-design-md',
+  'ui-ux-pro-max',
+  'impeccable',
   'imagegen-frontend-web',
   'imagegen-frontend-mobile',
   'high-end-visual-design',
+  'emil-design-eng',
   'design-taste-frontend',
   'frontend-design',
-  'impeccable',
+  'shadcn-ui',
   'react:components',
+  'supabase',
+  'postgres-patterns',
+  'playwright',
 ]);
 const GENERIC_QUERY_TOKENS = new Set(['app', 'skill', 'plugin', 'agent', 'tool', 'tools']);
 const NOISY_PRODUCT_TOKENS = new Set(['pro', 'max', 'plus']);
@@ -238,9 +245,27 @@ const CAPABILITY_INTENTS = [
   },
   {
     id: 'social-creative',
-    re: /\b(redes sociais|social media|linkedin|instagram|tiktok|facebook|x\/twitter|twitter|post social|criativo|ad creative|anuncio|anuncios|ads)\b/,
+    re: /\b(redes sociais|social media|linkedin|tiktok|facebook|x\/twitter|twitter|post social|criativo|ad creative|anuncio|anuncios|ads|instagram (post|reel|story|stories|ads|anuncio|anuncios|criativo|copy|content|conteudo))\b/,
     domains: ['marketing-growth', 'design-ui'],
     skills: ['social-content', 'ad-creative', 'paid-ads', 'imagegen-frontend-web'],
+  },
+  {
+    id: 'fullstack-product-ui',
+    re: /\b(implementar|build|criar|atualizar|melhorar|refatorar|dashboard|painel|pagina|página|formulario|formulário|modal|tabela|ui|ux|interface|react|vite|shadcn|tailwind|supabase|schema|banco de dados|migration|migracao|migração|rls|edge function|api)\b/,
+    domains: ['design-ui', 'web-dev', 'database-data'],
+    skills: ['awesome-design-md', 'ui-ux-pro-max', 'impeccable', 'design-taste-frontend', 'react:components', 'shadcn-ui', 'supabase', 'postgres-patterns'],
+  },
+  {
+    id: 'supabase-schema',
+    re: /\b(supabase|schema|banco de dados|database|postgres|postgresql|migration|migracao|migração|rls|edge function|edge functions|api|tabela|entidade|relacionamento|foreign key|soft delete)\b/,
+    domains: ['database-data', 'web-dev'],
+    skills: ['supabase', 'postgres-patterns', 'tech-lead-architect'],
+  },
+  {
+    id: 'analytics-dashboard',
+    re: /\b(dashboard|dashboards|painel|grafico|gráfico|metricas|métricas|analitico|analiticos|analítica|analíticas|analytics|kpi|funil|lucro|percentual|comparativo|tendencia|tendência|periodo|período)\b/,
+    domains: ['data-analytics', 'design-ui', 'web-dev'],
+    skills: ['ui-ux-pro-max', 'impeccable', 'awesome-design-md', 'design-taste-frontend', 'react:components'],
   },
   {
     id: 'analytics-tracking',
@@ -389,10 +414,12 @@ async function synthesizeBundleWithOpenAI({ task, domainReports, picks, bundle, 
 
   const prompt = [
     'Return only JSON with keys bundle_names, reasoning, caution.',
-    'bundle_names must contain at most 5 canonical asset names only, with no domain prefixes, ids, markdown, bullets, or extra text.',
-    'Choose the best cross-domain bundle for the task. Prefer the smallest set that covers the intent well.',
+    'bundle_names must contain at most 6 canonical asset names only, with no domain prefixes, ids, markdown, bullets, or extra text.',
+    'Choose the best cross-domain bundle for the task. Prefer the deterministic bundle unless it misses an important domain.',
+    'Do not write reasoning or caution that contradicts the deterministic bundle.',
     `Task: ${task}`,
     `Domains: ${domains.join(', ')}`,
+    `Deterministic bundle: ${(bundle || []).map((asset) => asset.name).join(', ')}`,
     'Candidates:',
     ...domainReports.slice(0, 4).map((report) => {
       const names = (report.bundle || report.top || []).slice(0, 3).map((asset) => asset.name).join(', ');
@@ -709,6 +736,32 @@ function scoreDomainText(task, domain) {
   return { id: domain.id, score, matched };
 }
 
+function isProductImplementationContext(task) {
+  const text = normalize(task);
+  return /\b(implementar|build|criar|atualizar|refatorar|feature|sistema|app|react|vite|frontend|supabase|schema|banco de dados|migration|migracao|rls|edge function|api|dashboard|painel|pagina|página|formulario|formulário|modal|tabela|crud|soft delete|entidade|relacionamento)\b/.test(text);
+}
+
+function hasMarketingExecutionIntent(task) {
+  const text = normalize(task);
+  return /\b(marketing|seo|ads|anuncio|anuncios|copywriting|copy|conteudo|content|post|reel|story|stories|social media|redes sociais|campanha|growth|cro|email|newsletter|launch|lancamento|lançamento|paid ads|google ads|meta ads|linkedin ads|instagram ads|criativo|criativos)\b/.test(text);
+}
+
+function adjustDomainScoreForContext(task, domainScore) {
+  if (domainScore.id !== 'marketing-growth') return domainScore;
+  if (!isProductImplementationContext(task) || hasMarketingExecutionIntent(task)) return domainScore;
+
+  const noisyOnly = domainScore.matched.length > 0
+    && domainScore.matched.every((kw) => ['instagram', 'social', 'linkedin', 'facebook', 'tiktok'].includes(normalize(kw)));
+
+  if (!noisyOnly) return domainScore;
+
+  return {
+    ...domainScore,
+    score: 0,
+    matched: [],
+  };
+}
+
 function detectDomains(task, idx, forcedDomains = []) {
   if (forcedDomains.length) {
     return forcedDomains
@@ -730,6 +783,7 @@ function detectDomains(task, idx, forcedDomains = []) {
         score: domain.score + intentBoost + capabilityBoost,
       };
     })
+    .map((domain) => adjustDomainScoreForContext(task, domain))
     .filter((d) => d.score > 0)
     .sort((a, b) => b.score - a.score)
     .map((d) => d.id);
@@ -872,11 +926,7 @@ function enrichRankedAsset(asset, domain, result, executor = null) {
 }
 
 function canonicalAssetKey(asset) {
-  return [
-    normalize(asset.type),
-    normalize(asset.name),
-    normalize(asset.invoke),
-  ].join('::');
+  return normalize(asset.name);
 }
 
 function assetTypeFit(asset, task) {
@@ -891,7 +941,7 @@ function assetTypeFit(asset, task) {
   if (asset.type === 'plugin') {
     if (/\b(plugin|extension|extensao|claude plugin|mcpb|install plugin|instalar plugin)\b/.test(text)) return 3;
     if (/\b(ui|ux|design|video|motion|logo|brand|frontend|hyperframe|hyperframes)\b/.test(text) && /ui|ux|design|video|motion|brand|hyperframe|hyperframes/.test(normalize(asset.name))) return -1;
-    return -6;
+    return -20;
   }
   return 0;
 }
@@ -983,15 +1033,42 @@ function buildRecommendedBundle(domainReports, picks, task) {
     preferredByIntent.push(intent.skills);
   }
   if (intents.branding) preferredByIntent.push(['brandkit', 'design', 'brand', 'impeccable', 'high-end-visual-design']);
-  if (intents.ui || intents.shortcuts) preferredByIntent.push(['ui-ux-pro-max', 'impeccable', 'design-taste-frontend', 'frontend-design', 'ui-styling', 'ui-toolkit/web', 'react:components']);
+  if (intents.ui || intents.shortcuts) preferredByIntent.push(['awesome-design-md', 'ui-ux-pro-max', 'impeccable', 'design-taste-frontend', 'frontend-design', 'high-end-visual-design', 'emil-design-eng', 'shadcn-ui', 'react:components']);
   if (intents.desktop) preferredByIntent.push(['design-taste-frontend', 'frontend-design', 'zoom-meeting-sdk-electron']);
   if (intents.videoMotion) preferredByIntent.push(['hyperframes', 'higgsfield', 'higgs-field', 'remotion', 'remotion-video-creation', 'remotion-to-hyperframes', 'website-to-hyperframes', 'frontend-slides']);
   if (/\bawesome design\b/.test(taskText)) preferredByIntent.unshift(['awesome-design-md', 'polish']);
+  if (isProductImplementationContext(task)) {
+    preferredByIntent.unshift(['awesome-design-md', 'ui-ux-pro-max', 'impeccable', 'design-taste-frontend']);
+    preferredByIntent.push(['react:components', 'shadcn-ui', 'frontend-design']);
+  }
+  if (/\b(supabase|schema|banco de dados|database|postgres|migration|migracao|migração|rls|edge function|api|soft delete|tabela|entidade|relacionamento)\b/.test(taskText)) {
+    preferredByIntent.push(['supabase', 'postgres-patterns', 'supabase-migration-deep-dive']);
+  }
+  if (/\b(dashboard|painel|grafico|gráfico|metricas|métricas|kpi|funil|lucro|percentual|comparativo|tendencia|tendência)\b/.test(taskText)) {
+    preferredByIntent.push(['ui-ux-pro-max', 'impeccable', 'awesome-design-md', 'design-taste-frontend']);
+  }
   if (/\b(ga4|gtm|google analytics|tag manager|utm|utms|tracking|conversion tracking|event tracking|attribution)\b/.test(taskText)) {
     preferredByIntent.unshift(['analytics-tracking', 'product-tracking-generate-implementation-guide', 'configuring-experiment-analytics']);
   }
   if (/\boracle\b/.test(taskText) || (/\bskill/.test(taskText) && /\bjunt/.test(taskText))) {
     preferredByIntent.unshift(['skill-oracle', 'workspace-surface-audit', 'plugin-structure']);
+  }
+
+  const requiredBundleNames = [];
+  if (isProductImplementationContext(task)) {
+    requiredBundleNames.push('awesome-design-md', 'ui-ux-pro-max', 'impeccable', 'react:components');
+  }
+  if (/\b(supabase|schema|banco de dados|database|postgres|migration|migracao|migração|rls|edge function|api|soft delete|tabela|entidade|relacionamento)\b/.test(taskText)) {
+    requiredBundleNames.push('supabase', 'postgres-patterns');
+  }
+
+  for (const name of requiredBundleNames) {
+    const asset = picks.find((candidate) => candidate.name === name)
+      || domainReports.flatMap((report) => report.top || []).find((candidate) => candidate.name === name);
+    if (asset && !seen.has(canonicalAssetKey(asset))) {
+      bundle.push(asset);
+      seen.add(canonicalAssetKey(asset));
+    }
   }
 
   for (const names of preferredByIntent) {
@@ -1013,7 +1090,7 @@ function buildRecommendedBundle(domainReports, picks, task) {
     if (seen.has(key)) continue;
     bundle.push(primary);
     seen.add(key);
-    if (bundle.length >= 4) return bundle.slice(0, 4);
+    if (bundle.length >= 6) return bundle.slice(0, 6);
   }
 
   for (const report of domainReports) {
@@ -1022,7 +1099,7 @@ function buildRecommendedBundle(domainReports, picks, task) {
       if (seen.has(key)) continue;
       bundle.push(asset);
       seen.add(key);
-      if (bundle.length >= 4) return bundle.slice(0, 4);
+      if (bundle.length >= 6) return bundle.slice(0, 6);
     }
   }
 
@@ -1046,7 +1123,7 @@ function buildRecommendedBundle(domainReports, picks, task) {
     }
   }
 
-  return bundle.slice(0, 4);
+  return bundle.slice(0, 6);
 }
 
 function mergeBundleIntoPicks(bundle, picks, limit) {
@@ -1325,7 +1402,7 @@ function formatResult(result) {
   } else {
     if (result.bundle && result.bundle.length) {
       lines.push('Recommended bundle:');
-      result.bundle.slice(0, 4).forEach((asset, index) => {
+      result.bundle.slice(0, 6).forEach((asset, index) => {
         lines.push(`  ${index + 1}. ${asset.name} (${asset.domain}) -> ${asset.invoke}`);
       });
       lines.push('');

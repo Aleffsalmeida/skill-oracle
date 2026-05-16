@@ -135,6 +135,16 @@ function scoreDomain(asset, domain) {
 }
 
 function classify(asset) {
+  const assetName = tokenize(`${asset.name} ${asset.id}`);
+  if (/\bsupabase\b/.test(assetName) || /\bpostgres-patterns\b/.test(assetName)) {
+    return {
+      id: 'database-data',
+      master: 'oracle-master-database',
+      score: 999,
+      matched: assetName.includes('supabase') ? ['supabase'] : ['postgres'],
+    };
+  }
+
   let best = { id: 'misc', master: 'oracle-master-misc', score: 0, matched: [] };
   for (const d of DOMAINS) {
     const { score, matched } = scoreDomain(asset, d);

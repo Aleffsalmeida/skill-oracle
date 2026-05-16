@@ -71,6 +71,13 @@ const CASES = [
     expectedResultNames: ['ui-ux-pro-max', 'polish'],
   },
   {
+    name: 'operations-ecosystem-fullstack-no-marketing-noise',
+    task: 'implementar melhorias no ecossistema de operações com entidade Agentes, Instagram vinculado a cooperações, dashboards analíticos, React Supabase, schema banco de dados, APIs, soft delete e lixeira de operadores',
+    expectedDomains: ['design-ui', 'web-dev', 'database-data', 'data-analytics'],
+    forbiddenDomains: ['marketing-growth'],
+    expectedResultNames: ['awesome-design-md', 'ui-ux-pro-max', 'impeccable', 'react:components', 'supabase'],
+  },
+  {
     name: 'mixed-logo-and-ui',
     task: 'criar logo premium identidade visual e melhorar design UI UX da tela inicial do app',
     expectedDomains: ['design-ui'],
