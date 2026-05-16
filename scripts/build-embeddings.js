@@ -10,7 +10,7 @@ const INDEX_FILE = path.join(os.homedir(), '.claude', 'oracle-index.json');
 function normalize(s) {
   return String(s || '')
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .toLowerCase();
 }
 
@@ -41,6 +41,7 @@ function assetText(asset) {
   return [
     `${asset.name}: ${asset.description || ''}`,
     asset.content_summary || '',
+    Array.isArray(asset.objectives) ? `Objectives: ${asset.objectives.join('. ')}` : '',
     Array.isArray(asset.use_when) ? `Use when: ${asset.use_when.join(', ')}` : '',
     Array.isArray(asset.capability_terms) ? `Capabilities: ${asset.capability_terms.join(', ')}` : '',
     Array.isArray(asset.workflow_terms) ? `Workflow: ${asset.workflow_terms.join(', ')}` : '',
@@ -52,6 +53,7 @@ function assetChunks(asset) {
     `# ${asset.name}`,
     `Description: ${asset.description || ''}`,
     asset.content_summary || '',
+    Array.isArray(asset.objectives) ? `Objectives:\n- ${asset.objectives.join('\n- ')}` : '',
     Array.isArray(asset.use_when) ? `Use when:\n- ${asset.use_when.join('\n- ')}` : '',
     Array.isArray(asset.workflow_terms) ? `Workflow terms: ${asset.workflow_terms.join(', ')}` : '',
     Array.isArray(asset.capability_terms) ? `Capability terms: ${asset.capability_terms.join(', ')}` : '',
