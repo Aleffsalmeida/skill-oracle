@@ -200,7 +200,7 @@ const DOMAIN_KEYWORDS = [
   {
     id: 'ecommerce',
     proactive: ['finance-billing'],
-    kw: ['shopify', 'woocommerce', 'wordpress', 'ecommerce', 'cart', 'checkout', 'product-catalog', 'inventory', 'fulfillment', 'sku', 'storefront'],
+    kw: ['shopify', 'woocommerce', 'wordpress', 'ecommerce', 'cart', 'product-catalog', 'inventory', 'fulfillment', 'sku', 'storefront'],
   },
   {
     id: 'crm-sales',
@@ -321,7 +321,7 @@ const EXPLICIT_SIGNAL_DOMAINS = new Set([
 const STRICT_DOMAIN_SIGNALS = {
   'security-audit': /\b(seguranca|segurança|security|auth|oauth|jwt|xss|csrf|owasp|pentest|secret|secrets|compliance|soc2|pci|gdpr|vulnerability|vulnerabilidade|audit|auditoria)\b/,
   'finance-billing': /\b(stripe|billing|invoice|payment|payments|pagamento|pagamentos|assinatura|subscription|revenue|tax|finance|pricing|paywall|checkout|churn|cancelamento)\b/,
-  ecommerce: /\b(shopify|woocommerce|wordpress|ecommerce|e-commerce|loja online|cart|carrinho|checkout|product-catalog|inventory|sku|storefront)\b/,
+  ecommerce: /\b(shopify|woocommerce|wordpress|ecommerce|e-commerce|loja online|cart|carrinho|product-catalog|inventory|sku|storefront)\b/,
   'crypto-web3': /\b(crypto|blockchain|ethereum|solana|defi|nft|wallet|token|dex|dao|smart contract|solidity|web3|metamask|onchain)\b/,
   'crm-sales': /\b(crm|sales|hubspot|salesforce|pipedrive|attio|intercom|lead|leads|pipeline|prospect|outbound|cold email|revops)\b/,
 };
@@ -1207,7 +1207,7 @@ async function selectAssets(idx, task, options = {}) {
   const complexity = estimateComplexity(task, finalDomainIds, picks);
   const modelHints = recommendedModels(complexity);
 
-  const fallbackRecommended = picks.length === 0 || finalDomainIds.every((id) => id === 'misc');
+  const fallbackRecommended = picks.length === 0;
 
   return {
     task,

@@ -85,6 +85,7 @@ const CASES = [
     name: 'stripe-pricing-paywall',
     task: 'preciso configurar Stripe checkout assinatura pricing e paywall',
     expectedDomains: ['finance-billing'],
+    forbiddenDomains: ['ecommerce'],
     expectedResultNames: ['stripe-best-practices', 'pricing-strategy'],
   },
   {
@@ -118,6 +119,13 @@ const CASES = [
     forbiddenDomains: ['marketing-growth', 'design-ui', 'web-dev', 'finance-billing', 'crm-sales', 'crypto-web3', 'ecommerce', 'security-audit'],
     expectFallbackRecommended: true,
   },
+  {
+    name: 'github-mcp-misc-no-fallback',
+    task: 'usar GitHub para revisar issues PRs e buscar contexto do repositorio',
+    expectedDomains: ['misc'],
+    expectedResultNames: ['github'],
+    expectFallbackRecommended: false,
+  },
 ];
 
 async function checkCase(idx, testCase) {
@@ -143,9 +151,12 @@ async function checkCase(idx, testCase) {
       `[${testCase.name}] expected ${name} in picks or bundle, got ${Array.from(resultNames).join(', ')}`
     );
   }
-  if (testCase.expectFallbackRecommended) {
+  if (testCase.expectFallbackRecommended === true) {
     assertCheck(result.fallbackRecommended, `[${testCase.name}] expected fallbackRecommended=true`);
   } else {
+    if (testCase.expectFallbackRecommended === false) {
+      assertCheck(!result.fallbackRecommended, `[${testCase.name}] expected fallbackRecommended=false`);
+    }
     assertCheck(result.bundle.length > 0, `[${testCase.name}] expected non-empty bundle`);
     assertCheck(result.virtualMasters.length > 0, `[${testCase.name}] expected virtual masters report`);
   }
