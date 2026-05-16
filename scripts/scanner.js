@@ -35,10 +35,10 @@ const PLUGIN_CACHE = path.join(PLUGINS_ROOT, 'cache');
 const PLUGIN_REGISTRY = path.join(PLUGINS_ROOT, 'installed_plugins.json');
 const SETTINGS_PATH = path.join(CLAUDE_ROOT, 'settings.json');
 
-const HEAD_BYTES = 24576; // enough for frontmatter + meaningful workflow sections without indexing full files
-const PREVIEW_CHARS = 1200;
-const SUMMARY_CHARS = 320;
-const MAX_TERMS = 24;
+const HEAD_BYTES = 0; // 0 = read full file for richest semantic profile
+const PREVIEW_CHARS = 3000;
+const SUMMARY_CHARS = 600;
+const MAX_TERMS = 32;
 const STOPWORDS = new Set([
   'a', 'an', 'and', 'are', 'as', 'at', 'be', 'before', 'by', 'for', 'from', 'if', 'in', 'into',
   'is', 'it', 'of', 'on', 'or', 'that', 'the', 'their', 'this', 'to', 'use', 'using', 'when',
@@ -55,7 +55,7 @@ function hashShort(s) {
 
 function safeRead(p, bytes) {
   try {
-    if (bytes) {
+    if (bytes && bytes > 0) {
       const fd = fs.openSync(p, 'r');
       const buf = Buffer.alloc(bytes);
       const n = fs.readSync(fd, buf, 0, bytes, 0);
@@ -88,7 +88,7 @@ function parseFrontmatter(content) {
 function normalize(s) {
   return String(s || '')
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .toLowerCase();
 }
 
@@ -182,31 +182,34 @@ function buildSemanticProfile(content, frontmatter = {}) {
   const sections = splitSections(content);
   const body = stripFrontmatter(content);
   const overview = sections.find((section) => section.heading === 'overview')?.text || '';
+  const objectives = collectSectionText(sections, /(goal|objective|purpose|aim|mission|overview|summary|about)/i, 4);
   const useWhen = [
     frontmatter.description || '',
-    ...collectSectionText(sections, /(when|invoke|use|applies|fit|trigger)/i, 3),
+    ...collectSectionText(sections, /(when|invoke|use|applies|fit|trigger|activate|call)/i, 8),
   ].filter(Boolean);
-  const workflow = collectSectionText(sections, /(procedure|workflow|process|checklist|steps|implementation|flow)/i, 3);
-  const constraints = collectSectionText(sections, /(constraints|guardrails|rules|policy|anti-pattern|safety)/i, 3);
-  const headings = sections.map((section) => section.heading).filter(Boolean).slice(0, 12);
+  const workflow = collectSectionText(sections, /(procedure|workflow|process|checklist|steps|implementation|flow|instruction|how)/i, 4);
+  const constraints = collectSectionText(sections, /(constraints|guardrails|rules|policy|anti-pattern|safety|limit|boundary)/i, 3);
+  const headings = sections.map((section) => section.heading).filter(Boolean).slice(0, 20);
   const capabilityTerms = topTermsFromTexts([
     frontmatter.name || '',
     frontmatter.description || '',
     overview,
+    ...objectives,
     ...useWhen,
     ...workflow,
     ...constraints,
     ...headings,
   ]);
-  const workflowTerms = topTermsFromTexts(workflow, 16);
+  const workflowTerms = topTermsFromTexts(workflow, 20);
 
   return {
     content_summary: summarizeBody(body, frontmatter.description || ''),
     content_preview: truncate(body, PREVIEW_CHARS),
-    use_when: useWhen.slice(0, 3),
+    objectives: objectives.slice(0, 4),
+    use_when: useWhen.slice(0, 8),
     workflow_terms: workflowTerms,
     capability_terms: capabilityTerms,
-    section_keywords: topTermsFromTexts(headings, 12),
+    section_keywords: topTermsFromTexts(headings, 16),
     constraint_terms: topTermsFromTexts(constraints, 12),
   };
 }
@@ -256,6 +259,7 @@ function buildSkillAsset(skillMdPath, source) {
     model: fm.model || null,
     content_summary: semantic.content_summary,
     content_preview: semantic.content_preview,
+    objectives: semantic.objectives,
     use_when: semantic.use_when,
     workflow_terms: semantic.workflow_terms,
     capability_terms: semantic.capability_terms,
@@ -282,6 +286,7 @@ function buildAgentAsset(agentMdPath, source) {
     model: fm.model || null,
     content_summary: semantic.content_summary,
     content_preview: semantic.content_preview,
+    objectives: semantic.objectives,
     use_when: semantic.use_when,
     workflow_terms: semantic.workflow_terms,
     capability_terms: semantic.capability_terms,
