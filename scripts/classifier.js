@@ -46,7 +46,7 @@ const DOMAINS = [
   },
   {
     id: 'design-ui', label: 'Design / UI / UX', master: 'oracle-master-design',
-    kw: ['design-system', 'ui', 'ux', 'figma', 'canva', 'brand', 'branding', 'palette', 'typography', 'wireframe', 'prototype', 'accessibility', 'a11y', 'wcag', 'visual', 'mockup', 'liquid-glass', 'minimalist', 'industrial-brutalist', 'logo', 'icon', 'icone', 'ícone', 'identidade', 'simbolo', 'símbolo', 'brandkit', 'remotion', 'stitch-design', 'stitch', 'imagegen', 'image-gen', 'image-direction', 'motion-design', 'animation', 'frontend-design', 'design-taste', 'taste-design', 'high-end-visual', 'polish', 'impeccable', 'image-to-code', 'visual-design', 'emil-design', 'component-design', 'ui-design', 'interface-design'],
+    kw: ['design-system', 'ui', 'ux', 'ui-ux', 'ui-ux-pro-max', 'figma', 'canva', 'brand', 'branding', 'palette', 'typography', 'wireframe', 'prototype', 'accessibility', 'a11y', 'wcag', 'visual', 'mockup', 'liquid-glass', 'minimalist', 'industrial-brutalist', 'logo', 'icon', 'icone', 'ícone', 'identidade', 'simbolo', 'símbolo', 'brandkit', 'remotion', 'hyperframe', 'hyperframes', 'higgsfield', 'higgs-field', 'stitch-design', 'stitch', 'imagegen', 'image-gen', 'image-direction', 'motion-design', 'animation', 'frontend-design', 'design-taste', 'taste-design', 'high-end-visual', 'polish', 'impeccable', 'image-to-code', 'visual-design', 'emil-design', 'component-design', 'ui-design', 'interface-design'],
   },
   {
     id: 'ai-ml', label: 'AI / ML', master: 'oracle-master-ai',

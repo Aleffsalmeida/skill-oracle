@@ -54,14 +54,21 @@ const CASES = [
     name: 'brand-video-logo-natural',
     task: 'preciso criar uma identidade visual premium com logo novo e gerar um video motion de apresentacao da marca para redes sociais',
     expectedDomains: ['design-ui'],
-    expectedResultNames: ['brandkit', 'remotion'],
+    expectedResultNames: ['brandkit'],
+    expectedAnyResultNames: ['hyperframes', 'remotion', 'remotion-video-creation', 'remotion-to-hyperframes'],
   },
   {
     name: 'ui-ux-no-brandkit-bias',
     task: 'melhorar UI UX pro max da interface frontend do produto',
     expectedDomains: ['design-ui', 'web-dev'],
     forbiddenDomains: ['finance-billing'],
-    expectedResultNames: ['impeccable', 'frontend-design'],
+    expectedResultNames: ['ui-ux-pro-max', 'impeccable', 'frontend-design'],
+  },
+  {
+    name: 'marketplace-design-skills-visible',
+    task: 'quero usar UI UX Pro Max e awesome design para melhorar uma dashboard SaaS',
+    expectedDomains: ['design-ui', 'web-dev'],
+    expectedResultNames: ['ui-ux-pro-max', 'polish'],
   },
   {
     name: 'mixed-logo-and-ui',
@@ -126,6 +133,12 @@ const CASES = [
     expectedResultNames: ['github'],
     expectFallbackRecommended: false,
   },
+  {
+    name: 'video-motion-hyperframes',
+    task: 'criar video motion com cenas animadas, captions, voiceover e export em hyperframes',
+    expectedDomains: ['design-ui', 'web-dev'],
+    expectedResultNames: ['hyperframes', 'hyperframes-cli', 'remotion-to-hyperframes'],
+  },
 ];
 
 async function checkCase(idx, testCase) {
@@ -149,6 +162,12 @@ async function checkCase(idx, testCase) {
     assertCheck(
       resultNames.has(name),
       `[${testCase.name}] expected ${name} in picks or bundle, got ${Array.from(resultNames).join(', ')}`
+    );
+  }
+  if (testCase.expectedAnyResultNames) {
+    assertCheck(
+      testCase.expectedAnyResultNames.some((name) => resultNames.has(name)),
+      `[${testCase.name}] expected one of ${testCase.expectedAnyResultNames.join(', ')} in picks or bundle, got ${Array.from(resultNames).join(', ')}`
     );
   }
   if (testCase.expectFallbackRecommended === true) {

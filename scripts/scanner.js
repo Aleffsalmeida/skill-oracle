@@ -2,7 +2,7 @@
 
 /**
  * Universal Scanner — discovers all Claude Code assets
- *   - Skills (SKILL.md): user dirs + plugin caches
+ *   - Skills (SKILL.md): user dirs + plugin caches + downloaded marketplaces
  *   - Agents (.md):       user agents/ + plugin agents/
  *   - Plugins:            plugins/installed_plugins.json + plugin.json
  *   - MCP servers:        settings.json mcpServers
@@ -32,7 +32,9 @@ const SKILLS_ROOTS = [
 const AGENTS_ROOT = path.join(CLAUDE_ROOT, 'agents');
 const PLUGINS_ROOT = path.join(CLAUDE_ROOT, 'plugins');
 const PLUGIN_CACHE = path.join(PLUGINS_ROOT, 'cache');
+const PLUGIN_MARKETPLACES = path.join(PLUGINS_ROOT, 'marketplaces');
 const PLUGIN_REGISTRY = path.join(PLUGINS_ROOT, 'installed_plugins.json');
+const PLUGIN_MARKETPLACE_REGISTRY = path.join(PLUGINS_ROOT, 'known_marketplaces.json');
 const SETTINGS_PATH = path.join(CLAUDE_ROOT, 'settings.json');
 
 const HEAD_BYTES = 0; // 0 = read full file for richest semantic profile
@@ -81,7 +83,17 @@ function computeInventorySignature() {
     for (const file of files) parts.push(fileFingerprint(file));
   }
 
-  for (const file of [PLUGIN_REGISTRY, SETTINGS_PATH]) {
+  for (const root of marketplaceRoots()) {
+    for (const subroot of [path.join(root, '.claude', 'skills'), path.join(root, '.claude', 'agents'), path.join(root, '.claude-plugin')]) {
+      const files = walkSync(subroot, {
+        maxDepth: 8,
+        filter: (_full, name) => name.endsWith('.md') || name === 'plugin.json',
+      });
+      for (const file of files) parts.push(fileFingerprint(file));
+    }
+  }
+
+  for (const file of [PLUGIN_REGISTRY, PLUGIN_MARKETPLACE_REGISTRY, SETTINGS_PATH]) {
     if (fs.existsSync(file)) parts.push(fileFingerprint(file));
   }
 
@@ -125,6 +137,10 @@ function normalize(s) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
+}
+
+function safeJson(p) {
+  try { return JSON.parse(safeRead(p)); } catch { return null; }
 }
 
 function tokenize(s) {
@@ -275,6 +291,35 @@ function walkSync(root, opts = {}) {
   return results;
 }
 
+function marketplaceRoots() {
+  const roots = [];
+  const seen = new Set();
+  const known = safeJson(PLUGIN_MARKETPLACE_REGISTRY) || {};
+
+  for (const meta of Object.values(known)) {
+    const installLocation = meta && meta.installLocation;
+    if (installLocation && fs.existsSync(installLocation) && !seen.has(installLocation)) {
+      seen.add(installLocation);
+      roots.push(installLocation);
+    }
+  }
+
+  if (fs.existsSync(PLUGIN_MARKETPLACES)) {
+    let entries = [];
+    try { entries = fs.readdirSync(PLUGIN_MARKETPLACES, { withFileTypes: true }); } catch { entries = []; }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const root = path.join(PLUGIN_MARKETPLACES, entry.name);
+      if (!seen.has(root)) {
+        seen.add(root);
+        roots.push(root);
+      }
+    }
+  }
+
+  return roots;
+}
+
 // ---------- asset builders ----------
 
 function buildSkillAsset(skillMdPath, source) {
@@ -395,6 +440,26 @@ function discoverSkills() {
     }
   }
 
+  // Downloaded marketplaces may contain skills that are available locally even
+  // before they are copied into the installed plugin cache.
+  for (const marketRoot of marketplaceRoots()) {
+    const pluginFolder = path.basename(marketRoot);
+    const files = walkSync(path.join(marketRoot, '.claude', 'skills'), {
+      maxDepth: 8,
+      filter: (_full, name) => name === 'SKILL.md',
+    });
+    for (const skillMd of files) {
+      const dir = path.dirname(skillMd);
+      const skillName = path.basename(dir);
+      const id = `skill:marketplace/${pluginFolder}/${skillName}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const asset = buildSkillAsset(skillMd, `marketplace:${pluginFolder}`);
+      asset.id = id;
+      out.push(asset);
+    }
+  }
+
   return out;
 }
 
@@ -432,11 +497,27 @@ function discoverAgents() {
     }
   }
 
+  for (const marketRoot of marketplaceRoots()) {
+    const pluginFolder = path.basename(marketRoot);
+    const files = walkSync(path.join(marketRoot, '.claude', 'agents'), {
+      maxDepth: 8,
+      filter: (_full, name) => name.endsWith('.md'),
+    });
+    for (const f of files) {
+      const asset = buildAgentAsset(f, `marketplace:${pluginFolder}`);
+      asset.id = `agent:marketplace/${pluginFolder}/${asset.name}`;
+      if (seen.has(asset.id)) continue;
+      seen.add(asset.id);
+      out.push(asset);
+    }
+  }
+
   return out;
 }
 
 function discoverPlugins() {
   const out = [];
+  const seen = new Set();
   if (!fs.existsSync(PLUGIN_REGISTRY)) return out;
   let reg;
   try { reg = JSON.parse(safeRead(PLUGIN_REGISTRY)); } catch { return out; }
@@ -455,7 +536,7 @@ function discoverPlugins() {
         version = data.version || version;
       } catch { /* skip malformed */ }
     }
-    out.push({
+    const asset = {
       id: `plugin:${name}`,
       type: 'plugin',
       name,
@@ -466,6 +547,41 @@ function discoverPlugins() {
       user_invocable: false,
       version,
       fq_name: fqName,
+      last_seen: null,
+    };
+    seen.add(asset.id);
+    out.push(asset);
+  }
+
+  const known = safeJson(PLUGIN_MARKETPLACE_REGISTRY) || {};
+  for (const [name, meta] of Object.entries(known)) {
+    const id = `plugin:marketplace/${name}`;
+    if (seen.has(id)) continue;
+    const installPath = meta && meta.installLocation;
+    const pluginJson = installPath ? path.join(installPath, '.claude-plugin', 'plugin.json') : null;
+    const skillJson = installPath ? path.join(installPath, 'skill.json') : null;
+    let description = '';
+    let version = null;
+    for (const jsonPath of [pluginJson, skillJson]) {
+      const data = jsonPath && fs.existsSync(jsonPath) ? safeJson(jsonPath) : null;
+      if (!data) continue;
+      description = description || data.description || data.summary || '';
+      version = version || data.version || null;
+    }
+    if (!description && installPath) {
+      description = truncate(safeRead(path.join(installPath, 'README.md')), 400);
+    }
+    out.push({
+      id,
+      type: 'plugin',
+      name,
+      description: description.slice(0, 400),
+      path: installPath || PLUGIN_MARKETPLACE_REGISTRY,
+      source: 'plugins/known_marketplaces.json',
+      hash: hashShort(name + (version || '') + (installPath || '')),
+      user_invocable: false,
+      version,
+      fq_name: `${name}@marketplace`,
       last_seen: null,
     });
   }

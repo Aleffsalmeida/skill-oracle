@@ -150,7 +150,7 @@ const DOMAIN_KEYWORDS = [
   {
     id: 'design-ui',
     proactive: ['data-analytics'],
-    kw: ['design-system', 'ui', 'ux', 'figma', 'canva', 'brand', 'branding', 'palette', 'typography', 'wireframe', 'prototype', 'accessibility', 'a11y', 'wcag', 'visual', 'mockup', 'minimalist', 'logo', 'icon', 'icone', 'ícone', 'identidade', 'simbolo', 'símbolo', 'topbar', 'taskbar', 'botao', 'botão', 'botoes', 'botões', 'shortcut', 'atalho', 'remotion', 'stitch-design', 'stitch', 'imagegen', 'image-gen', 'image-direction', 'motion-design', 'animation', 'frontend-design', 'design-taste', 'taste-design', 'high-end-visual', 'polish', 'impeccable', 'image-to-code', 'visual-design', 'emil-design', 'component-design', 'ui-design', 'interface-design', 'hyperframe', 'hyperframes', 'video', 'motion', 'lottie', 'gsap', 'animejs', 'composition', 'render', 'liquid-glass', 'industrial-brutalist', 'brandkit'],
+    kw: ['design-system', 'ui', 'ux', 'figma', 'canva', 'brand', 'branding', 'palette', 'typography', 'wireframe', 'prototype', 'accessibility', 'a11y', 'wcag', 'visual', 'mockup', 'minimalist', 'logo', 'icon', 'icone', 'ícone', 'identidade', 'simbolo', 'símbolo', 'topbar', 'taskbar', 'botao', 'botão', 'botoes', 'botões', 'shortcut', 'atalho', 'remotion', 'stitch-design', 'stitch', 'imagegen', 'image-gen', 'image-direction', 'motion-design', 'animation', 'frontend-design', 'design-taste', 'taste-design', 'high-end-visual', 'polish', 'impeccable', 'image-to-code', 'visual-design', 'emil-design', 'component-design', 'ui-design', 'interface-design', 'hyperframe', 'hyperframes', 'higgsfield', 'higgs-field', 'video', 'motion', 'lottie', 'gsap', 'animejs', 'composition', 'render', 'liquid-glass', 'industrial-brutalist', 'brandkit'],
   },
   {
     id: 'mobile',
@@ -222,19 +222,19 @@ const CAPABILITY_INTENTS = [
     id: 'ui-interface',
     re: /\b(ui|ux|interface|tela|layout|dashboard|frontend|componentes|component|design de interface|produto|app shell|visual hierarchy|hierarquia visual)\b/,
     domains: ['design-ui', 'web-dev'],
-    skills: ['impeccable', 'frontend-design', 'design-taste-frontend', 'refactoring-ui', 'ux-heuristics', 'ui-ux-expert', 'stitch-design'],
+    skills: ['ui-ux-pro-max', 'impeccable', 'frontend-design', 'design-taste-frontend', 'refactoring-ui', 'ux-heuristics', 'ui-ux-expert', 'ui-styling', 'stitch-design'],
   },
   {
     id: 'logo-brand',
     re: /\b(logo|icone|icon|simbolo|brand|branding|identidade visual|brand kit|brandkit|marca|manual da marca)\b/,
     domains: ['design-ui'],
-    skills: ['brandkit', 'high-end-visual-design', 'stitch-design-taste', 'imagegen-frontend-web', 'impeccable'],
+    skills: ['brandkit', 'design', 'brand', 'high-end-visual-design', 'stitch-design-taste', 'imagegen-frontend-web', 'impeccable'],
   },
   {
     id: 'video-motion',
-    re: /\b(video|videos|motion|animacao|animar|animated|animation|reel|shorts|story|stories|apresentacao|brand video|demo video|walkthrough|trailer|redes sociais)\b/,
+    re: /\b(video|videos|motion|animacao|animar|animated|animation|reel|shorts|story|stories|apresentacao|brand video|demo video|walkthrough|trailer|redes sociais|hyperframes|hyperframe|higgsfield|higgs field)\b/,
     domains: ['design-ui', 'web-dev'],
-    skills: ['remotion', 'remotion-video-creation', 'remotion-to-hyperframes', 'frontend-slides'],
+    skills: ['hyperframes', 'hyperframes-cli', 'higgsfield', 'higgs-field', 'remotion', 'remotion-video-creation', 'remotion-to-hyperframes', 'website-to-hyperframes', 'frontend-slides'],
   },
   {
     id: 'social-creative',
@@ -770,6 +770,7 @@ function recommendedModels(complexity) {
 }
 
 function scoreAsset(asset, taskTokens, activeCapabilityIntents = []) {
+  const taskText = normalize(taskTokens.join(' '));
   const nameText = normalize(`${asset.name} ${asset.id}`);
   const descText = normalize(asset.description);
   const segments = semanticSegments(asset);
@@ -812,19 +813,27 @@ function scoreAsset(asset, taskTokens, activeCapabilityIntents = []) {
   const capabilityMatches = activeCapabilityIntents.filter((intent) => intent.skills.some((name) => normalize(name) === assetName));
   if (STRONG_AUTHOR_SOURCES.some((prefix) => sourceText.startsWith(prefix))) score *= 1.12;
   if (PREFERRED_SKILLS.has(asset.name)) score *= 1.18;
+  if (/\bawesome design\b/.test(taskText) && assetName === 'polish') {
+    score += 40;
+    matched.push('awesome-design');
+  }
   if (capabilityMatches.length) {
     score += capabilityMatches.length * 14;
     for (const intent of capabilityMatches) matched.push(intent.id);
   }
   if (intents.branding && /brandkit|logo|brand|visual|design/.test(assetName)) score *= 1.18;
+  if (intents.branding && assetName === 'brandkit') {
+    score += 35;
+    matched.push('logo-brand');
+  }
   if (
     activeCapabilityIntents.some((intent) => intent.id === 'ui-interface')
     && activeCapabilityIntents.some((intent) => intent.id === 'logo-brand')
     && assetName === 'brandkit'
   ) score *= 0.92;
-  if (intents.videoMotion && /remotion|video|motion|slides|hyperframe/.test(assetName)) score *= 1.22;
+  if (intents.videoMotion && /hyperframe|higgsfield|higgs-field|remotion|video|motion|slides|lottie|gsap|animejs/.test(assetName)) score *= 1.32;
   if (intents.analytics && /analytics|tracking|experiment|posthog|event/.test(assetName)) score *= 1.18;
-  if ((intents.ui || intents.shortcuts) && /frontend|design-taste|impeccable|ui-toolkit|design/.test(assetName)) score *= 1.16;
+  if ((intents.ui || intents.shortcuts) && /ui-ux-pro-max|ui-styling|frontend|design-taste|impeccable|ui-toolkit|design/.test(assetName)) score *= 1.2;
   if (intents.desktop && /electron|frontend|ui|design/.test(assetName)) score *= 1.12;
   if (asset.user_invocable) score *= 1.2;
   if (asset.type === 'skill') score *= 1.1;
@@ -876,7 +885,9 @@ function assetTypeFit(asset, task) {
     return /\b(mcp|browser|navegador|github|repo|pull request|pr|issue|web search|pesquisar na web|buscar na web|internet|docs atuais|documentacao atual|context7|playwright|chrome|tavily|exa|memory|memoria)\b/.test(text) ? 4 : -8;
   }
   if (asset.type === 'plugin') {
-    return /\b(plugin|extension|extensao|claude plugin|mcpb|install plugin|instalar plugin)\b/.test(text) ? 3 : -6;
+    if (/\b(plugin|extension|extensao|claude plugin|mcpb|install plugin|instalar plugin)\b/.test(text)) return 3;
+    if (/\b(ui|ux|design|video|motion|logo|brand|frontend|hyperframe|hyperframes)\b/.test(text) && /ui|ux|design|video|motion|brand|hyperframe|hyperframes/.test(normalize(asset.name))) return -1;
+    return -6;
   }
   return 0;
 }
@@ -907,7 +918,7 @@ function scoreSupportingFit(asset, domainId, intents) {
   score += Math.min(asset.capability_terms?.length || 0, 6) * 0.25;
 
   const name = normalize(asset.name);
-  if (domainId === 'design-ui' && /brand|design|frontend|ui|visual/.test(name)) score += 2;
+  if (domainId === 'design-ui' && /brand|design|frontend|ui|ux|visual|hyperframe|motion|video/.test(name)) score += 2;
   if (domainId === 'web-dev' && /frontend|react|electron|playwright|shadcn|component/.test(name)) score += 2;
   if (intents.desktop && /electron|desktop/.test(name)) score += 1.5;
   if (intents.shortcuts && /frontend|design|component|react/.test(name)) score += 1.5;
@@ -967,10 +978,11 @@ function buildRecommendedBundle(domainReports, picks, task) {
   for (const intent of activeCapabilityIntents) {
     preferredByIntent.push(intent.skills);
   }
-  if (intents.branding) preferredByIntent.push(['brandkit', 'impeccable', 'high-end-visual-design']);
-  if (intents.ui || intents.shortcuts) preferredByIntent.push(['design-taste-frontend', 'frontend-design', 'ui-toolkit/web', 'react:components']);
+  if (intents.branding) preferredByIntent.push(['brandkit', 'design', 'brand', 'impeccable', 'high-end-visual-design']);
+  if (intents.ui || intents.shortcuts) preferredByIntent.push(['ui-ux-pro-max', 'impeccable', 'design-taste-frontend', 'frontend-design', 'ui-styling', 'ui-toolkit/web', 'react:components']);
   if (intents.desktop) preferredByIntent.push(['design-taste-frontend', 'frontend-design', 'zoom-meeting-sdk-electron']);
-  if (intents.videoMotion) preferredByIntent.push(['remotion', 'remotion-video-creation', 'remotion-to-hyperframes', 'frontend-slides']);
+  if (intents.videoMotion) preferredByIntent.push(['hyperframes', 'higgsfield', 'higgs-field', 'remotion', 'remotion-video-creation', 'remotion-to-hyperframes', 'website-to-hyperframes', 'frontend-slides']);
+  if (/\bawesome design\b/.test(taskText)) preferredByIntent.unshift(['polish']);
   if (/\b(ga4|gtm|google analytics|tag manager|utm|utms|tracking|conversion tracking|event tracking|attribution)\b/.test(taskText)) {
     preferredByIntent.unshift(['analytics-tracking', 'product-tracking-generate-implementation-guide', 'configuring-experiment-analytics']);
   }
