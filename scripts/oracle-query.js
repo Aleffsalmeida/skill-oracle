@@ -1141,6 +1141,82 @@ function mergeBundleIntoPicks(bundle, picks, limit) {
   return merged;
 }
 
+function findAssetByName(idx, name) {
+  return (idx.assets || []).find((asset) => asset.name === name || asset.id === `skill:${name}` || asset.id === name) || null;
+}
+
+function workflowRecommendations(idx, task, domains) {
+  const text = normalize(task);
+  const tokenCount = tokenize(task).length;
+  const nonTrivial = tokenCount >= 8 || domains.length >= 2 || isProductImplementationContext(task);
+  const featureWork = /\b(build|create|add|implement|update|refactor|feature|app|dashboard|ui|ux|schema|migration|soft delete|criar|implementar|atualizar|melhorar|sistema|pagina|página|formulario|formulário)\b/.test(text);
+  const multiStep = domains.length >= 3 || /\b(schema|migration|database|supabase|api|ui|dashboard|soft delete|lixeira|rls|multi-step|end-to-end|banco de dados)\b/.test(text);
+
+  const names = [];
+  if (nonTrivial) names.push('using-superpowers');
+  if (featureWork) names.push('brainstorming');
+  if (multiStep) names.push('writing-plans');
+
+  const seen = new Set();
+  return names
+    .filter((name) => {
+      if (seen.has(name)) return false;
+      seen.add(name);
+      return true;
+    })
+    .map((name) => {
+      const asset = findAssetByName(idx, name);
+      return {
+        name,
+        type: asset?.type || 'skill',
+        domain: asset?.domain || 'tooling-meta',
+        source: asset?.source || 'expected-local-skill',
+        path: asset?.path || null,
+        invoke: `Skill("${name}")`,
+        available: Boolean(asset),
+      };
+    });
+}
+
+function parallelExecutionPlan(task, domains, preflight) {
+  const text = normalize(task);
+  const executorName = normalize(preflight?.preflight?.executor?.name || preflight?.executor?.name || '');
+  const visiblePaneExecutor = executorName === 'pane_spawn' || /\boverclock\b/.test(normalize(preflight?.preflight?.runtime || ''));
+  const heavy = domains.length >= 3 || /\b(schema|migration|dashboard|ui|ux|api|soft delete|lixeira|rls|security|test|playwright|multi-step|end-to-end|banco de dados)\b/.test(text);
+
+  if (!heavy) {
+    return {
+      recommended: false,
+      executor: visiblePaneExecutor ? 'pane_spawn' : 'none',
+      reason: 'Task does not clearly split into independent workstreams.',
+      workstreams: [],
+    };
+  }
+
+  const workstreams = [];
+  if (domains.includes('database-data') || /\b(supabase|schema|postgres|migration|rls|soft delete|banco de dados)\b/.test(text)) {
+    workstreams.push('Database/Supabase schema, RLS, migrations, soft delete, restore semantics');
+  }
+  if (domains.includes('design-ui') || domains.includes('web-dev') || /\b(ui|ux|react|frontend|form|modal|pagina|página)\b/.test(text)) {
+    workstreams.push('React UI/UX components, forms, page flows, shadcn integration');
+  }
+  if (domains.includes('data-analytics') || /\b(dashboard|grafico|gráfico|metricas|métricas|kpi|funil|comparativo)\b/.test(text)) {
+    workstreams.push('Analytics dashboards, grouping, period comparison, funnel metrics');
+  }
+  if (/\b(test|qa|security|audit|playwright|rls|delete|exclusao|exclusão)\b/.test(text) || heavy) {
+    workstreams.push('QA/security review, Playwright checks, RLS and destructive-action audit');
+  }
+
+  return {
+    recommended: workstreams.length >= 2,
+    executor: visiblePaneExecutor ? 'pane_spawn' : 'visible-pane-required',
+    reason: visiblePaneExecutor
+      ? 'Independent workstreams can run in visible Overclock panes.'
+      : 'Use visible panes/agents only; do not use invisible Task subagents in Overclock.',
+    workstreams: workstreams.slice(0, 4),
+  };
+}
+
 async function selectAssets(idx, task, options = {}) {
   // Keyword-based domain detection (baseline)
   const domainIds = detectDomains(task, idx, options.domains || []);
@@ -1209,6 +1285,7 @@ async function selectAssets(idx, task, options = {}) {
   if (!(options.domains || []).length) {
     finalDomainIds = finalDomainIds
       .filter((id) => !blockedDomains.has(id))
+      .filter((id) => !(id === 'marketing-growth' && isProductImplementationContext(task) && !hasMarketingExecutionIntent(task)))
       .filter((id) => !EXPLICIT_SIGNAL_DOMAINS.has(id) || hasExplicitDomainSignal(task, id));
     if (!finalDomainIds.length) finalDomainIds = ['misc'];
   }
@@ -1301,6 +1378,8 @@ async function selectAssets(idx, task, options = {}) {
   const modelHints = recommendedModels(complexity);
 
   const fallbackRecommended = picks.length === 0;
+  const processWorkflow = workflowRecommendations(idx, task, finalDomainIds);
+  const parallelPlan = parallelExecutionPlan(task, finalDomainIds, options.preflight || { executor });
 
   return {
     task,
@@ -1318,6 +1397,8 @@ async function selectAssets(idx, task, options = {}) {
     synthesis,
     synthesisUsed: Boolean(synthesis),
     suggestions: proactiveSuggestions(task, finalDomainIds, idx),
+    processWorkflow,
+    parallelPlan,
     fallbackRecommended,
     fallback: fallbackRecommended ? fallbackGuidance(task) : null,
     modelHints,
@@ -1400,6 +1481,14 @@ function formatResult(result) {
       lines.push('https://github.com/vercel-labs/skills');
     }
   } else {
+    if (result.processWorkflow && result.processWorkflow.length) {
+      lines.push('Recommended workflow:');
+      result.processWorkflow.forEach((step, index) => {
+        const availability = step.available ? '' : ' (not indexed in current inventory)';
+        lines.push(`  ${index + 1}. ${step.name} -> ${step.invoke}${availability}`);
+      });
+      lines.push('');
+    }
     if (result.bundle && result.bundle.length) {
       lines.push('Recommended bundle:');
       result.bundle.slice(0, 6).forEach((asset, index) => {
@@ -1418,6 +1507,15 @@ function formatResult(result) {
       lines.push(`${index + 1}. ${asset.name} - ${asset.type} - score ${asset.score} - ${asset.domain}`);
       lines.push(`   Why: matched ${asset.matched.join(', ') || 'task context'}`);
       lines.push(`   Invoke: ${asset.invoke}`);
+    });
+  }
+
+  if (result.parallelPlan && result.parallelPlan.recommended) {
+    lines.push('');
+    lines.push(`Parallel execution: ${result.parallelPlan.executor}`);
+    lines.push(`Reason: ${result.parallelPlan.reason}`);
+    result.parallelPlan.workstreams.forEach((item, index) => {
+      lines.push(`  ${index + 1}. ${item}`);
     });
   }
 

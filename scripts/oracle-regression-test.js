@@ -76,6 +76,8 @@ const CASES = [
     expectedDomains: ['design-ui', 'web-dev', 'database-data', 'data-analytics'],
     forbiddenDomains: ['marketing-growth'],
     expectedResultNames: ['awesome-design-md', 'ui-ux-pro-max', 'impeccable', 'react:components', 'supabase'],
+    expectedWorkflowNames: ['using-superpowers', 'brainstorming', 'writing-plans'],
+    expectParallelRecommended: true,
   },
   {
     name: 'mixed-logo-and-ui',
@@ -188,6 +190,19 @@ async function checkCase(idx, testCase) {
   }
   if (testCase.expectSynthesisUsed) {
     assertCheck(result.synthesisUsed, `[${testCase.name}] expected synthesisUsed=true`);
+  }
+  if (testCase.expectedWorkflowNames) {
+    const workflowNames = new Set((result.processWorkflow || []).map((step) => step.name));
+    for (const name of testCase.expectedWorkflowNames) {
+      assertCheck(
+        workflowNames.has(name),
+        `[${testCase.name}] expected workflow ${name}, got ${Array.from(workflowNames).join(', ')}`
+      );
+    }
+  }
+  if (testCase.expectParallelRecommended === true) {
+    assertCheck(result.parallelPlan?.recommended, `[${testCase.name}] expected parallelPlan.recommended=true`);
+    assertCheck((result.parallelPlan?.workstreams || []).length >= 2, `[${testCase.name}] expected at least 2 workstreams`);
   }
 
   return {
