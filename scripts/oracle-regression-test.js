@@ -44,21 +44,42 @@ const CASES = [
     expectedDomains: ['web-dev', 'finance-billing', 'testing-qa'],
     expectedPickNames: ['react:components', 'playwright'],
   },
+  {
+    name: 'ga4-tracking-direct',
+    task: 'configurar GA4 Google Analytics Tag Manager eventos de conversao UTMs e tracking de signup',
+    expectedDomains: ['data-analytics'],
+    expectedPickNames: ['analytics-tracking'],
+  },
+  {
+    name: 'negated-domain-noise',
+    task: 'calcular genealogia ritual de uma lingua ficticia alienigena sem relacao com software marketing design dados ou automacao',
+    forbiddenDomains: ['marketing-growth', 'design-ui', 'web-dev'],
+    expectFallbackRecommended: true,
+  },
 ];
 
 async function checkCase(idx, testCase) {
   const result = await selectAssets(idx, testCase.task, { limit: 8 });
-  for (const domain of testCase.expectedDomains) {
+  for (const domain of testCase.expectedDomains || []) {
     assertCheck(result.domains.includes(domain), `[${testCase.name}] expected domain ${domain}, got ${result.domains.join(', ')}`);
+  }
+  for (const domain of testCase.forbiddenDomains || []) {
+    assertCheck(!result.domains.includes(domain), `[${testCase.name}] forbidden domain ${domain}, got ${result.domains.join(', ')}`);
   }
 
   const pickNames = new Set(result.picks.map((pick) => pick.name));
-  assertCheck(
-    testCase.expectedPickNames.some((name) => pickNames.has(name)),
-    `[${testCase.name}] expected one of ${testCase.expectedPickNames.join(', ')} in picks, got ${Array.from(pickNames).join(', ')}`
-  );
-  assertCheck(result.bundle.length > 0, `[${testCase.name}] expected non-empty bundle`);
-  assertCheck(result.virtualMasters.length > 0, `[${testCase.name}] expected virtual masters report`);
+  if (testCase.expectedPickNames) {
+    assertCheck(
+      testCase.expectedPickNames.some((name) => pickNames.has(name)),
+      `[${testCase.name}] expected one of ${testCase.expectedPickNames.join(', ')} in picks, got ${Array.from(pickNames).join(', ')}`
+    );
+  }
+  if (testCase.expectFallbackRecommended) {
+    assertCheck(result.fallbackRecommended, `[${testCase.name}] expected fallbackRecommended=true`);
+  } else {
+    assertCheck(result.bundle.length > 0, `[${testCase.name}] expected non-empty bundle`);
+    assertCheck(result.virtualMasters.length > 0, `[${testCase.name}] expected virtual masters report`);
+  }
   if (testCase.expectSynthesisUsed) {
     assertCheck(result.synthesisUsed, `[${testCase.name}] expected synthesisUsed=true`);
   }

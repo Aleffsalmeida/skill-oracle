@@ -58,7 +58,7 @@ const DOMAINS = [
   },
   {
     id: 'data-analytics', label: 'Data / Analytics', master: 'oracle-master-analytics',
-    kw: ['analytics', 'dashboard', 'visualization', 'chart', 'metric', 'kpi', 'posthog', 'mixpanel', 'amplitude', 'segment', 'tableau', 'looker', 'metabase', 'forecasting', 'time-series', 'clustering', 'regression-analysis'],
+    kw: ['analytics', 'dashboard', 'visualization', 'chart', 'metric', 'kpi', 'posthog', 'mixpanel', 'amplitude', 'segment', 'tableau', 'looker', 'metabase', 'forecasting', 'time-series', 'clustering', 'regression-analysis', 'ga4', 'gtm', 'google-analytics', 'google analytics', 'tag-manager', 'tag manager', 'utm', 'utms', 'tracking', 'conversion-tracking', 'event-tracking', 'attribution'],
   },
   {
     id: 'marketing-growth', label: 'Marketing / Growth', master: 'oracle-master-marketing',

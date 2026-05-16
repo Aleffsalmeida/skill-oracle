@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/schema-v2-purple?style=flat-square" alt="schema"/>
 </p>
 
-**Single entry point for 5,000+ Claude Code and Codex-local assets.** Indexes Skills, Agents, Plugins, and MCP servers — then routes any task to the right Master Agent in Claude Code or to the local semantic selector in Codex-compatible runtimes.
+**Single entry point for 5,000+ Claude Code, Overclock, and Codex-local assets.** Indexes Skills, Agents, Plugins, and MCP servers — then routes any task to the right Master Agent in Claude Code or to the local semantic selector in Overclock/Codex-compatible runtimes.
 
 Loads minutes-of-overhead environments in seconds. Built for Claude Code users who have hundreds of plugins and don't want to pay token cost on every prompt.
 
@@ -63,7 +63,7 @@ The old `build-index.js` is preserved for backward compat. New pipeline is `scan
               final answer
 ```
 
-Every asset carries a `domain` and `master_agent` tag in the index. In Claude Code, the Oracle dispatches in parallel and each master sees only its own cluster. In Codex/local runtimes, `scripts/oracle-query.js` reads the same index, evaluates enriched semantic fields extracted from each `SKILL.md`, and ranks assets deterministically without requiring Claude Code's `Task` dispatcher.
+Every asset carries a `domain` and `master_agent` tag in the index. In Claude Code, the Oracle dispatches in parallel and each master sees only its own cluster. In Overclock/Codex/local runtimes, `scripts/oracle-query.js` reads the same index, evaluates enriched semantic fields extracted from each `SKILL.md`, and ranks assets deterministically without requiring Claude Code's `Task` dispatcher. In Overclock, follow-up agent work should be delegated through visible `pane_spawn` panes.
 
 The local path is not a per-domain LLM orchestration layer. It is a semantic selector that approximates the master-agent bundle by combining:
 
@@ -106,7 +106,7 @@ skill-oracle/
     install-agents.js   # copies masters into ~/.claude/agents/
     optimizer.js        # settings.json lazy-loading optimizer
     auto-rebuild.js     # SessionStart hook entry point
-    oracle-query.js     # Codex/local semantic selector; no Task dispatcher required
+    oracle-query.js     # Overclock/Codex/local semantic selector; no Task dispatcher required
     oracle-smoke-test.js # local health check for scripts, index, agents, query
     build-index.js      # legacy v1 builder (kept for backward compat)
 ```
@@ -224,9 +224,9 @@ Slash command:
 /skill-oracle --no-debate <task>     # cheapest path, no master debate
 ```
 
-### Codex/local usage
+### Overclock/Codex/local usage
 
-Codex does not expose Claude Code's native `Task(subagent_type="...")` dispatcher. Use the local runner instead:
+Overclock and Codex do not expose Claude Code's native `Task(subagent_type="...")` dispatcher safely. Use the local runner instead:
 
 ```bash
 node ~/.claude/skills/skill-oracle/scripts/oracle-query.js "build a React dashboard with Stripe billing and Playwright tests"
@@ -340,7 +340,7 @@ Safety filters applied to every ecosystem result:
 
 Accepted recommendations get **auto-indexed** on the next Oracle run because the inventory signature changes. No manual scanner/classifier command is required after the skill is installed.
 
-Codex/local note: `oracle-query.js` cannot directly invoke another runtime skill by itself, so it exits with code `2` and prints the exact `find-skills` invocation. Claude Code skill orchestration should invoke `find-skills` immediately when it sees that fallback signal.
+Overclock/Codex/local note: `oracle-query.js` cannot directly invoke another runtime skill by itself, so it exits with code `2` and prints the exact `find-skills` invocation. Claude Code skill orchestration should invoke `find-skills` immediately when it sees that fallback signal. In Overclock, visible panes are the supported delegation path for deeper agent review.
 
 ### Privacy and repository safety
 

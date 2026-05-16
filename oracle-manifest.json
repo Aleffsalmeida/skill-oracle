@@ -1,6 +1,6 @@
 {
-  "version": "2.4.1",
-  "updated_at": "2026-05-15T23:36:00Z",
+  "version": "2.4.2",
+  "updated_at": "2026-05-16T05:55:00Z",
   "paths": [
     "SKILL.md",
     "README.md",
@@ -17,6 +17,7 @@
     "scripts/optimizer.js",
     "scripts/oracle-bootstrap.js",
     "scripts/oracle-query.js",
+    "scripts/oracle-regression-test.js",
     "scripts/oracle-smoke-test.js",
     "scripts/scanner.js",
     "scripts/setup.js",

@@ -46,11 +46,20 @@ const STOPWORDS = new Set([
   'o', 'os', 'a', 'as', 'de', 'da', 'das', 'do', 'dos', 'e', 'em', 'na',
   'nas', 'no', 'nos', 'para', 'por', 'com', 'sem', 'um', 'uma', 'uns',
   'umas', 'ao', 'aos', 'que', 'como',
+  'relacao', 'relação', 'related', 'relation',
 ]);
 const ACTION_WORDS = new Set([
   'add', 'build', 'change', 'create', 'fix', 'implement', 'make', 'need',
   'setup', 'update', 'write',
   'melhorar', 'corrigir', 'criar', 'fazer', 'ajustar', 'usar', 'quero',
+]);
+const NEGATION_CUES = new Set([
+  'without', 'except', 'excluding', 'exclude', 'not', 'no',
+  'sem', 'exceto', 'excluir', 'excluindo', 'nao', 'não',
+]);
+const NEGATION_BREAKS = new Set([
+  'and', 'or', 'but', 'then', 'with', 'using',
+  'e', 'ou', 'mas', 'entao', 'então', 'com', 'usando',
 ]);
 
 function findLocalSkill(name) {
@@ -151,7 +160,7 @@ const DOMAIN_KEYWORDS = [
   {
     id: 'data-analytics',
     proactive: [],
-    kw: ['analytics', 'dashboard', 'visualization', 'chart', 'metric', 'kpi', 'posthog', 'mixpanel', 'amplitude', 'segment', 'tableau', 'looker', 'metabase', 'forecasting', 'time-series'],
+    kw: ['analytics', 'dashboard', 'visualization', 'chart', 'metric', 'kpi', 'posthog', 'mixpanel', 'amplitude', 'segment', 'tableau', 'looker', 'metabase', 'forecasting', 'time-series', 'ga4', 'gtm', 'google-analytics', 'google analytics', 'tag-manager', 'tag manager', 'utm', 'utms', 'tracking', 'conversion-tracking', 'event-tracking', 'attribution'],
   },
   {
     id: 'marketing-growth',
@@ -205,6 +214,7 @@ const INTENT_PATTERNS = [
   { re: /\b(atalho|shortcut|hotkey|botoes|botões|botao|botão)\b/, domains: ['web-dev', 'design-ui'] },
   { re: /\b(electron|janela|taskbar|topbar|barra do windows)\b/, domains: ['web-dev', 'design-ui'] },
   { re: /\b(claude code|codex|oracle|plugin|skill|hook|setup)\b/, domains: ['tooling-meta'] },
+  { re: /\b(ga4|gtm|google analytics|tag manager|utm|utms|tracking|conversion tracking|event tracking|attribution)\b/, domains: ['data-analytics'] },
 ];
 
 const TYPE_PRIORITY = { skill: 4, agent: 3, mcp: 2, plugin: 1 };
@@ -436,6 +446,41 @@ function buildTokenSet(text) {
   return new Set(tokenize(text));
 }
 
+function escapeRegex(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function containsKeyword(text, normalizedKw) {
+  if (!normalizedKw) return false;
+  if (/^[a-z0-9.+#-]+$/.test(normalizedKw)) {
+    return new RegExp(`(^|[^a-z0-9.+#-])${escapeRegex(normalizedKw)}($|[^a-z0-9.+#-])`).test(text);
+  }
+  return text.includes(normalizedKw);
+}
+
+function negatedTokenSet(text) {
+  const rawTokens = normalize(text)
+    .split(/[^a-z0-9.+#-]+/)
+    .filter(Boolean);
+  const negated = new Set();
+  for (let i = 0; i < rawTokens.length; i += 1) {
+    if (!NEGATION_CUES.has(rawTokens[i])) continue;
+    for (let j = i + 1; j < Math.min(rawTokens.length, i + 8); j += 1) {
+      const token = rawTokens[j];
+      if ((token === 'com' || token === 'with') && j <= i + 3) continue;
+      if (NEGATION_BREAKS.has(token)) break;
+      if (STOPWORDS.has(token) || ACTION_WORDS.has(token)) continue;
+      negated.add(token);
+    }
+  }
+  return negated;
+}
+
+function positiveTokens(task) {
+  const negated = negatedTokenSet(task);
+  return tokenize(task).filter((token) => !negated.has(token));
+}
+
 function isMeaningfulToken(token) {
   return token.length >= MIN_TOKEN_LENGTH || SHORT_TOKEN_ALLOWLIST.has(token);
 }
@@ -477,17 +522,20 @@ function buildAssetSemanticTokens(asset) {
 
 function scoreDomainText(task, domain) {
   const text = normalize(task);
-  const taskTokens = buildTokenSet(text);
+  const taskTokens = new Set(positiveTokens(task));
+  const negated = negatedTokenSet(task);
   let score = 0;
   const matched = [];
   for (const kw of domain.kw) {
     const normalizedKw = normalize(kw);
+    const kwTokens = tokenize(normalizedKw);
+    if (kwTokens.length && kwTokens.every((token) => negated.has(token))) continue;
     if (taskTokens.has(normalizedKw)) {
       score += normalizedKw.length > 4 ? 4 : 3;
       matched.push(normalizedKw);
       continue;
     }
-    if (text.includes(normalizedKw)) {
+    if (!kwTokens.some((token) => negated.has(token)) && containsKeyword(text, normalizedKw)) {
       score += normalizedKw.length > 4 ? 2 : 1;
       matched.push(kw);
     }
@@ -602,7 +650,7 @@ function scoreAsset(asset, taskTokens) {
   return { score, matched: Array.from(new Set(matched)).slice(0, 8) };
 }
 
-function enrichRankedAsset(asset, domain, result) {
+function enrichRankedAsset(asset, domain, result, executor = null) {
   const segments = semanticSegments(asset);
   return {
     id: asset.id,
@@ -625,7 +673,7 @@ function enrichRankedAsset(asset, domain, result) {
     },
     path: asset.path,
     source: asset.source,
-    invoke: invocationHint(asset),
+    invoke: invocationHint(asset, executor),
   };
 }
 
@@ -637,9 +685,18 @@ function canonicalAssetKey(asset) {
   ].join('::');
 }
 
-function invocationHint(asset) {
+function invocationHint(asset, executor = null) {
   if (asset.type === 'skill') return `Skill("${asset.name}")`;
-  if (asset.type === 'agent') return `Task(subagent_type="${asset.name}")`;
+  if (asset.type === 'agent') {
+    const executorName = normalize(executor?.name || process.env.ORACLE_EXECUTOR || '');
+    if (executorName === 'pane_spawn') {
+      return `pane_spawn visible pane, then prompt it to use ${asset.name}`;
+    }
+    if (executorName === 'oracle-query.js' || executorName === 'local-runner') {
+      return `local guidance only: ${asset.name}`;
+    }
+    return `Task(subagent_type="${asset.name}")`;
+  }
   if (asset.type === 'mcp') return `mcp__${asset.name}__*`;
   return `plugin:${asset.name}`;
 }
@@ -713,8 +770,23 @@ function buildRecommendedBundle(domainReports, picks, task) {
   if (intents.branding) preferredByIntent.push(['brandkit', 'impeccable', 'high-end-visual-design']);
   if (intents.ui || intents.shortcuts) preferredByIntent.push(['design-taste-frontend', 'frontend-design', 'ui-toolkit/web', 'react:components']);
   if (intents.desktop) preferredByIntent.push(['design-taste-frontend', 'frontend-design', 'zoom-meeting-sdk-electron']);
+  if (/\b(ga4|gtm|google analytics|tag manager|utm|utms|tracking|conversion tracking|event tracking|attribution)\b/.test(taskText)) {
+    preferredByIntent.unshift(['analytics-tracking', 'product-tracking-generate-implementation-guide', 'configuring-experiment-analytics']);
+  }
   if (/\boracle\b/.test(taskText) || (/\bskill/.test(taskText) && /\bjunt/.test(taskText))) {
     preferredByIntent.unshift(['skill-oracle', 'workspace-surface-audit', 'plugin-structure']);
+  }
+
+  for (const names of preferredByIntent) {
+    for (const name of names) {
+      const asset = picks.find((candidate) => candidate.name === name)
+        || domainReports.flatMap((report) => report.top || []).find((candidate) => candidate.name === name);
+      if (asset && !seen.has(canonicalAssetKey(asset))) {
+        bundle.push(asset);
+        seen.add(canonicalAssetKey(asset));
+        break;
+      }
+    }
   }
 
   for (const report of domainReports) {
@@ -778,7 +850,8 @@ function mergeBundleIntoPicks(bundle, picks, limit) {
 async function selectAssets(idx, task, options = {}) {
   // Keyword-based domain detection (baseline)
   const domainIds = detectDomains(task, idx, options.domains || []);
-  const taskTokens = tokenize(task);
+  const taskTokens = positiveTokens(task);
+  const executor = options.executor || options.preflight?.preflight?.executor || null;
 
   // Embedding enhancement: load pre-built vectors and embed the query
   let queryVector = null;
@@ -859,7 +932,7 @@ async function selectAssets(idx, task, options = {}) {
           if (sim > 0.45) score += (sim - 0.45) * 50;
         }
 
-        return enrichRankedAsset(asset, domain, { score, matched: result.matched });
+        return enrichRankedAsset(asset, domain, { score, matched: result.matched }, executor);
       })
       .filter((asset) => asset.score > 0)
       .sort((a, b) => {
@@ -919,6 +992,8 @@ async function selectAssets(idx, task, options = {}) {
   const complexity = estimateComplexity(task, finalDomainIds, picks);
   const modelHints = recommendedModels(complexity);
 
+  const fallbackRecommended = picks.length === 0 || finalDomainIds.every((id) => id === 'misc');
+
   return {
     task,
     domains: finalDomainIds,
@@ -935,8 +1010,8 @@ async function selectAssets(idx, task, options = {}) {
     synthesis,
     synthesisUsed: Boolean(synthesis),
     suggestions: proactiveSuggestions(task, finalDomainIds, idx),
-    fallbackRecommended: picks.length === 0,
-    fallback: picks.length === 0 ? fallbackGuidance(task) : null,
+    fallbackRecommended,
+    fallback: fallbackRecommended ? fallbackGuidance(task) : null,
     modelHints,
   };
 }
@@ -1137,7 +1212,7 @@ async function main(argv = process.argv.slice(2)) {
     return 1;
   }
 
-  const result = await selectAssets(idx, args.task, args);
+  const result = await selectAssets(idx, args.task, { ...args, executor: preflight.preflight.executor, preflight });
   if (args.json) console.log(JSON.stringify(result, null, 2));
   else console.log(formatResult(result));
   return result.fallbackRecommended ? 2 : 0;

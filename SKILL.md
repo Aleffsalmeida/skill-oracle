@@ -50,13 +50,14 @@ You are the **single entry point** for all asset discovery in Claude Code and Co
 Before routing, identify the current host runtime:
 
 - **Claude Code runtime:** `Task` subagents are available and `~/.claude/agents/oracle-master-*.md` can be discovered. Use the Master Agent procedure below.
+- **Overclock runtime:** visible panes are available and invisible `Task` subagents may be blocked. Use `scripts/oracle-query.js` for ranking, then delegate only through visible `pane_spawn` panes when deeper review is needed.
 - **Codex or generic local runtime:** `Task(subagent_type=...)` is not available. Do not pretend to dispatch subagents. Use the local runner instead:
 
 ```bash
 node ~/.claude/skills/skill-oracle/scripts/oracle-query.js "<task description>"
 ```
 
-The local runner reads `~/.claude/oracle-index.json`, detects domains, ranks assets directly, prints the top picks, and exits with code `2` when no strong local match exists. Treat exit code `2` as the signal to use the `find-skills` fallback.
+The local runner reads `~/.claude/oracle-index.json`, detects domains, ranks assets directly, prints the top picks, and exits with code `2` when no strong local match exists or only `misc` matches. Treat exit code `2` as the signal to use the `find-skills` fallback.
 
 ### Model policy
 
@@ -123,7 +124,7 @@ Output a short list: `domains = ["web-dev", "finance-billing"]` (1-3 domains, ma
 
 ### Step 3 — Dispatch to Master Agents (parallel)
 
-**Claude Code only.** If you are in Codex/local runtime, skip this step and run `scripts/oracle-query.js` instead.
+**Claude Code only.** If you are in Overclock, Codex, or another local runtime, skip this step and run `scripts/oracle-query.js` instead. In Overclock, any follow-up delegation must use visible panes, not invisible background subagents.
 
 For each identified domain `D`, invoke its Master Agent via the **Task tool**:
 
@@ -153,7 +154,7 @@ node ~/.claude/skills/skill-oracle/scripts/oracle-query.js --rebuild
 node ~/.claude/skills/skill-oracle/scripts/oracle-smoke-test.js
 ```
 
-When using Codex, summarize the `oracle-query.js` output to the user and then invoke the recommended skill or tool according to Codex's available skill/tool mechanism.
+When using Overclock or Codex, summarize the `oracle-query.js` output to the user and then invoke the recommended skill or tool according to the host's available mechanism. For Overclock, agent recommendations should be treated as visible `pane_spawn` follow-up work; direct `Task(subagent_type=...)` is only valid in Claude Code.
 
 ### Step 4 — Synthesize
 

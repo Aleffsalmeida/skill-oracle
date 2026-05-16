@@ -84,10 +84,34 @@ function isInventoryChanged(index = null) {
 
 function detectRuntime() {
   const env = process.env;
+  const forced = String(env.ORACLE_RUNTIME || '').trim().toLowerCase();
+  if (['overclock', 'codex', 'claude-code', 'local'].includes(forced)) {
+    return forced === 'local' ? 'codex' : forced;
+  }
+
+  const overclockHints = [
+    env.OVERCLOCK_APP,
+    env.OVERCLOCK_WORKSPACE,
+    env.OVERCLOCK_SESSION,
+    fs.existsSync(path.join(HOME, '.overclock-app')),
+    fs.existsSync(path.join(HOME, 'AppData', 'Roaming', 'Overclock')),
+    fs.existsSync(path.join(HOME, 'AppData', 'Local', 'Overclock')),
+  ];
+  const codexHints = [
+    env.CODEX_HOME,
+    env.CODEX,
+    env.CODEX_THREAD_ID,
+    env.CODEX_MANAGED_BY_NPM,
+  ];
+  const claudeHints = [
+    env.CLAUDE_CODE,
+    env.CLAUDE_HOME,
+    env.CLAUDECODE,
+  ];
   const hints = [
-    ['overclock', env.OVERCLOCK_APP || env.OVERCLOCK_WORKSPACE || fs.existsSync(path.join(HOME, '.overclock-app'))],
-    ['codex', env.CODEX_HOME || env.CODEX],
-    ['claude-code', env.CLAUDE_CODE || env.CLAUDE_HOME || fs.existsSync(CLAUDE_ROOT)],
+    ['overclock', overclockHints.some(Boolean)],
+    ['codex', codexHints.some(Boolean)],
+    ['claude-code', claudeHints.some(Boolean)],
   ];
 
   for (const [runtime, hit] of hints) {
@@ -384,6 +408,9 @@ function getLocalManifest() {
 function tryBuildEmbeddings(quiet) {
   try {
     if (process.env.ORACLE_SKIP_EMBEDDINGS === '1') return { built: false, reason: 'disabled' };
+    if (fs.existsSync(path.join(CLAUDE_ROOT, 'oracle-embeddings.json')) && !isInventoryChanged()) {
+      return { built: false, reason: 'already-current' };
+    }
     const embedConfig = require('./embed-config');
     const apiConfig = embedConfig.getApiKey();
     if (!apiConfig) return { built: false, reason: 'no-api-key' };
