@@ -70,6 +70,7 @@ The local path is not a per-domain LLM orchestration layer. It is a semantic sel
 - `name`, `description`, and classification keywords
 - extracted `content_summary`, `use_when`, `workflow_terms`, and `capability_terms`
 - intent boosts for UI, desktop, branding, shortcuts, and tooling tasks
+- capability aliases for natural-language intents such as logo/brand, video/motion, tracking, signup/onboarding, SEO/schema, payments, security, testing, docs/files, mobile, ecommerce, and CRM
 
 This keeps the local runner fast and deterministic while still preserving most of the signal hidden inside the skill content.
 

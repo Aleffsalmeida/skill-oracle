@@ -51,6 +51,42 @@ const CASES = [
     expectedPickNames: ['analytics-tracking'],
   },
   {
+    name: 'brand-video-logo-natural',
+    task: 'preciso criar uma identidade visual premium com logo novo e gerar um video motion de apresentacao da marca para redes sociais',
+    expectedDomains: ['design-ui'],
+    expectedResultNames: ['brandkit', 'remotion'],
+  },
+  {
+    name: 'signup-onboarding-ga4',
+    task: 'quero otimizar cadastro onboarding emails e medir eventos no GA4',
+    expectedDomains: ['marketing-growth', 'data-analytics'],
+    expectedResultNames: ['signup-flow-cro', 'email-sequence', 'analytics-tracking'],
+  },
+  {
+    name: 'seo-schema-ai-search',
+    task: 'preciso melhorar SEO com schema json ld e aparecer em respostas de IA',
+    expectedDomains: ['marketing-growth', 'docs-content'],
+    expectedResultNames: ['seo-audit', 'schema-markup'],
+  },
+  {
+    name: 'stripe-pricing-paywall',
+    task: 'preciso configurar Stripe checkout assinatura pricing e paywall',
+    expectedDomains: ['finance-billing'],
+    expectedResultNames: ['stripe-best-practices', 'pricing-strategy'],
+  },
+  {
+    name: 'mobile-app-design',
+    task: 'desenhar telas premium para aplicativo mobile iOS e Android',
+    expectedDomains: ['mobile', 'design-ui'],
+    expectedResultNames: ['imagegen-frontend-mobile', 'ios-hig-design'],
+  },
+  {
+    name: 'docs-file-workflow',
+    task: 'editar contrato em docx gerar pdf e criar planilha xlsx de resumo',
+    expectedDomains: ['docs-content'],
+    expectedResultNames: ['docx', 'pdf', 'xlsx'],
+  },
+  {
     name: 'negated-domain-noise',
     task: 'calcular genealogia ritual de uma lingua ficticia alienigena sem relacao com software marketing design dados ou automacao',
     forbiddenDomains: ['marketing-growth', 'design-ui', 'web-dev'],
@@ -68,10 +104,17 @@ async function checkCase(idx, testCase) {
   }
 
   const pickNames = new Set(result.picks.map((pick) => pick.name));
+  const resultNames = new Set([...result.picks, ...result.bundle].map((pick) => pick.name));
   if (testCase.expectedPickNames) {
     assertCheck(
       testCase.expectedPickNames.some((name) => pickNames.has(name)),
       `[${testCase.name}] expected one of ${testCase.expectedPickNames.join(', ')} in picks, got ${Array.from(pickNames).join(', ')}`
+    );
+  }
+  for (const name of testCase.expectedResultNames || []) {
+    assertCheck(
+      resultNames.has(name),
+      `[${testCase.name}] expected ${name} in picks or bundle, got ${Array.from(resultNames).join(', ')}`
     );
   }
   if (testCase.expectFallbackRecommended) {

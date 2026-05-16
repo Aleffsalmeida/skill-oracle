@@ -118,6 +118,7 @@ Extract the user's intent. Identify candidate domains using these heuristics:
 
 - **Direct keywords** — match against each domain's `keywords[]` in `oracle-index.json.domains[]`.
 - **Co-occurrence** — tasks like "build website with payments" -> `web-dev` + `finance-billing`.
+- **Capability aliases** — map natural-language intents to tool-specific skills, e.g. "brand video" -> `remotion`, "event tracking" -> `analytics-tracking`, "JSON-LD" -> `schema-markup`, "signup dropoff" -> `signup-flow-cro`.
 - **Implicit needs** — any task that produces or modifies code -> consider `security-audit` + `testing-qa` as proactive suggestions.
 
 Output a short list: `domains = ["web-dev", "finance-billing"]` (1-3 domains, max 5).
@@ -161,6 +162,7 @@ When using Overclock or Codex, summarize the `oracle-query.js` output to the use
 Collect all picks. Deduplicate by `asset.id`. Re-rank by:
 - Score returned by master
 - Cross-domain reinforcement (asset that appeared in 2+ masters wins)
+- Capability-slot coverage for compound requests (logo + video + social, signup + email + tracking, SEO + schema, payments + pricing, etc.)
 - Type preference: `skill` > `agent` > `plugin` > `mcp` for declarative tasks; reverse for exploratory tasks
 
 Present **top 5 final** with invocation guidance:

@@ -217,6 +217,93 @@ const INTENT_PATTERNS = [
   { re: /\b(ga4|gtm|google analytics|tag manager|utm|utms|tracking|conversion tracking|event tracking|attribution)\b/, domains: ['data-analytics'] },
 ];
 
+const CAPABILITY_INTENTS = [
+  {
+    id: 'logo-brand',
+    re: /\b(logo|icone|icon|simbolo|brand|branding|identidade visual|brand kit|brandkit|marca|manual da marca)\b/,
+    domains: ['design-ui'],
+    skills: ['brandkit', 'high-end-visual-design', 'stitch-design-taste', 'imagegen-frontend-web'],
+  },
+  {
+    id: 'video-motion',
+    re: /\b(video|videos|motion|animacao|animar|animated|animation|reel|shorts|story|stories|apresentacao|brand video|demo video|walkthrough|trailer|redes sociais)\b/,
+    domains: ['design-ui', 'web-dev'],
+    skills: ['remotion', 'remotion-video-creation', 'remotion-to-hyperframes', 'frontend-slides'],
+  },
+  {
+    id: 'social-creative',
+    re: /\b(redes sociais|social media|linkedin|instagram|tiktok|facebook|x\/twitter|twitter|post social|criativo|ad creative|anuncio|anuncios|ads)\b/,
+    domains: ['marketing-growth', 'design-ui'],
+    skills: ['social-content', 'ad-creative', 'paid-ads', 'imagegen-frontend-web'],
+  },
+  {
+    id: 'analytics-tracking',
+    re: /\b(ga4|gtm|google analytics|tag manager|utm|utms|tracking|conversion tracking|event tracking|attribution|mensuracao|medir conversao|eventos de conversao)\b/,
+    domains: ['data-analytics'],
+    skills: ['analytics-tracking', 'product-tracking-generate-implementation-guide', 'configuring-experiment-analytics'],
+  },
+  {
+    id: 'experimentation',
+    re: /\b(a\/b|ab test|a b test|split test|experimento|experimentos|variant|variante|hipotese|significancia|testar duas versoes)\b/,
+    domains: ['marketing-growth', 'data-analytics'],
+    skills: ['ab-test-setup', 'configuring-experiment-analytics', 'creating-experiments'],
+  },
+  {
+    id: 'signup-onboarding',
+    re: /\b(signup|sign up|cadastro|registro|registration|trial|onboarding|ativacao|activation|aha moment|primeira sessao|dropoff|abandono)\b/,
+    domains: ['marketing-growth', 'data-analytics'],
+    skills: ['signup-flow-cro', 'onboarding-cro', 'email-sequence', 'analytics-tracking'],
+  },
+  {
+    id: 'seo-schema',
+    re: /\b(seo|schema|json-ld|rich snippet|sitemap|trafego organico|ranking|google search|ai overview|ai search|llm seo|programmatic seo)\b/,
+    domains: ['marketing-growth', 'docs-content'],
+    skills: ['seo-audit', 'schema-markup', 'ai-seo', 'programmatic-seo', 'site-architecture'],
+  },
+  {
+    id: 'payments-billing',
+    re: /\b(stripe|pagamento|pagamentos|checkout|billing|assinatura|subscription|invoice|fatura|pricing|preco|precos|paywall|churn|cancelamento)\b/,
+    domains: ['finance-billing', 'marketing-growth', 'security-audit'],
+    skills: ['stripe-best-practices', 'pricing-strategy', 'paywall-upgrade-cro', 'churn-prevention', 'finance-billing-ops'],
+  },
+  {
+    id: 'security-review',
+    re: /\b(seguranca|security|vulnerabilidade|vulnerability|owasp|pentest|auth|oauth|jwt|xss|csrf|sql injection|secrets|compliance|soc2|pci|gdpr|auditoria)\b/,
+    domains: ['security-audit', 'testing-qa'],
+    skills: ['security-review', 'security-scan', 'compliance-audit', 'claude-setup-audit'],
+  },
+  {
+    id: 'testing-browser',
+    re: /\b(playwright|cypress|selenium|e2e|teste end to end|testes end to end|browser test|visual regression|regression test|qa|coverage)\b/,
+    domains: ['testing-qa'],
+    skills: ['playwright', 'e2e-testing', 'browser-qa', 'testing-visual-regression'],
+  },
+  {
+    id: 'docs-files',
+    re: /\b(pdf|docx|xlsx|planilha|documento|contrato|relatorio|presentation|pptx|slides|manual|documentacao|readme)\b/,
+    domains: ['docs-content'],
+    skills: ['pdf', 'docx', 'xlsx', 'copy-editing', 'writing-plans'],
+  },
+  {
+    id: 'mobile-app',
+    re: /\b(mobile|ios|android|app nativo|react native|expo|flutter|swiftui|kotlin|app store|google play)\b/,
+    domains: ['mobile', 'design-ui'],
+    skills: ['imagegen-frontend-mobile', 'ios-hig-design', 'swiftui-patterns', 'flutter-dart-code-review'],
+  },
+  {
+    id: 'ecommerce-shop',
+    re: /\b(shopify|woocommerce|loja online|ecommerce|e-commerce|carrinho|produto|sku|storefront|checkout extensions)\b/,
+    domains: ['ecommerce', 'finance-billing'],
+    skills: ['shopify-use-shopify-cli', 'shopify-storefront-headless', 'shopify-functions', 'shopify-checkout-extensions'],
+  },
+  {
+    id: 'crm-sales',
+    re: /\b(crm|hubspot|salesforce|pipeline|lead|leads|prospeccao|prospeccao|cold email|outbound|sales enablement|revops|demo script)\b/,
+    domains: ['crm-sales', 'marketing-growth'],
+    skills: ['revops', 'sales-enablement', 'cold-email', 'lead-magnets'],
+  },
+];
+
 const TYPE_PRIORITY = { skill: 4, agent: 3, mcp: 2, plugin: 1 };
 
 // Lazy-load embedding modules — silently skipped if not installed
@@ -492,7 +579,14 @@ function intentBoosts(task) {
     ui: /\b(interface|ui|ux|visual|layout|botao|botao|botoes|botoes|tabela|table)\b/.test(text),
     desktop: /\b(electron|desktop|taskbar|topbar|janela|barra do windows)\b/.test(text),
     shortcuts: /\b(atalho|shortcut|hotkey)\b/.test(text),
+    videoMotion: /\b(video|motion|animacao|animar|reel|shorts|story|stories|apresentacao|walkthrough|trailer|redes sociais)\b/.test(text),
+    analytics: /\b(ga4|gtm|google analytics|tag manager|utm|tracking|attribution|mensuracao|conversao)\b/.test(text),
   };
+}
+
+function matchedCapabilityIntents(task) {
+  const text = normalize(task);
+  return CAPABILITY_INTENTS.filter((intent) => intent.re.test(text));
 }
 
 function semanticSegments(asset) {
@@ -556,9 +650,12 @@ function detectDomains(task, idx, forcedDomains = []) {
       const intentBoost = INTENT_PATTERNS
         .filter((rule) => rule.re.test(normalize(task)) && rule.domains.includes(domain.id))
         .reduce((sum, _rule) => sum + 4, 0);
+      const capabilityBoost = matchedCapabilityIntents(task)
+        .filter((intent) => intent.domains.includes(domain.id))
+        .reduce((sum, _intent) => sum + 8, 0);
       return {
         ...domain,
-        score: domain.score + intentBoost,
+        score: domain.score + intentBoost + capabilityBoost,
       };
     })
     .filter((d) => d.score > 0)
@@ -600,7 +697,7 @@ function recommendedModels(complexity) {
   };
 }
 
-function scoreAsset(asset, taskTokens) {
+function scoreAsset(asset, taskTokens, activeCapabilityIntents = []) {
   const nameText = normalize(`${asset.name} ${asset.id}`);
   const descText = normalize(asset.description);
   const segments = semanticSegments(asset);
@@ -640,9 +737,16 @@ function scoreAsset(asset, taskTokens) {
   const sourceText = normalize(asset.source || '');
   const assetName = normalize(asset.name);
   const intents = intentBoosts(taskTokens.join(' '));
+  const capabilityMatches = activeCapabilityIntents.filter((intent) => intent.skills.some((name) => normalize(name) === assetName));
   if (STRONG_AUTHOR_SOURCES.some((prefix) => sourceText.startsWith(prefix))) score *= 1.12;
   if (PREFERRED_SKILLS.has(asset.name)) score *= 1.18;
+  if (capabilityMatches.length) {
+    score += capabilityMatches.length * 14;
+    for (const intent of capabilityMatches) matched.push(intent.id);
+  }
   if (intents.branding && /brandkit|logo|brand|visual|design/.test(assetName)) score *= 1.18;
+  if (intents.videoMotion && /remotion|video|motion|slides|hyperframe/.test(assetName)) score *= 1.22;
+  if (intents.analytics && /analytics|tracking|experiment|posthog|event/.test(assetName)) score *= 1.18;
   if ((intents.ui || intents.shortcuts) && /frontend|design-taste|impeccable|ui-toolkit|design/.test(assetName)) score *= 1.16;
   if (intents.desktop && /electron|frontend|ui|design/.test(assetName)) score *= 1.12;
   if (asset.user_invocable) score *= 1.2;
@@ -765,11 +869,16 @@ function buildRecommendedBundle(domainReports, picks, task) {
   const bundle = [];
   const seen = new Set();
   const taskText = normalize(task);
+  const activeCapabilityIntents = matchedCapabilityIntents(task);
 
   const preferredByIntent = [];
+  for (const intent of activeCapabilityIntents) {
+    preferredByIntent.push(intent.skills);
+  }
   if (intents.branding) preferredByIntent.push(['brandkit', 'impeccable', 'high-end-visual-design']);
   if (intents.ui || intents.shortcuts) preferredByIntent.push(['design-taste-frontend', 'frontend-design', 'ui-toolkit/web', 'react:components']);
   if (intents.desktop) preferredByIntent.push(['design-taste-frontend', 'frontend-design', 'zoom-meeting-sdk-electron']);
+  if (intents.videoMotion) preferredByIntent.push(['remotion', 'remotion-video-creation', 'remotion-to-hyperframes', 'frontend-slides']);
   if (/\b(ga4|gtm|google analytics|tag manager|utm|utms|tracking|conversion tracking|event tracking|attribution)\b/.test(taskText)) {
     preferredByIntent.unshift(['analytics-tracking', 'product-tracking-generate-implementation-guide', 'configuring-experiment-analytics']);
   }
@@ -852,6 +961,7 @@ async function selectAssets(idx, task, options = {}) {
   const domainIds = detectDomains(task, idx, options.domains || []);
   const taskTokens = positiveTokens(task);
   const executor = options.executor || options.preflight?.preflight?.executor || null;
+  const activeCapabilityIntents = matchedCapabilityIntents(task);
 
   // Embedding enhancement: load pre-built vectors and embed the query
   let queryVector = null;
@@ -916,7 +1026,7 @@ async function selectAssets(idx, task, options = {}) {
     const assets = idx.assets.filter((asset) => asset.master_agent === domain.master_agent);
     const ranked = assets
       .map((asset) => {
-        const result = scoreAsset(asset, taskTokens);
+        const result = scoreAsset(asset, taskTokens, activeCapabilityIntents);
         let { score } = result;
 
         // Additive embedding bonus: semantically similar assets get a boost
