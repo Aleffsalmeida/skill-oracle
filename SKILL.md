@@ -89,6 +89,7 @@ It should:
 - check GitHub for a newer release
 - update the local skill files when a newer version exists
 - rebuild the Oracle index if missing, stale, or forced
+- rebuild the Oracle index when the local inventory signature changes because a Skill, Agent, Plugin, or MCP server was installed, removed, or edited
 - reinstall the generated master agents
 - install the SessionStart hook automatically when asked with `--install`
 - produce a preflight report with runtime, index, hook, and master-agent status
@@ -106,7 +107,9 @@ After bootstrap, **offer optimization**:
 
 ### Step 1 — Delta detection
 
-The bootstrap already keeps the index and master agents current. It also emits a preflight report before routing so the user sees what is ready and what is missing. If the local index is older than 24h, the bootstrap refreshes it before routing. Continue immediately with whatever data is current — do not block.
+The bootstrap already keeps the index and master agents current. It also emits a preflight report before routing so the user sees what is ready and what is missing.
+
+Delta detection is based on `oracle-index.json.inventory_signature`, which summarizes installed Skills, Agents, Plugins, and MCP configuration. If the signature changed, the bootstrap reruns the master-agent/scanner/classifier pipeline automatically before routing. If the signature is unchanged and the index is less than 24h old, Oracle reuses the existing index. Continue immediately with whatever data is current — do not block.
 
 ### Step 2 — Parse the user task
 
@@ -224,11 +227,10 @@ Apply the same safety criteria the legacy oracle used:
 When a found-skills result passes all checks AND the user accepts, **auto-index it**:
 
 ```bash
-node ~/.claude/skills/skill-oracle/scripts/scanner.js
-node ~/.claude/skills/skill-oracle/scripts/classifier.js
+node ~/.claude/skills/skill-oracle/scripts/oracle-bootstrap.js --rebuild
 ```
 
-The new asset is immediately available in future invocations.
+The new asset is immediately available in future invocations. In normal usage this manual command is not required: the next `oracle-query.js` run or SessionStart hook detects the changed inventory signature and rebuilds automatically after the skill is installed.
 
 ---
 

@@ -16,7 +16,7 @@ const GITHUB_BRANCH = 'main';
 const REMOTE_MANIFEST_URL = 'https://raw.githubusercontent.com/Aleffsalmeida/skill-oracle/main/oracle-manifest.json';
 const REMOTE_RAW_BASE = 'https://raw.githubusercontent.com/Aleffsalmeida/skill-oracle/main';
 const REMOTE_API_BASE = `https://api.github.com/repos/${GITHUB_REPO}/contents`;
-const BOOTSTRAP_SCRIPTS = ['scanner.js', 'classifier.js', 'gen-masters.js', 'install-agents.js'];
+const BOOTSTRAP_SCRIPTS = ['gen-masters.js', 'install-agents.js', 'scanner.js', 'classifier.js'];
 const SESSION_HOOK_COMMAND = 'node ~/.claude/skills/skill-oracle/scripts/auto-rebuild.js';
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 10000;
@@ -61,8 +61,25 @@ function isIndexFresh() {
   if (!idx || !idx.generated_at) return false;
   if (!Array.isArray(idx.assets) || !idx.assets.length) return false;
   if (!Array.isArray(idx.domains) || idx.domains.length !== REQUIRED_MASTER_COUNT) return false;
+  if (isInventoryChanged(idx)) return false;
   const ageMs = Date.now() - Date.parse(idx.generated_at);
   return Number.isFinite(ageMs) && ageMs <= MAX_AGE_MS;
+}
+
+function computeInventorySignatureSafe() {
+  try {
+    return require('./scanner').computeInventorySignature();
+  } catch (_error) {
+    return null;
+  }
+}
+
+function isInventoryChanged(index = null) {
+  const idx = index || readJson(INDEX_PATH, null);
+  if (!idx || !idx.inventory_signature) return true;
+  const current = computeInventorySignatureSafe();
+  if (!current) return false;
+  return current !== idx.inventory_signature;
 }
 
 function detectRuntime() {
@@ -133,13 +150,15 @@ function buildPreflightReport() {
   const mastersInstalled = countInstalledMasters();
   const hookInstalled = settings ? sessionHookExists(settings) : false;
   const indexFresh = isIndexFresh();
+  const inventoryChanged = indexExists ? isInventoryChanged() : false;
   const runtimeKnown = runtime !== 'unknown';
   const executorReady = executor.name !== 'none' && executor.kind !== 'unknown';
   const requiredActions = [
     !runtimeKnown ? 'Set up the host runtime so Oracle can identify Claude Code, Overclock, or Codex/local.' : null,
     !executorReady ? `Expose a supported executor (${executor.dispatch}).` : null,
     !indexExists ? 'Run Oracle bootstrap to build the unified index.' : null,
-    indexExists && !indexFresh ? 'Run Oracle bootstrap to refresh the unified index.' : null,
+    indexExists && inventoryChanged ? 'Run Oracle bootstrap to analyze newly installed or changed skills, agents, plugins, or MCP servers.' : null,
+    indexExists && !inventoryChanged && !indexFresh ? 'Run Oracle bootstrap to refresh the unified index.' : null,
     !settingsExists ? 'Create ~/.claude/settings.json or run Oracle with --install to generate the SessionStart hook.' : null,
     settingsExists && !hookInstalled ? 'Run Oracle bootstrap with --install so the SessionStart hook is installed.' : null,
     mastersInstalled < REQUIRED_MASTER_COUNT ? `Install the missing Oracle master agents (${mastersInstalled}/${REQUIRED_MASTER_COUNT} present).` : null,
@@ -150,6 +169,7 @@ function buildPreflightReport() {
     executor,
     index_exists: indexExists,
     index_fresh: indexFresh,
+    inventory_changed: inventoryChanged,
     settings_exists: settingsExists,
     session_hook_installed: hookInstalled,
     masters_installed: mastersInstalled,
@@ -159,7 +179,8 @@ function buildPreflightReport() {
     required_actions: requiredActions,
     warnings: [
       !indexExists ? 'Oracle index is missing.' : null,
-      !indexFresh ? 'Oracle index is stale or invalid.' : null,
+      inventoryChanged ? 'Oracle asset inventory changed since the last index build.' : null,
+      !inventoryChanged && !indexFresh ? 'Oracle index is stale or invalid.' : null,
       !settingsExists ? '~/.claude/settings.json is missing.' : null,
       settingsExists && !hookInstalled ? 'Oracle SessionStart hook is missing.' : null,
       mastersInstalled < REQUIRED_MASTER_COUNT ? `Only ${mastersInstalled}/${REQUIRED_MASTER_COUNT} Oracle master agents are installed.` : null,
@@ -362,6 +383,7 @@ function getLocalManifest() {
 
 function tryBuildEmbeddings(quiet) {
   try {
+    if (process.env.ORACLE_SKIP_EMBEDDINGS === '1') return { built: false, reason: 'disabled' };
     const embedConfig = require('./embed-config');
     const apiConfig = embedConfig.getApiKey();
     if (!apiConfig) return { built: false, reason: 'no-api-key' };
@@ -398,7 +420,7 @@ async function run(options = {}) {
   const remoteState = update ? await fetchRemoteManifestSafe(warnings) : { manifest: null, error: null };
   const remoteManifest = remoteState.manifest;
   actions.remoteFetchError = remoteState.error;
-  const preflight = buildPreflightReport();
+  const initialPreflight = buildPreflightReport();
 
   if (remoteManifest && compareVersions(remoteManifest.version, localManifest.version) > 0 && !preflightOnly) {
     await syncRemoteManifest(remoteManifest);
@@ -408,7 +430,8 @@ async function run(options = {}) {
   }
 
   const manifestToUse = remoteManifest || localManifest;
-  const needRepair = repair && !preflightOnly && (forceRepair || !isIndexFresh() || actions.updated);
+  const inventoryChanged = isInventoryChanged();
+  const needRepair = repair && !preflightOnly && (forceRepair || inventoryChanged || !isIndexFresh() || actions.updated);
 
   if (needRepair) {
     for (const script of BOOTSTRAP_SCRIPTS) {
@@ -440,7 +463,7 @@ async function run(options = {}) {
     remote_version: remoteManifest && remoteManifest.version ? remoteManifest.version : localManifest.version,
     manifest_version: manifestToUse.version || localManifest.version,
     actions,
-    preflight,
+    preflight: preflightOnly ? initialPreflight : buildPreflightReport(),
     warnings,
   };
 }
@@ -492,6 +515,7 @@ module.exports = {
   compareVersions,
   ensureSessionHook,
   isIndexFresh,
+  isInventoryChanged,
   run,
   sessionHookExists,
 };

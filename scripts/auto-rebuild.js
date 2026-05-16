@@ -16,6 +16,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { run: runBootstrap } = require('./oracle-bootstrap');
+const { computeInventorySignature } = require('./scanner');
 
 const ORACLE_INDEX = path.join(os.homedir(), '.claude', 'oracle-index.json');
 const LEGACY_INDEX = path.join(os.homedir(), '.claude', 'skill-index.json');
@@ -43,16 +44,29 @@ function isStale(p) {
   }
 }
 
+function inventoryChanged(p) {
+  if (!fs.existsSync(p)) return true;
+  try {
+    const idx = JSON.parse(fs.readFileSync(p, 'utf8'));
+    return !idx.inventory_signature || idx.inventory_signature !== computeInventorySignature();
+  } catch {
+    return true;
+  }
+}
+
 (async () => {
   try {
-    if (QUIET_MODE && hasValidIndex(ORACLE_INDEX)) {
+    const changed = inventoryChanged(ORACLE_INDEX);
+    const stale = isStale(ORACLE_INDEX);
+
+    if (QUIET_MODE && hasValidIndex(ORACLE_INDEX) && !changed && !stale) {
       return;
     }
 
     await runBootstrap({
       update: true,
       repair: true,
-      forceRepair: isStale(ORACLE_INDEX),
+      forceRepair: changed || stale,
       installHook: false,
       quiet: QUIET_MODE,
     });

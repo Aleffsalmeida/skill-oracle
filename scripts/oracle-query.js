@@ -53,6 +53,42 @@ const ACTION_WORDS = new Set([
   'melhorar', 'corrigir', 'criar', 'fazer', 'ajustar', 'usar', 'quero',
 ]);
 
+function findLocalSkill(name) {
+  const roots = [
+    path.join(HOME, '.claude', 'skills'),
+    path.join(HOME, '.codex', 'skills'),
+    path.join(HOME, '.agents', 'skills'),
+  ];
+  for (const root of roots) {
+    const skillPath = path.join(root, name, 'SKILL.md');
+    if (fs.existsSync(skillPath)) return skillPath;
+  }
+  return null;
+}
+
+function fallbackGuidance(task) {
+  const findSkillsPath = findLocalSkill('find-skills');
+  if (!findSkillsPath) {
+    return {
+      available: false,
+      skill: 'find-skills',
+      install_url: 'https://github.com/vercel-labs/skills',
+      message: 'find-skills is not installed locally. Install it from the official Vercel Labs repository, then rerun this query so Oracle can search the external skill ecosystem safely.',
+    };
+  }
+  return {
+    available: true,
+    skill: 'find-skills',
+    path: findSkillsPath,
+    invoke: `Skill("find-skills") with task: ${task}`,
+    after_accept: [
+      'Install the accepted skill using the find-skills recommendation.',
+      'Rerun Oracle or start a new session; the inventory signature will trigger an automatic rebuild.',
+      'Oracle will classify it into the right domain/master agent and use it on the next query.',
+    ],
+  };
+}
+
 const MODEL_HINTS = {
   claude: {
     simple: 'claude-haiku-4-5',
@@ -384,7 +420,7 @@ function loadIndex(indexPath) {
 function normalize(s) {
   return String(s || '')
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
 }
 
@@ -900,6 +936,7 @@ async function selectAssets(idx, task, options = {}) {
     synthesisUsed: Boolean(synthesis),
     suggestions: proactiveSuggestions(task, finalDomainIds, idx),
     fallbackRecommended: picks.length === 0,
+    fallback: picks.length === 0 ? fallbackGuidance(task) : null,
     modelHints,
   };
 }
@@ -969,7 +1006,16 @@ function formatResult(result) {
   lines.push('');
 
   if (!result.picks.length) {
-    lines.push('No strong local match. Recommend fallback to find-skills ecosystem search.');
+    lines.push('No strong local match. Fallback required: use find-skills ecosystem search.');
+    if (result.fallback?.available) {
+      lines.push(`Fallback invoke: ${result.fallback.invoke}`);
+      lines.push(`find-skills path: ${result.fallback.path}`);
+      lines.push('After accepting a result, Oracle will rebuild automatically when the installed inventory changes.');
+    } else {
+      lines.push('The `find-skills` skill is not installed locally.');
+      lines.push('Install it from the official Vercel Labs repository so Oracle can search the ecosystem:');
+      lines.push('https://github.com/vercel-labs/skills');
+    }
   } else {
     if (result.bundle && result.bundle.length) {
       lines.push('Recommended bundle:');

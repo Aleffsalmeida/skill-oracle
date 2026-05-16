@@ -150,6 +150,12 @@ node ~/.claude/skills/skill-oracle/scripts/oracle-bootstrap.js
 
 The Oracle also checks for updates every time `oracle-query.js` runs, installs the SessionStart hook if it is missing, and emits a preflight report before routing.
 
+The index is delta-aware. Each scan writes an `inventory_signature` built from installed Skills, Agents, Plugins, and MCP configuration. On the next SessionStart or `oracle-query.js` run, Oracle compares the current inventory to that signature:
+
+- if nothing changed and the index is less than 24 hours old, it reuses the existing index
+- if a user installed, removed, or edited a Skill, Agent, Plugin, or MCP server, it automatically reruns `gen-masters.js`, `install-agents.js`, `scanner.js`, `classifier.js`, and embeddings when an API key is configured
+- after a `find-skills` recommendation is accepted and installed, the next Oracle run detects the new skill and classifies it into the correct domain/master agent
+
 The preflight report now states which dispatch mechanism the host is expected to use:
 
 - `Task` on Claude Code
@@ -314,7 +320,7 @@ Edit `scripts/classifier.js` to refine domain rules.
 
 ## Ecosystem fallback
 
-When no master returns a strong match, the Oracle invokes `find-skills` automatically and applies safety filters.
+When no master returns a strong match, the Oracle falls back to `find-skills` and applies safety filters.
 
 > **Don't have `find-skills` installed?** Oracle will tell you to install it from the official Vercel Labs repo before falling back:
 > **https://github.com/vercel-labs/skills**
@@ -332,7 +338,18 @@ Safety filters applied to every ecosystem result:
 | Code safety | No `eval`, `base64 -d`, no unknown `curl \| sh` |
 | Author | Identifiable (anonymous blocked) |
 
-Accepted recommendations get **auto-indexed** so subsequent prompts can pick them.
+Accepted recommendations get **auto-indexed** on the next Oracle run because the inventory signature changes. No manual scanner/classifier command is required after the skill is installed.
+
+Codex/local note: `oracle-query.js` cannot directly invoke another runtime skill by itself, so it exits with code `2` and prints the exact `find-skills` invocation. Claude Code skill orchestration should invoke `find-skills` immediately when it sees that fallback signal.
+
+### Privacy and repository safety
+
+The public repository should contain only source scripts, generated master-agent templates, docs, images, and the manifest. Do not commit local runtime state or secrets:
+
+- never commit `~/.claude/settings.json`, `.credentials.json`, `history.jsonl`, `session-data`, `projects`, `oracle-index.json`, or `oracle-embeddings.json`
+- never commit API keys, GitHub tokens, OpenAI keys, Anthropic keys, MCP credentials, customer prompts, terminal history, or local cache files
+- use environment variables such as `ORACLE_GITHUB_TOKEN`, `GITHUB_TOKEN`, `GH_TOKEN`, and provider API keys only at runtime
+- keep generated backups such as `settings.json.oracle-*.bak` local
 
 ---
 

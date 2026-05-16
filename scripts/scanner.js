@@ -53,6 +53,41 @@ function hashShort(s) {
   return crypto.createHash('sha256').update(s).digest('hex').slice(0, 12);
 }
 
+function fileFingerprint(filePath) {
+  try {
+    const stat = fs.statSync(filePath);
+    return `${filePath}:${stat.size}:${Math.floor(stat.mtimeMs)}`;
+  } catch {
+    return `${filePath}:missing`;
+  }
+}
+
+function computeInventorySignature() {
+  const parts = [];
+
+  for (const root of SKILLS_ROOTS) {
+    const files = walkSync(root, {
+      maxDepth: 8,
+      filter: (_full, name) => name === 'SKILL.md',
+    });
+    for (const file of files) parts.push(fileFingerprint(file));
+  }
+
+  for (const root of [AGENTS_ROOT, PLUGIN_CACHE]) {
+    const files = walkSync(root, {
+      maxDepth: 8,
+      filter: (_full, name) => name.endsWith('.md') || name === 'plugin.json',
+    });
+    for (const file of files) parts.push(fileFingerprint(file));
+  }
+
+  for (const file of [PLUGIN_REGISTRY, SETTINGS_PATH]) {
+    if (fs.existsSync(file)) parts.push(fileFingerprint(file));
+  }
+
+  return hashShort(parts.sort().join('\n'));
+}
+
 function safeRead(p, bytes) {
   try {
     if (bytes && bytes > 0) {
@@ -88,7 +123,7 @@ function parseFrontmatter(content) {
 function normalize(s) {
   return String(s || '')
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
 }
 
@@ -474,6 +509,7 @@ function build() {
   const index = {
     version: 2,
     generated_at: now,
+    inventory_signature: computeInventorySignature(),
     build_ms: Date.now() - t0,
     stats: {
       total: assets.length,
@@ -505,4 +541,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { build, discoverSkills, discoverAgents, discoverPlugins, discoverMcp };
+module.exports = { build, computeInventorySignature, discoverSkills, discoverAgents, discoverPlugins, discoverMcp };

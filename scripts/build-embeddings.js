@@ -10,7 +10,7 @@ const INDEX_FILE = path.join(os.homedir(), '.claude', 'oracle-index.json');
 function normalize(s) {
   return String(s || '')
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
 }
 
