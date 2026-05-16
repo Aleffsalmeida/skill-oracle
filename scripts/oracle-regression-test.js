@@ -57,6 +57,19 @@ const CASES = [
     expectedResultNames: ['brandkit', 'remotion'],
   },
   {
+    name: 'ui-ux-no-brandkit-bias',
+    task: 'melhorar UI UX pro max da interface frontend do produto',
+    expectedDomains: ['design-ui', 'web-dev'],
+    forbiddenDomains: ['finance-billing'],
+    expectedResultNames: ['impeccable', 'frontend-design'],
+  },
+  {
+    name: 'mixed-logo-and-ui',
+    task: 'criar logo premium identidade visual e melhorar design UI UX da tela inicial do app',
+    expectedDomains: ['design-ui'],
+    expectedResultNames: ['brandkit', 'impeccable', 'frontend-design'],
+  },
+  {
     name: 'signup-onboarding-ga4',
     task: 'quero otimizar cadastro onboarding emails e medir eventos no GA4',
     expectedDomains: ['marketing-growth', 'data-analytics'],

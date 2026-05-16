@@ -29,7 +29,6 @@ const MIN_TOKEN_LENGTH = 3;
 const SHORT_TOKEN_ALLOWLIST = new Set(['ai', 'ml', 'ui', 'ux', 'qa', '3d']);
 const STRONG_AUTHOR_SOURCES = ['agents:', 'codex:', 'user:'];
 const PREFERRED_SKILLS = new Set([
-  'brandkit',
   'skill-oracle',
   'imagegen-frontend-web',
   'imagegen-frontend-mobile',
@@ -40,6 +39,7 @@ const PREFERRED_SKILLS = new Set([
   'react:components',
 ]);
 const GENERIC_QUERY_TOKENS = new Set(['app', 'skill', 'plugin', 'agent', 'tool', 'tools']);
+const NOISY_PRODUCT_TOKENS = new Set(['pro', 'max', 'plus']);
 const STOPWORDS = new Set([
   'a', 'an', 'and', 'as', 'at', 'be', 'by', 'for', 'from', 'in', 'into',
   'of', 'on', 'or', 'the', 'to', 'with', 'without', 'using', 'use',
@@ -219,10 +219,16 @@ const INTENT_PATTERNS = [
 
 const CAPABILITY_INTENTS = [
   {
+    id: 'ui-interface',
+    re: /\b(ui|ux|interface|tela|layout|dashboard|frontend|componentes|component|design de interface|produto|app shell|visual hierarchy|hierarquia visual)\b/,
+    domains: ['design-ui', 'web-dev'],
+    skills: ['impeccable', 'frontend-design', 'design-taste-frontend', 'refactoring-ui', 'ux-heuristics', 'ui-ux-expert', 'stitch-design'],
+  },
+  {
     id: 'logo-brand',
     re: /\b(logo|icone|icon|simbolo|brand|branding|identidade visual|brand kit|brandkit|marca|manual da marca)\b/,
     domains: ['design-ui'],
-    skills: ['brandkit', 'high-end-visual-design', 'stitch-design-taste', 'imagegen-frontend-web'],
+    skills: ['brandkit', 'high-end-visual-design', 'stitch-design-taste', 'imagegen-frontend-web', 'impeccable'],
   },
   {
     id: 'video-motion',
@@ -305,6 +311,18 @@ const CAPABILITY_INTENTS = [
 ];
 
 const TYPE_PRIORITY = { skill: 4, agent: 3, mcp: 2, plugin: 1 };
+const EXPLICIT_SIGNAL_DOMAINS = new Set([
+  'finance-billing',
+  'ecommerce',
+  'crypto-web3',
+  'crm-sales',
+]);
+const STRICT_DOMAIN_SIGNALS = {
+  'finance-billing': /\b(stripe|billing|invoice|payment|payments|pagamento|pagamentos|assinatura|subscription|revenue|tax|finance|pricing|paywall|checkout|churn|cancelamento)\b/,
+  ecommerce: /\b(shopify|woocommerce|wordpress|ecommerce|e-commerce|loja online|cart|carrinho|checkout|product-catalog|inventory|sku|storefront)\b/,
+  'crypto-web3': /\b(crypto|blockchain|ethereum|solana|defi|nft|wallet|token|dex|dao|smart contract|solidity|web3|metamask|onchain)\b/,
+  'crm-sales': /\b(crm|sales|hubspot|salesforce|pipedrive|attio|intercom|lead|leads|pipeline|prospect|outbound|cold email|revops)\b/,
+};
 
 // Lazy-load embedding modules — silently skipped if not installed
 let _embedMods = null;
@@ -526,6 +544,7 @@ function tokenize(s) {
     .split(/[^a-z0-9.+#-]+/)
     .filter((token) => token && token.length > 1)
     .filter((token) => !STOPWORDS.has(token))
+    .filter((token) => !NOISY_PRODUCT_TOKENS.has(token))
     .filter((token) => !ACTION_WORDS.has(token));
 }
 
@@ -584,9 +603,24 @@ function intentBoosts(task) {
   };
 }
 
+function hasUiInterfaceIntent(task) {
+  return matchedCapabilityIntents(task).some((intent) => intent.id === 'ui-interface');
+}
+
 function matchedCapabilityIntents(task) {
   const text = normalize(task);
   return CAPABILITY_INTENTS.filter((intent) => intent.re.test(text));
+}
+
+function hasExplicitDomainSignal(task, domainId) {
+  if (STRICT_DOMAIN_SIGNALS[domainId]) {
+    return STRICT_DOMAIN_SIGNALS[domainId].test(normalize(task));
+  }
+  const domain = DOMAIN_KEYWORDS.find((item) => item.id === domainId);
+  const textScore = domain ? scoreDomainText(task, domain).score : 0;
+  const capabilityScore = matchedCapabilityIntents(task)
+    .some((intent) => intent.domains.includes(domainId));
+  return textScore > 0 || capabilityScore;
 }
 
 function semanticSegments(asset) {
@@ -745,6 +779,11 @@ function scoreAsset(asset, taskTokens, activeCapabilityIntents = []) {
     for (const intent of capabilityMatches) matched.push(intent.id);
   }
   if (intents.branding && /brandkit|logo|brand|visual|design/.test(assetName)) score *= 1.18;
+  if (
+    activeCapabilityIntents.some((intent) => intent.id === 'ui-interface')
+    && activeCapabilityIntents.some((intent) => intent.id === 'logo-brand')
+    && assetName === 'brandkit'
+  ) score *= 0.92;
   if (intents.videoMotion && /remotion|video|motion|slides|hyperframe/.test(assetName)) score *= 1.22;
   if (intents.analytics && /analytics|tracking|experiment|posthog|event/.test(assetName)) score *= 1.18;
   if ((intents.ui || intents.shortcuts) && /frontend|design-taste|impeccable|ui-toolkit|design/.test(assetName)) score *= 1.16;
@@ -1007,6 +1046,7 @@ async function selectAssets(idx, task, options = {}) {
     // Add high-confidence embedding-only domains the keywords missed
     const embOnly = [...centroidScores.entries()]
       .filter(([id, sim]) => sim >= 0.5 && !filteredKeyword.includes(id))
+      .filter(([id]) => !EXPLICIT_SIGNAL_DOMAINS.has(id) || hasExplicitDomainSignal(task, id))
       .sort((a, b) => b[1] - a[1])
       .slice(0, 2)
       .map(([id]) => id);
@@ -1014,6 +1054,12 @@ async function selectAssets(idx, task, options = {}) {
     const merged = [...new Set([...filteredKeyword, ...embOnly])].slice(0, MAX_DOMAINS);
     // Fallback: if filtering removed everything, keep top keyword domain
     finalDomainIds = merged.length > 0 ? merged : domainIds.slice(0, 1);
+  }
+
+  if (!(options.domains || []).length) {
+    finalDomainIds = finalDomainIds
+      .filter((id) => !EXPLICIT_SIGNAL_DOMAINS.has(id) || hasExplicitDomainSignal(task, id));
+    if (!finalDomainIds.length) finalDomainIds = ['misc'];
   }
 
   const byKey = new Map();
