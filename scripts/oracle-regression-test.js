@@ -105,6 +105,19 @@ const CASES = [
     forbiddenDomains: ['marketing-growth', 'design-ui', 'web-dev'],
     expectFallbackRecommended: true,
   },
+  {
+    name: 'negated-commerce-noise',
+    task: 'melhorar produto pro max com experiencia mais fluida sem billing pagamentos ou checkout',
+    forbiddenDomains: ['finance-billing', 'ecommerce'],
+    expectedDomains: ['design-ui'],
+    expectedResultNames: ['impeccable'],
+  },
+  {
+    name: 'broad-negation-fallback',
+    task: 'criar ritual alienigena sem software marketing design dados automacao pagamento crm crypto loja',
+    forbiddenDomains: ['marketing-growth', 'design-ui', 'web-dev', 'finance-billing', 'crm-sales', 'crypto-web3', 'ecommerce', 'security-audit'],
+    expectFallbackRecommended: true,
+  },
 ];
 
 async function checkCase(idx, testCase) {

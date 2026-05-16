@@ -54,12 +54,12 @@ const ACTION_WORDS = new Set([
   'melhorar', 'corrigir', 'criar', 'fazer', 'ajustar', 'usar', 'quero',
 ]);
 const NEGATION_CUES = new Set([
-  'without', 'except', 'excluding', 'exclude', 'not', 'no',
+  'without', 'except', 'excluding', 'exclude', 'not',
   'sem', 'exceto', 'excluir', 'excluindo', 'nao', 'não',
 ]);
 const NEGATION_BREAKS = new Set([
-  'and', 'or', 'but', 'then', 'with', 'using',
-  'e', 'ou', 'mas', 'entao', 'então', 'com', 'usando',
+  'but', 'then', 'with', 'using',
+  'mas', 'entao', 'então', 'com', 'usando',
 ]);
 
 function findLocalSkill(name) {
@@ -312,16 +312,32 @@ const CAPABILITY_INTENTS = [
 
 const TYPE_PRIORITY = { skill: 4, agent: 3, mcp: 2, plugin: 1 };
 const EXPLICIT_SIGNAL_DOMAINS = new Set([
+  'security-audit',
   'finance-billing',
   'ecommerce',
   'crypto-web3',
   'crm-sales',
 ]);
 const STRICT_DOMAIN_SIGNALS = {
+  'security-audit': /\b(seguranca|segurança|security|auth|oauth|jwt|xss|csrf|owasp|pentest|secret|secrets|compliance|soc2|pci|gdpr|vulnerability|vulnerabilidade|audit|auditoria)\b/,
   'finance-billing': /\b(stripe|billing|invoice|payment|payments|pagamento|pagamentos|assinatura|subscription|revenue|tax|finance|pricing|paywall|checkout|churn|cancelamento)\b/,
   ecommerce: /\b(shopify|woocommerce|wordpress|ecommerce|e-commerce|loja online|cart|carrinho|checkout|product-catalog|inventory|sku|storefront)\b/,
   'crypto-web3': /\b(crypto|blockchain|ethereum|solana|defi|nft|wallet|token|dex|dao|smart contract|solidity|web3|metamask|onchain)\b/,
   'crm-sales': /\b(crm|sales|hubspot|salesforce|pipedrive|attio|intercom|lead|leads|pipeline|prospect|outbound|cold email|revops)\b/,
+};
+const DOMAIN_NEGATION_SIGNALS = {
+  'web-dev': /\b(software|frontend|backend|web|app|codigo|código|code|api|dashboard)\b/,
+  'backend-api': /\b(api|backend|server|endpoint|webhook)\b/,
+  'database-data': /\b(dados|data|database|banco|sql|postgres|analytics|metricas|métricas)\b/,
+  'design-ui': /\b(design|ui|ux|interface|visual|logo|marca|branding)\b/,
+  'marketing-growth': /\b(marketing|growth|seo|ads|copy|social|funil|funnel|lead|leads)\b/,
+  'finance-billing': /\b(billing|pagamento|pagamentos|payment|payments|checkout|stripe|pricing|paywall|assinatura|subscription|finance)\b/,
+  ecommerce: /\b(ecommerce|e-commerce|loja|shopify|woocommerce|checkout|cart|carrinho|produto|sku)\b/,
+  'crypto-web3': /\b(crypto|blockchain|wallet|token|ethereum|solana|web3|dex|nft)\b/,
+  'crm-sales': /\b(crm|hubspot|salesforce|sales|vendas|pipeline|lead|leads|outbound)\b/,
+  'security-audit': /\b(seguranca|segurança|security|auth|jwt|compliance|audit|auditoria|vulnerability|vulnerabilidade)\b/,
+  'testing-qa': /\b(test|tests|teste|testes|qa|playwright|cypress|e2e|coverage)\b/,
+  'data-analytics': /\b(analytics|dados|metricas|métricas|dashboard|ga4|tracking|eventos|conversao|conversão)\b/,
 };
 
 // Lazy-load embedding modules — silently skipped if not installed
@@ -571,7 +587,7 @@ function negatedTokenSet(text) {
   const negated = new Set();
   for (let i = 0; i < rawTokens.length; i += 1) {
     if (!NEGATION_CUES.has(rawTokens[i])) continue;
-    for (let j = i + 1; j < Math.min(rawTokens.length, i + 8); j += 1) {
+    for (let j = i + 1; j < Math.min(rawTokens.length, i + 14); j += 1) {
       const token = rawTokens[j];
       if ((token === 'com' || token === 'with') && j <= i + 3) continue;
       if (NEGATION_BREAKS.has(token)) break;
@@ -585,6 +601,27 @@ function negatedTokenSet(text) {
 function positiveTokens(task) {
   const negated = negatedTokenSet(task);
   return tokenize(task).filter((token) => !negated.has(token));
+}
+
+function negatedTextWindows(task) {
+  const text = normalize(task);
+  const windows = [];
+  const cueRe = /\b(without|except|excluding|exclude|not|sem|exceto|excluir|excluindo|nao|não)\b/g;
+  let match;
+  while ((match = cueRe.exec(text)) !== null) {
+    windows.push(text.slice(match.index, match.index + 180));
+  }
+  return windows;
+}
+
+function domainBlocksFromNegation(task) {
+  const windows = negatedTextWindows(task);
+  if (!windows.length) return new Set();
+  const blocked = new Set();
+  for (const [domain, re] of Object.entries(DOMAIN_NEGATION_SIGNALS)) {
+    if (windows.some((window) => re.test(window))) blocked.add(domain);
+  }
+  return blocked;
 }
 
 function isMeaningfulToken(token) {
@@ -608,11 +645,12 @@ function hasUiInterfaceIntent(task) {
 }
 
 function matchedCapabilityIntents(task) {
-  const text = normalize(task);
+  const text = positiveTokens(task).join(' ');
   return CAPABILITY_INTENTS.filter((intent) => intent.re.test(text));
 }
 
 function hasExplicitDomainSignal(task, domainId) {
+  if (domainBlocksFromNegation(task).has(domainId)) return false;
   if (STRICT_DOMAIN_SIGNALS[domainId]) {
     return STRICT_DOMAIN_SIGNALS[domainId].test(normalize(task));
   }
@@ -828,6 +866,21 @@ function canonicalAssetKey(asset) {
   ].join('::');
 }
 
+function assetTypeFit(asset, task) {
+  const text = normalize(task);
+  if (asset.type === 'skill') return 0;
+  if (asset.type === 'agent') {
+    return /\b(agent|especialista|expert|review|audit|auditoria|deep dive|second opinion|subagent)\b/.test(text) ? 2 : -4;
+  }
+  if (asset.type === 'mcp') {
+    return /\b(mcp|browser|navegador|github|repo|pull request|pr|issue|web search|pesquisar na web|buscar na web|internet|docs atuais|documentacao atual|context7|playwright|chrome|tavily|exa|memory|memoria)\b/.test(text) ? 4 : -8;
+  }
+  if (asset.type === 'plugin') {
+    return /\b(plugin|extension|extensao|claude plugin|mcpb|install plugin|instalar plugin)\b/.test(text) ? 3 : -6;
+  }
+  return 0;
+}
+
 function invocationHint(asset, executor = null) {
   if (asset.type === 'skill') return `Skill("${asset.name}")`;
   if (asset.type === 'agent') {
@@ -1001,6 +1054,7 @@ async function selectAssets(idx, task, options = {}) {
   const taskTokens = positiveTokens(task);
   const executor = options.executor || options.preflight?.preflight?.executor || null;
   const activeCapabilityIntents = matchedCapabilityIntents(task);
+  const blockedDomains = domainBlocksFromNegation(task);
 
   // Embedding enhancement: load pre-built vectors and embed the query
   let queryVector = null;
@@ -1041,7 +1095,7 @@ async function selectAssets(idx, task, options = {}) {
     );
 
     // Filter keyword-detected domains: drop those with low centroid similarity (false positives)
-    const filteredKeyword = domainIds.filter((id) => (centroidScores.get(id) || 0) >= 0.25);
+    const filteredKeyword = domainIds.filter((id) => (centroidScores.get(id) || 0) >= 0.25 || hasExplicitDomainSignal(task, id));
 
     // Add high-confidence embedding-only domains the keywords missed
     const embOnly = [...centroidScores.entries()]
@@ -1056,8 +1110,12 @@ async function selectAssets(idx, task, options = {}) {
     finalDomainIds = merged.length > 0 ? merged : domainIds.slice(0, 1);
   }
 
+  const explicitDomainIds = domainIds.filter((id) => hasExplicitDomainSignal(task, id));
+  finalDomainIds = [...new Set([...explicitDomainIds, ...finalDomainIds])].slice(0, MAX_DOMAINS);
+
   if (!(options.domains || []).length) {
     finalDomainIds = finalDomainIds
+      .filter((id) => !blockedDomains.has(id))
       .filter((id) => !EXPLICIT_SIGNAL_DOMAINS.has(id) || hasExplicitDomainSignal(task, id));
     if (!finalDomainIds.length) finalDomainIds = ['misc'];
   }
@@ -1074,6 +1132,7 @@ async function selectAssets(idx, task, options = {}) {
       .map((asset) => {
         const result = scoreAsset(asset, taskTokens, activeCapabilityIntents);
         let { score } = result;
+        score += assetTypeFit(asset, task);
 
         // Additive embedding bonus: semantically similar assets get a boost
         if (queryVector && embedLookup) {
