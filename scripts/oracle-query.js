@@ -813,6 +813,10 @@ function scoreAsset(asset, taskTokens, activeCapabilityIntents = []) {
   const capabilityMatches = activeCapabilityIntents.filter((intent) => intent.skills.some((name) => normalize(name) === assetName));
   if (STRONG_AUTHOR_SOURCES.some((prefix) => sourceText.startsWith(prefix))) score *= 1.12;
   if (PREFERRED_SKILLS.has(asset.name)) score *= 1.18;
+  if (/\bawesome design\b/.test(taskText) && assetName === 'awesome-design-md') {
+    score += 55;
+    matched.push('awesome-design');
+  }
   if (/\bawesome design\b/.test(taskText) && assetName === 'polish') {
     score += 40;
     matched.push('awesome-design');
@@ -982,7 +986,7 @@ function buildRecommendedBundle(domainReports, picks, task) {
   if (intents.ui || intents.shortcuts) preferredByIntent.push(['ui-ux-pro-max', 'impeccable', 'design-taste-frontend', 'frontend-design', 'ui-styling', 'ui-toolkit/web', 'react:components']);
   if (intents.desktop) preferredByIntent.push(['design-taste-frontend', 'frontend-design', 'zoom-meeting-sdk-electron']);
   if (intents.videoMotion) preferredByIntent.push(['hyperframes', 'higgsfield', 'higgs-field', 'remotion', 'remotion-video-creation', 'remotion-to-hyperframes', 'website-to-hyperframes', 'frontend-slides']);
-  if (/\bawesome design\b/.test(taskText)) preferredByIntent.unshift(['polish']);
+  if (/\bawesome design\b/.test(taskText)) preferredByIntent.unshift(['awesome-design-md', 'polish']);
   if (/\b(ga4|gtm|google analytics|tag manager|utm|utms|tracking|conversion tracking|event tracking|attribution)\b/.test(taskText)) {
     preferredByIntent.unshift(['analytics-tracking', 'product-tracking-generate-implementation-guide', 'configuring-experiment-analytics']);
   }
