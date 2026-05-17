@@ -70,6 +70,16 @@ node ~/.claude/skills/skill-oracle/scripts/oracle-query.js "<task description>"
 
 The local runner reads `~/.claude/oracle-index.json`, detects domains, ranks assets directly, and by default prints a compact execution plan instead of exposing the internal asset list. Pass `--show-internals` when you need the ranked picks and asset names for debugging. It exits with code `2` when no strong local match exists or only `misc` matches. Treat exit code `2` as the signal to use the `find-skills` fallback.
 
+### Provider selection
+
+Before spawning any visible panes or delegating a task outside the current pane, confirm which providers are actually usable in this Overclock install.
+
+- Call `pane_list_providers` first when the current provider is uncertain or has already failed.
+- Prefer a provider that is explicitly enabled and known to work for the current session.
+- If the current provider is blocked, unavailable, or fails authentication, switch to another enabled provider instead of retrying blindly.
+- If two or more enabled providers look viable and the task is sensitive or long-running, ask the user which one to use before spawning panes.
+- Never open panes on a provider that is known to be unavailable for the current session.
+
 ### Availability contract
 
 Oracle may index assets from Claude Code, Codex, Agents, plugins, and cached ecosystem sources, but it must not present an indexed skill as directly invocable unless that skill's `SKILL.md` exists in the current runtime skill roots.

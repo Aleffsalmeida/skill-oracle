@@ -182,6 +182,15 @@ When the task has two or more independent workstreams, Oracle must open visible 
 
 Do not keep a compound task in a single pane if separate panes would let the work happen in parallel. The point is to make the orchestration visible and reduce the chance of missing a branch of the task.
 
+### Provider fallback rule
+
+If the current provider cannot execute panes reliably, Oracle must confirm the active provider list before spawning anything else. Use `pane_list_providers` to check what is actually enabled in this install.
+
+- If the provider already failed or is known to be blocked, switch to an enabled provider instead of retrying the same one.
+- If more than one provider is viable and the task is important, ask the user which provider to use.
+- Do not assume a provider is usable just because it appears in the UI or was usable earlier in the session.
+- The goal is to avoid opening panes that cannot run and to fail fast before wasting time.
+
 ### Step 3 — Add the auto-rebuild hook (one-time, optional if you used `--install`)
 
 If you did not run `--install`, add the SessionStart hook in `~/.claude/settings.json`:
