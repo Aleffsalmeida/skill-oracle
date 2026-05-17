@@ -23,13 +23,16 @@ const CASES = [
     name: 'design-system-ptbr',
     task: 'preciso de skill para design system e identidade visual',
     expectedDomains: ['design-ui'],
-    expectedPickNames: ['design-system', 'refactoring-ui'],
+    expectedPickNames: ['brandkit'],
+    expectedResultNames: ['brandkit', 'stitch-design-taste', 'design-md'],
+    expectedUnavailableNames: ['design-system', 'impeccable', 'frontend-design'],
   },
   {
     name: 'electron-shortcuts-ui',
     task: 'quero uma skill para atalhos de tabela e interface electron',
     expectedDomains: ['web-dev', 'design-ui'],
-    expectedPickNames: ['design-taste-frontend', 'frontend-design', 'impeccable'],
+    expectedPickNames: ['awesome-design-md', 'design-taste-frontend'],
+    expectedUnavailableNames: ['ui-ux-pro-max', 'impeccable', 'frontend-design'],
   },
   {
     name: 'oracle-multi-skill-composition',
@@ -62,20 +65,23 @@ const CASES = [
     task: 'melhorar UI UX pro max da interface frontend do produto',
     expectedDomains: ['design-ui', 'web-dev'],
     forbiddenDomains: ['finance-billing'],
-    expectedResultNames: ['ui-ux-pro-max', 'impeccable', 'frontend-design'],
+    expectedResultNames: ['react:components', 'design-taste-frontend', 'ui-ux-expert'],
+    expectedUnavailableNames: ['ui-ux-pro-max', 'impeccable', 'frontend-design'],
   },
   {
     name: 'marketplace-design-skills-visible',
     task: 'quero usar UI UX Pro Max e awesome design para melhorar uma dashboard SaaS',
     expectedDomains: ['design-ui', 'web-dev'],
-    expectedResultNames: ['ui-ux-pro-max', 'polish'],
+    expectedResultNames: ['awesome-design-md', 'design-taste-frontend'],
+    expectedUnavailableNames: ['ui-ux-pro-max', 'impeccable', 'polish', 'frontend-design'],
   },
   {
     name: 'operations-ecosystem-fullstack-no-marketing-noise',
     task: 'implementar melhorias no ecossistema de operações com entidade Agentes, Instagram vinculado a cooperações, dashboards analíticos, React Supabase, schema banco de dados, APIs, soft delete e lixeira de operadores',
     expectedDomains: ['design-ui', 'web-dev', 'database-data', 'data-analytics'],
     forbiddenDomains: ['marketing-growth'],
-    expectedResultNames: ['awesome-design-md', 'ui-ux-pro-max', 'impeccable', 'react:components', 'supabase'],
+    expectedResultNames: ['awesome-design-md', 'react:components', 'design-taste-frontend', 'shadcn-ui'],
+    expectedUnavailableNames: ['ui-ux-pro-max', 'impeccable', 'supabase', 'postgres-patterns'],
     expectedWorkflowNames: ['using-superpowers', 'brainstorming', 'writing-plans'],
     expectParallelRecommended: true,
   },
@@ -83,7 +89,8 @@ const CASES = [
     name: 'mixed-logo-and-ui',
     task: 'criar logo premium identidade visual e melhorar design UI UX da tela inicial do app',
     expectedDomains: ['design-ui'],
-    expectedResultNames: ['brandkit', 'impeccable', 'frontend-design'],
+    expectedResultNames: ['brandkit', 'design-taste-frontend', 'stitch-design'],
+    expectedUnavailableNames: ['ui-ux-pro-max', 'impeccable', 'frontend-design'],
   },
   {
     name: 'signup-onboarding-ga4',
@@ -102,19 +109,22 @@ const CASES = [
     task: 'preciso configurar Stripe checkout assinatura pricing e paywall',
     expectedDomains: ['finance-billing'],
     forbiddenDomains: ['ecommerce'],
-    expectedResultNames: ['stripe-best-practices', 'pricing-strategy'],
+    expectedResultNames: ['pricing-strategy', 'paywall-upgrade-cro', 'churn-prevention'],
+    expectedUnavailableNames: ['stripe-best-practices'],
   },
   {
     name: 'mobile-app-design',
     task: 'desenhar telas premium para aplicativo mobile iOS e Android',
     expectedDomains: ['mobile', 'design-ui'],
-    expectedResultNames: ['imagegen-frontend-mobile', 'ios-hig-design'],
+    expectedResultNames: ['imagegen-frontend-mobile'],
+    expectedUnavailableNames: ['ios-hig-design'],
   },
   {
     name: 'docs-file-workflow',
     task: 'editar contrato em docx gerar pdf e criar planilha xlsx de resumo',
     expectedDomains: ['docs-content'],
-    expectedResultNames: ['docx', 'pdf', 'xlsx'],
+    expectedResultNames: ['copy-editing', 'writing-plans'],
+    expectedUnavailableNames: ['docx', 'pdf', 'xlsx'],
   },
   {
     name: 'negated-domain-noise',
@@ -127,7 +137,8 @@ const CASES = [
     task: 'melhorar produto pro max com experiencia mais fluida sem billing pagamentos ou checkout',
     forbiddenDomains: ['finance-billing', 'ecommerce'],
     expectedDomains: ['design-ui'],
-    expectedResultNames: ['impeccable'],
+    expectedResultNames: ['design-taste-frontend', 'stitch-design'],
+    expectedUnavailableNames: ['impeccable', 'ux-heuristics', 'refactoring-ui'],
   },
   {
     name: 'broad-negation-fallback',
@@ -146,7 +157,8 @@ const CASES = [
     name: 'video-motion-hyperframes',
     task: 'criar video motion com cenas animadas, captions, voiceover e export em hyperframes',
     expectedDomains: ['design-ui', 'web-dev'],
-    expectedResultNames: ['hyperframes', 'hyperframes-cli', 'remotion-to-hyperframes'],
+    expectedResultNames: ['remotion', 'motion-advisor'],
+    expectedUnavailableNames: ['hyperframes', 'remotion-to-hyperframes', 'remotion-video-creation'],
   },
 ];
 
@@ -161,6 +173,7 @@ async function checkCase(idx, testCase) {
 
   const pickNames = new Set(result.picks.map((pick) => pick.name));
   const resultNames = new Set([...result.picks, ...result.bundle].map((pick) => pick.name));
+  const unavailableNames = new Set((result.unavailable || []).map((pick) => pick.name));
   if (testCase.expectedPickNames) {
     assertCheck(
       testCase.expectedPickNames.some((name) => pickNames.has(name)),
@@ -171,6 +184,16 @@ async function checkCase(idx, testCase) {
     assertCheck(
       resultNames.has(name),
       `[${testCase.name}] expected ${name} in picks or bundle, got ${Array.from(resultNames).join(', ')}`
+    );
+  }
+  for (const name of testCase.expectedUnavailableNames || []) {
+    assertCheck(
+      unavailableNames.has(name),
+      `[${testCase.name}] expected ${name} in unavailable, got ${Array.from(unavailableNames).join(', ')}`
+    );
+    assertCheck(
+      !resultNames.has(name),
+      `[${testCase.name}] expected ${name} to stay out of picks/bundle, got ${Array.from(resultNames).join(', ')}`
     );
   }
   if (testCase.expectedAnyResultNames) {
