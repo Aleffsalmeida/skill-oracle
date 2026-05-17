@@ -1,6 +1,13 @@
 'use strict';
 
-const { loadIndex, selectAssets, DEFAULT_INDEX } = require('./oracle-query');
+const {
+  loadIndex,
+  selectAssets,
+  DEFAULT_INDEX,
+  estimateComplexity,
+  recommendedModels,
+  parallelExecutionPlan,
+} = require('./oracle-query');
 
 function assertCheck(condition, message) {
   if (!condition) throw new Error(message);
@@ -242,6 +249,32 @@ async function main() {
   for (const testCase of CASES) {
     reports.push(await checkCase(idx, testCase));
   }
+  assertCheck(
+    estimateComplexity('corrigir typo em um botao', ['design-ui'], []) === 'simple',
+    'simple local UI edits must stay on the cheap model tier'
+  );
+  assertCheck(
+    recommendedModels('simple').claude === 'claude-haiku-4-5',
+    'simple Claude model must be claude-haiku-4-5'
+  );
+  const simplePlan = parallelExecutionPlan(
+    'corrigir typo em um botao',
+    ['design-ui'],
+    { preflight: { executor: { name: 'pane_spawn' }, runtime: 'Overclock' } },
+    recommendedModels('simple')
+  );
+  assertCheck(simplePlan.modelPolicy.defaultModel === 'claude-haiku-4-5', 'simple pane plan must explicitly use Haiku');
+  const heavyPlan = parallelExecutionPlan(
+    'implementar dashboard com api banco de dados rls testes playwright e auditoria de seguranca',
+    ['web-dev', 'database-data', 'data-analytics', 'security-audit'],
+    { preflight: { executor: { name: 'pane_spawn' }, runtime: 'Overclock' } },
+    recommendedModels('heavy')
+  );
+  assertCheck(heavyPlan.modelPolicy.defaultModel === 'claude-opus-4-7', 'heavy pane plan must explicitly use Opus');
+  assertCheck(
+    heavyPlan.workstreams.every((item) => item.model),
+    'each visible-pane workstream must include an explicit model'
+  );
   for (const report of reports) {
     console.log(`ok - ${report.name}: ${report.domains.join(', ')} -> picks ${report.picks.join(', ')} | bundle ${report.bundle.join(', ')}`);
   }

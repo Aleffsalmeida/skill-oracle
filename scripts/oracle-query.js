@@ -174,6 +174,12 @@ const MODEL_HINTS = {
   },
 };
 
+const COMPLEXITY_LEVELS = {
+  simple: { level: 'low', label_pt: 'baixo' },
+  medium: { level: 'medium', label_pt: 'medio' },
+  heavy: { level: 'high', label_pt: 'alto' },
+};
+
 const DOMAIN_KEYWORDS = [
   {
     id: 'web-dev',
@@ -861,13 +867,20 @@ function estimateComplexity(task, domains, picks) {
   const tokens = tokenize(task);
   let score = 0;
 
+  const simpleLocalEdit = /\b(typo|copy|texto|label|r[oó]tulo|botao|botão|cor|padding|margin|espacamento|espaçamento|icone|ícone)\b/.test(text)
+    && /\b(corrigir|ajustar|trocar|mudar|renomear|alterar|fix)\b/.test(text)
+    && !/\b(api|database|banco|schema|migration|migracao|migração|security|seguranca|segurança|auth|rls|test|teste|playwright|dashboard|arquitetura|architecture|refactor|rewrite)\b/.test(text);
+
   if (domains.length >= 3) score += 2;
   else if (domains.length >= 2) score += 1;
 
   if (picks.length >= 5) score += 1;
   if (tokens.length >= 18) score += 1;
-  if (/\b(parallel|architecture|system|migration|refactor|rewrite|end-to-end|multi-step|cross-domain)\b/.test(text)) score += 1;
-  if (/\b(debug|fix|repair|review|audit|test|validate)\b/.test(text)) score += 1;
+  if (/\b(parallel|architecture|arquitetura|system|migration|migracao|migração|refactor|rewrite|end-to-end|multi-step|cross-domain)\b/.test(text)) score += 1;
+  if (/\b(debug|repair|review|audit|auditoria|validate)\b/.test(text)) score += 1;
+  if (/\b(test|tests|teste|testes|playwright|security|seguranca|segurança|auth|rls)\b/.test(text)) score += 1;
+  if (/\b(production|producao|produção|payments|pagamentos|billing|checkout|dados sensiveis|dados sensíveis)\b/.test(text)) score += 1;
+  if (simpleLocalEdit) score = Math.min(score, 1);
 
   if (score <= 1) return 'simple';
   if (score <= 3) return 'medium';
@@ -877,6 +890,8 @@ function estimateComplexity(task, domains, picks) {
 function recommendedModels(complexity) {
   return {
     complexity,
+    level: COMPLEXITY_LEVELS[complexity]?.level || complexity,
+    label_pt: COMPLEXITY_LEVELS[complexity]?.label_pt || complexity,
     claude: MODEL_HINTS.claude[complexity],
     codex: MODEL_HINTS.codex[complexity],
   };
@@ -1250,7 +1265,31 @@ function workflowRecommendations(idx, task, domains) {
     });
 }
 
-function parallelExecutionPlan(task, domains, preflight) {
+function paneModelForWorkstream(workstream, modelHints) {
+  const hint = modelHints || recommendedModels('simple');
+  const text = normalize(workstream);
+
+  if (hint.complexity === 'simple') return hint.claude;
+  if (hint.complexity === 'medium') return hint.claude;
+
+  if (/\b(security|audit|rls|architecture|schema|migration|banco de dados|database)\b/.test(text)) {
+    return hint.claude;
+  }
+
+  return MODEL_HINTS.claude.medium;
+}
+
+function makeWorkstream(description, modelHints) {
+  return {
+    description,
+    model: paneModelForWorkstream(description, modelHints),
+    complexity: modelHints?.complexity || 'simple',
+    level: modelHints?.level || 'low',
+    label_pt: modelHints?.label_pt || 'baixo',
+  };
+}
+
+function parallelExecutionPlan(task, domains, preflight, modelHints = recommendedModels('simple')) {
   const text = normalize(task);
   const executorName = normalize(preflight?.preflight?.executor?.name || preflight?.executor?.name || '');
   const visiblePaneExecutor = executorName === 'pane_spawn' || /\boverclock\b/.test(normalize(preflight?.preflight?.runtime || ''));
@@ -1260,6 +1299,13 @@ function parallelExecutionPlan(task, domains, preflight) {
     return {
       recommended: false,
       executor: visiblePaneExecutor ? 'pane_spawn' : 'none',
+      modelPolicy: {
+        defaultModel: modelHints.claude,
+        complexity: modelHints.complexity,
+        level: modelHints.level,
+        label_pt: modelHints.label_pt,
+        rule: 'Pass this model explicitly to pane_spawn if a pane is opened; do not rely on the current session default.',
+      },
       reason: 'Task does not clearly split into independent workstreams.',
       workstreams: [],
     };
@@ -1267,21 +1313,28 @@ function parallelExecutionPlan(task, domains, preflight) {
 
   const workstreams = [];
   if (domains.includes('database-data') || /\b(supabase|schema|postgres|migration|rls|soft delete|banco de dados)\b/.test(text)) {
-    workstreams.push('Database/Supabase schema, RLS, migrations, soft delete, restore semantics');
+    workstreams.push(makeWorkstream('Database/Supabase schema, RLS, migrations, soft delete, restore semantics', modelHints));
   }
   if (domains.includes('design-ui') || domains.includes('web-dev') || /\b(ui|ux|react|frontend|form|modal|pagina|página)\b/.test(text)) {
-    workstreams.push('React UI/UX components, forms, page flows, shadcn integration');
+    workstreams.push(makeWorkstream('React UI/UX components, forms, page flows, shadcn integration', modelHints));
   }
   if (domains.includes('data-analytics') || /\b(dashboard|grafico|gráfico|metricas|métricas|kpi|funil|comparativo)\b/.test(text)) {
-    workstreams.push('Analytics dashboards, grouping, period comparison, funnel metrics');
+    workstreams.push(makeWorkstream('Analytics dashboards, grouping, period comparison, funnel metrics', modelHints));
   }
   if (/\b(test|qa|security|audit|playwright|rls|delete|exclusao|exclusão)\b/.test(text) || heavy) {
-    workstreams.push('QA/security review, Playwright checks, RLS and destructive-action audit');
+    workstreams.push(makeWorkstream('QA/security review, Playwright checks, RLS and destructive-action audit', modelHints));
   }
 
   return {
     recommended: workstreams.length >= 2,
     executor: visiblePaneExecutor ? 'pane_spawn' : 'visible-pane-required',
+    modelPolicy: {
+      defaultModel: modelHints.claude,
+      complexity: modelHints.complexity,
+      level: modelHints.level,
+      label_pt: modelHints.label_pt,
+      rule: 'Pass this model explicitly to pane_spawn; do not rely on the current session default.',
+    },
     reason: visiblePaneExecutor
       ? 'Independent workstreams can run in visible Overclock panes.'
       : 'Use visible panes/agents only; do not use invisible Task subagents in Overclock.',
@@ -1466,7 +1519,7 @@ async function selectAssets(idx, task, options = {}) {
 
   const fallbackRecommended = picks.length === 0;
   const processWorkflow = workflowRecommendations(idx, task, finalDomainIds);
-  const parallelPlan = parallelExecutionPlan(task, finalDomainIds, options.preflight || { executor });
+  const parallelPlan = parallelExecutionPlan(task, finalDomainIds, options.preflight || { executor }, modelHints);
   const skillSuggestions = taskSkillSuggestions(task, finalDomainIds, idx);
   const analysis = buildTaskAnalysis(task, finalDomainIds, picks, bundle, skillSuggestions);
 
@@ -1685,7 +1738,7 @@ function formatResult(result, options = {}) {
   lines.push(`Domains: ${result.domains.join(', ')}`);
   if (result.embeddingUsed) lines.push('Mode: semantic (keyword + embedding hybrid)');
   if (result.modelHints) {
-    lines.push(`Model hint: ${result.modelHints.complexity} | Claude=${result.modelHints.claude} | Codex=${result.modelHints.codex}`);
+    lines.push(`Model hint: ${result.modelHints.label_pt}/${result.modelHints.complexity} | Claude=${result.modelHints.claude} | Codex=${result.modelHints.codex}`);
   }
   if (result.runtimeSkillRoots?.length) {
     lines.push(`Runtime skill roots: ${result.runtimeSkillRoots.join(' | ')}`);
@@ -1722,6 +1775,9 @@ function formatResult(result, options = {}) {
 
   if (!showInternals) {
     lines.push('Execution plan:');
+    if (result.parallelPlan?.modelPolicy?.defaultModel) {
+      lines.push(`  - Pane model policy: ${result.parallelPlan.modelPolicy.defaultModel} (${result.parallelPlan.modelPolicy.label_pt}/${result.parallelPlan.modelPolicy.complexity}); pass model explicitly if any pane is opened.`);
+    }
     if (!result.picks.length) {
       lines.push('  - No strong local match; fallback to ecosystem search is required.');
       if (result.fallback?.available) {
@@ -1732,7 +1788,11 @@ function formatResult(result, options = {}) {
     } else if (result.parallelPlan && result.parallelPlan.recommended) {
       lines.push(`  - Orchestrate via ${result.parallelPlan.executor}.`);
       result.parallelPlan.workstreams.forEach((item) => {
-        lines.push(`  - ${item}`);
+        if (typeof item === 'string') {
+          lines.push(`  - ${item}`);
+        } else {
+          lines.push(`  - ${item.description} [model=${item.model}]`);
+        }
       });
     } else {
       lines.push('  - Single-route execution is sufficient.');
@@ -1935,6 +1995,9 @@ module.exports = {
   DEFAULT_INDEX,
   DOMAIN_KEYWORDS,
   detectDomains,
+  estimateComplexity,
+  recommendedModels,
+  parallelExecutionPlan,
   selectAssets,
   loadIndex,
   main,

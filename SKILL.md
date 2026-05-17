@@ -109,6 +109,14 @@ Use the smallest model that can safely finish the work.
 
 If the task is clearly local and low-risk, do not spend an expensive model on it. Escalate only when the task spans multiple domains, needs deep reasoning, or the cheaper model cannot close the loop cleanly.
 
+For Overclock visible panes, the model hint is mandatory execution metadata, not advisory text. When opening a pane with `pane_spawn`, pass the selected `model` explicitly:
+
+- `baixo/simple` -> `model: "claude-haiku-4-5"` or `model: "gpt-5.4-mini"`
+- `medio/medium` -> `model: "claude-sonnet-4-6"` or `model: "gpt-5.4"`
+- `alto/heavy` -> `model: "claude-opus-4-7"` or `model: "gpt-5.5"`
+
+Never let a simple task inherit the current session's default premium model. Only escalate a spawned pane above the task-level hint when that pane has a specific high-risk scope such as architecture, security, RLS, migrations, or production billing.
+
 The bootstrap preflight should report the detected executor explicitly:
 
 - `Task` for Claude Code

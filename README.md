@@ -82,11 +82,13 @@ When an OpenAI API key and the embedding index are available, ambiguous multi-do
 
 The local runner also emits a model hint so simple tasks can stay on a cheaper model by default:
 
-- **simple** -> `claude-haiku-4-5` / `gpt-5.4-mini`
-- **medium** -> `claude-sonnet-4-6` / `gpt-5.4`
-- **heavy** -> `claude-opus-4-7` / `gpt-5.5`
+- **baixo/simple** -> `claude-haiku-4-5` / `gpt-5.4-mini`
+- **medio/medium** -> `claude-sonnet-4-6` / `gpt-5.4`
+- **alto/heavy** -> `claude-opus-4-7` / `gpt-5.5`
 
 Rule of thumb: start with the smallest model that can safely close the task, and only escalate when the task is multi-domain, long-running, or architecture-heavy.
+
+In Overclock, this hint must be passed as the explicit `model` argument to `pane_spawn`. Do not let simple tasks inherit the current session's default premium model.
 
 ---
 
@@ -181,6 +183,8 @@ When the task has two or more independent workstreams, Oracle must open visible 
 - validation or smoke testing
 
 Do not keep a compound task in a single pane if separate panes would let the work happen in parallel. The point is to make the orchestration visible and reduce the chance of missing a branch of the task.
+
+Each workstream in the local execution plan includes a model. Use it directly when spawning panes. Simple tasks should use Haiku/mini, medium tasks should use Sonnet/full GPT, and only high-risk or deeply cross-domain workstreams should use Opus/highest GPT.
 
 ### Provider fallback rule
 
