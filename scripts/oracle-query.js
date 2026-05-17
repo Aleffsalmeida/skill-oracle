@@ -579,6 +579,7 @@ function usage() {
     '  --limit <n>       Number of final picks to print (default: 5)',
     '  --domain <id>     Force one or more domains; repeatable',
     '  --json            Print machine-readable JSON',
+    '  --show-internals  Include internal skill/agent picks in text output',
     '  --index <path>    Use a custom oracle-index.json',
     '  --no-embed        Disable embedding enhancement for this query',
   ].join('\n');
@@ -597,6 +598,7 @@ function parseArgs(argv) {
     rebuild: false,
     help: false,
     noEmbed: false,
+    showInternals: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -608,6 +610,7 @@ function parseArgs(argv) {
     else if (arg === '--list-domains') out.listDomains = true;
     else if (arg === '--rebuild') out.rebuild = true;
     else if (arg === '--no-embed') out.noEmbed = true;
+    else if (arg === '--show-internals') out.showInternals = true;
     else if (arg === '--limit') out.limit = Number(argv[++i] || DEFAULT_LIMIT);
     else if (arg === '--domain') out.domains.push(argv[++i]);
     else if (arg === '--index') out.indexPath = path.resolve(argv[++i]);
@@ -1673,7 +1676,8 @@ function formatDomains(idx) {
     .join('\n');
 }
 
-function formatResult(result) {
+function formatResult(result, options = {}) {
+  const showInternals = Boolean(options.showInternals);
   const visibleCount = result.modelHints?.complexity === 'heavy' || (result.domains || []).length >= 3 ? 8 : 5;
   const visibleBundleCount = Math.max(visibleCount, 6);
   const lines = [];
@@ -1714,6 +1718,28 @@ function formatResult(result) {
       result.analysis.criticalGaps.forEach((line) => lines.push(`    - ${line}`));
     }
     lines.push('');
+  }
+
+  if (!showInternals) {
+    lines.push('Execution plan:');
+    if (!result.picks.length) {
+      lines.push('  - No strong local match; fallback to ecosystem search is required.');
+      if (result.fallback?.available) {
+        lines.push('  - Use find-skills to locate the closest external asset set.');
+      } else {
+        lines.push('  - Install find-skills if you want Oracle to search the external ecosystem automatically.');
+      }
+    } else if (result.parallelPlan && result.parallelPlan.recommended) {
+      lines.push(`  - Orchestrate via ${result.parallelPlan.executor}.`);
+      result.parallelPlan.workstreams.forEach((item) => {
+        lines.push(`  - ${item}`);
+      });
+    } else {
+      lines.push('  - Single-route execution is sufficient.');
+    }
+    lines.push('  - Oracle will select and invoke the required assets internally.');
+    lines.push('  - Internal skill names stay hidden unless requested with --show-internals.');
+    return lines.join('\n');
   }
 
   if (!result.picks.length) {
@@ -1892,7 +1918,7 @@ async function main(argv = process.argv.slice(2)) {
 
   const result = await selectAssets(idx, args.task, { ...args, executor: preflight.preflight.executor, preflight });
   if (args.json) console.log(JSON.stringify(result, null, 2));
-  else console.log(formatResult(result));
+  else console.log(formatResult(result, { showInternals: args.showInternals }));
   return result.fallbackRecommended ? 2 : 0;
 }
 

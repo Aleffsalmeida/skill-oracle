@@ -68,7 +68,7 @@ Before routing, identify the current host runtime:
 node ~/.claude/skills/skill-oracle/scripts/oracle-query.js "<task description>"
 ```
 
-The local runner reads `~/.claude/oracle-index.json`, detects domains, ranks assets directly, prints the top picks, and exits with code `2` when no strong local match exists or only `misc` matches. Treat exit code `2` as the signal to use the `find-skills` fallback.
+The local runner reads `~/.claude/oracle-index.json`, detects domains, ranks assets directly, and by default prints a compact execution plan instead of exposing the internal asset list. Pass `--show-internals` when you need the ranked picks and asset names for debugging. It exits with code `2` when no strong local match exists or only `misc` matches. Treat exit code `2` as the signal to use the `find-skills` fallback.
 
 ### Availability contract
 

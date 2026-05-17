@@ -67,6 +67,8 @@ The old `build-index.js` is preserved for backward compat. New pipeline is `scan
 
 Every asset carries a `domain` and `master_agent` tag in the index. In Claude Code, the Oracle dispatches in parallel and each master sees only its own cluster. In Overclock/Codex/local runtimes, `scripts/oracle-query.js` reads the same index, evaluates enriched semantic fields extracted from each `SKILL.md`, and ranks assets deterministically without requiring Claude Code's `Task` dispatcher. In Overclock, follow-up agent work should be delegated through visible `pane_spawn` panes.
 
+The local runner defaults to a compact execution plan. It hides internal skill names unless you pass `--show-internals`, which is meant for debugging and maintenance only.
+
 The local path is not a per-domain LLM orchestration layer. It is a semantic selector that approximates the master-agent bundle by combining:
 
 - `name`, `description`, and classification keywords
