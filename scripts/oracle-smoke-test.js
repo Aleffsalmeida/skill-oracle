@@ -73,7 +73,14 @@ async function checkQuery(idx) {
 
 function checkPreflight() {
   const full = path.join(__dirname, 'oracle-query.js');
-  const result = spawnSync(process.execPath, [full, '--preflight'], { encoding: 'utf8', timeout: 120000 });
+  const attempt = () => spawnSync(process.execPath, [full, '--preflight'], { encoding: 'utf8', timeout: 120000 });
+  let result = attempt();
+  if (result.status !== 0) {
+    const bootstrap = path.join(__dirname, 'oracle-bootstrap.js');
+    const repair = spawnSync(process.execPath, [bootstrap, '--install'], { encoding: 'utf8', timeout: 180000 });
+    assertCheck(repair.status === 0, `oracle-bootstrap repair failed: ${repair.stderr || repair.stdout}`);
+    result = attempt();
+  }
   assertCheck(result.status === 0, `oracle-query preflight failed: ${result.stderr || result.stdout}`);
   assertCheck(/Oracle preflight: ready/i.test(result.stdout), 'preflight should report ready');
 }

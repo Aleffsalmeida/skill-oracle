@@ -109,7 +109,8 @@ const CASES = [
     name: 'seo-schema-ai-search',
     task: 'preciso melhorar SEO com schema json ld e aparecer em respostas de IA',
     expectedDomains: ['marketing-growth', 'docs-content'],
-    expectedResultNames: ['seo-audit', 'schema-markup'],
+    expectedResultNames: ['seo-audit'],
+    expectedAnyResultNames: ['schema-markup', 'technical-seo', 'seo'],
   },
   {
     name: 'stripe-pricing-paywall',

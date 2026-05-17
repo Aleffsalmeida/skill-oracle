@@ -16,7 +16,7 @@ const GITHUB_BRANCH = 'main';
 const REMOTE_MANIFEST_URL = 'https://raw.githubusercontent.com/Aleffsalmeida/skill-oracle/main/oracle-manifest.json';
 const REMOTE_RAW_BASE = 'https://raw.githubusercontent.com/Aleffsalmeida/skill-oracle/main';
 const REMOTE_API_BASE = `https://api.github.com/repos/${GITHUB_REPO}/contents`;
-const BOOTSTRAP_SCRIPTS = ['gen-masters.js', 'install-agents.js', 'scanner.js', 'classifier.js'];
+const BOOTSTRAP_SCRIPTS = ['sync-runtime-skills.js', 'gen-masters.js', 'install-agents.js', 'scanner.js', 'classifier.js'];
 const SESSION_HOOK_COMMAND = 'node ~/.claude/skills/skill-oracle/scripts/auto-rebuild.js';
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 10000;
@@ -438,6 +438,7 @@ async function run(options = {}) {
     repaired: false,
     hookInstalled: false,
     embeddingsBuilt: false,
+    runtimeSkillsSynced: false,
     updateFrom: null,
     updateTo: null,
     remoteFetchError: null,
@@ -463,6 +464,7 @@ async function run(options = {}) {
   if (needRepair) {
     for (const script of BOOTSTRAP_SCRIPTS) {
       runScript(script);
+      if (script === 'sync-runtime-skills.js') actions.runtimeSkillsSynced = true;
     }
     // Build embedding index when API key is configured
     const embedResult = tryBuildEmbeddings(quiet);

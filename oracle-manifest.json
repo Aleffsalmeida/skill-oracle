@@ -1,6 +1,6 @@
 {
-  "version": "2.4.10",
-  "updated_at": "2026-05-16T22:10:00Z",
+  "version": "2.4.11",
+  "updated_at": "2026-05-17T18:25:00Z",
   "paths": [
     "SKILL.md",
     "README.md",
@@ -20,6 +20,7 @@
     "scripts/oracle-regression-test.js",
     "scripts/oracle-smoke-test.js",
     "scripts/scanner.js",
+    "scripts/sync-runtime-skills.js",
     "scripts/setup.js",
     "agents/oracle-master-ai.md",
     "agents/oracle-master-analytics.md",
