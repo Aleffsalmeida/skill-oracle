@@ -1464,6 +1464,8 @@ async function selectAssets(idx, task, options = {}) {
   const fallbackRecommended = picks.length === 0;
   const processWorkflow = workflowRecommendations(idx, task, finalDomainIds);
   const parallelPlan = parallelExecutionPlan(task, finalDomainIds, options.preflight || { executor });
+  const skillSuggestions = taskSkillSuggestions(task, finalDomainIds, idx);
+  const analysis = buildTaskAnalysis(task, finalDomainIds, picks, bundle, skillSuggestions);
 
   return {
     task,
@@ -1483,7 +1485,8 @@ async function selectAssets(idx, task, options = {}) {
     synthesis,
     synthesisUsed: Boolean(synthesis),
     suggestions: proactiveSuggestions(task, finalDomainIds, idx),
-    skillSuggestions: taskSkillSuggestions(task, finalDomainIds, idx),
+    skillSuggestions,
+    analysis,
     processWorkflow,
     parallelPlan,
     fallbackRecommended,
@@ -1577,6 +1580,78 @@ function taskSkillSuggestions(task, domainIds, idx) {
     });
 }
 
+function buildTaskAnalysis(task, domainIds, picks, bundle, skillSuggestions) {
+  const text = normalize(task);
+  const codeLike = /\b(build|create|add|implement|fix|refactor|code|app|api|feature)\b/.test(text);
+  const securityLike = /\b(seguran[çc]a|security|hack|clon|roubo|invas|audit|vulner|auth|senha|token|jwt|csrf|xss|owasp)\b/.test(text);
+  const billingLike = /\b(assinatura|subscription|licen[cs]a|license|pre[çc]o|pricing|cobrar|pagamento|payment|stripe|pix|paywall|checkout)\b/.test(text);
+  const uiLike = /\b(pagin[aá]|page|download|video|demo|demonstrativo|landing|site|frontend|ui|ux|design)\b/.test(text);
+  const launchLike = /\b(lan[cç]amento|launch|go-to-market|gtm)\b/.test(text);
+  const dataLike = /\b(dado|dados|data|database|analytics|métrica|metricas|métricas|tracking|conversao|conversão)\b/.test(text);
+
+  const coverage = [];
+  const gaps = [];
+
+  coverage.push(`Selected domains: ${domainIds.join(', ') || 'misc'}.`);
+  coverage.push(`Selected picks: ${picks.slice(0, 5).map((asset) => asset.name).join(', ') || 'none yet'}.`);
+
+  if (securityLike || codeLike) {
+    if (domainIds.includes('security-audit')) coverage.push('Security review is covered.');
+    else gaps.push('Security review is implied by the task, but `security-audit` is not in the current domain set.');
+
+    if (codeLike) {
+      if (domainIds.includes('testing-qa')) coverage.push('QA and regression coverage are present.');
+      else gaps.push('The task implies code or behavior changes, but `testing-qa` is missing.');
+    }
+  }
+
+  if (billingLike) {
+    if (domainIds.includes('finance-billing')) coverage.push('Billing or licensing coverage is present.');
+    else gaps.push('Monetization or licensing is implied, but `finance-billing` is not in the current domain set.');
+
+    if (!domainIds.includes('security-audit')) {
+      gaps.push('Payments or licensing should also be checked for auth and abuse controls.');
+    }
+  }
+
+  if (uiLike) {
+    if (domainIds.includes('design-ui') || domainIds.includes('web-dev')) coverage.push('UI, page, or demo flow coverage is present.');
+    else gaps.push('A visible page or flow is implied, but UI/web coverage is weak.');
+  }
+
+  if (launchLike) {
+    if (domainIds.includes('marketing-growth')) coverage.push('Launch or distribution coverage is present.');
+    else gaps.push('This looks like a launchable feature, but `launch-strategy` / growth coverage is absent.');
+  }
+
+  if (dataLike) {
+    if (domainIds.includes('database-data') || domainIds.includes('data-analytics')) coverage.push('Data or analytics coverage is present.');
+    else gaps.push('The task touches data or measurement, but the domain coverage is thin there.');
+  }
+
+  if (!gaps.length) gaps.push('No major coverage gap detected from the current local index.');
+
+  const criticalGaps = gaps.filter((line) =>
+    /security|payments|licensing|code|testing|regression|abuse|auth/.test(normalize(line)),
+  );
+
+  const recommendationSummary = [];
+  const uniqueSkillNames = new Set();
+  for (const skill of skillSuggestions) {
+    if (uniqueSkillNames.has(skill.name)) continue;
+    uniqueSkillNames.add(skill.name);
+    if (skill.available) recommendationSummary.push(skill.name);
+  }
+
+  return {
+    status: criticalGaps.length ? 'partial' : 'covered',
+    coverage,
+    gaps,
+    criticalGaps,
+    recommendations: recommendationSummary.slice(0, 8),
+  };
+}
+
 function formatStats(idx) {
   const byType = idx.stats && idx.stats.by_type ? idx.stats.by_type : {};
   const topDomains = Object.entries((idx.stats && idx.stats.by_domain) || {})
@@ -1620,6 +1695,26 @@ function formatResult(result) {
     lines.push('');
   }
   lines.push('');
+
+  if (result.analysis) {
+    lines.push('Analysis complete:');
+    result.analysis.coverage.forEach((line) => {
+      lines.push(`  - ${line}`);
+    });
+    lines.push('');
+    lines.push('Gap analysis:');
+    result.analysis.gaps.forEach((line) => {
+      lines.push(`  - ${line}`);
+    });
+    if (result.analysis.status) {
+      lines.push(`  Status: ${result.analysis.status}`);
+    }
+    if (result.analysis.criticalGaps && result.analysis.criticalGaps.length) {
+      lines.push('  Critical:');
+      result.analysis.criticalGaps.forEach((line) => lines.push(`    - ${line}`));
+    }
+    lines.push('');
+  }
 
   if (!result.picks.length) {
     lines.push('No strong local match. Fallback required: use find-skills ecosystem search.');

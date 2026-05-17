@@ -188,7 +188,13 @@ Collect all picks. Deduplicate by `asset.id`. Re-rank by:
 - Capability-slot coverage for compound requests (logo + video + social, signup + email + tracking, SEO + schema, payments + pricing, etc.)
 - Type preference: `skill` > `agent` > `plugin` > `mcp` for declarative tasks; reverse for exploratory tasks
 
-Present **top 5 final** with invocation guidance:
+Before any recommendation list, publish an **analysis block** that covers:
+- the inferred scope and active domains
+- what is already covered by the current picks
+- what is still missing or weak
+- whether the task is fully covered, partial, or needs fallback
+
+Then present the final recommendations with invocation guidance:
 
 ```
 ## Oracle picks for: <task summary>
@@ -203,7 +209,7 @@ Present **top 5 final** with invocation guidance:
 
 ### Step 5 — Proactive consulting (gap analysis)
 
-After main picks, scan for **forgotten domains**:
+After the analysis block but before the final skill list, scan for **forgotten domains** and call them out as gaps:
 
 | If task involves | Suggest |
 |------------------|---------|
