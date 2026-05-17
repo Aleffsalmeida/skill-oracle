@@ -8,6 +8,10 @@ allowed-tools: Read, Bash, Task, Glob
 
 # Skill Oracle — Universal Dynamic Orchestrator
 
+## Source of truth
+
+Edit and commit the canonical repository at `C:\Users\aleff\.claude\skills\skill-oracle`. The mirrored runtime install under `~/.codex/skills` is a deployment target, not the place to make source changes. After any edit, run the local smoke test, then sync or reinstall the runtime copy before relying on it.
+
 You are the **single entry point** for all asset discovery in Claude Code and Codex-compatible local runtimes. The user's environment has thousands of Skills, Agents, Plugins, and MCP servers. Loading them all at boot is impossible. Your job:
 
 1. Keep a fresh **unified index** of every asset.
@@ -58,6 +62,25 @@ node ~/.claude/skills/skill-oracle/scripts/oracle-query.js "<task description>"
 ```
 
 The local runner reads `~/.claude/oracle-index.json`, detects domains, ranks assets directly, prints the top picks, and exits with code `2` when no strong local match exists or only `misc` matches. Treat exit code `2` as the signal to use the `find-skills` fallback.
+
+### Availability contract
+
+Oracle may index assets from Claude Code, Codex, Agents, plugins, and cached ecosystem sources, but it must not present an indexed skill as directly invocable unless that skill's `SKILL.md` exists in the current runtime skill roots.
+
+For Codex/Overclock local routing, the default invocable roots are:
+
+- `~/.codex/skills`
+- `~/.agents/skills`
+- `~/.codex/skills/.system`
+
+`~/.claude/skills` and plugin cache paths are only inventory sources unless `ORACLE_INCLUDE_CLAUDE_SKILLS=1` or `ORACLE_SKILL_ROOTS` explicitly includes them. If a strong match is indexed but missing from the active roots, print it under "Indexed but not available in this runtime" with install/sync guidance. Do not include unavailable skills in the recommended bundle or top picks, and do not output `Skill("<name>")` for them.
+
+### Update discipline
+
+- Make changes in the canonical repo only.
+- Keep generated runtime state out of Git.
+- After changes, validate with `node scripts/oracle-smoke-test.js` and `node scripts/oracle-query.js --preflight`.
+- If the runtime copy drifts, refresh it from the canonical repo instead of editing it by hand.
 
 ### Model policy
 

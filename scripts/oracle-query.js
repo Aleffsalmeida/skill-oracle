@@ -69,17 +69,73 @@ const NEGATION_BREAKS = new Set([
   'mas', 'entao', 'então', 'com', 'usando',
 ]);
 
-function findLocalSkill(name) {
+function configuredRuntimeSkillRoots() {
+  if (process.env.ORACLE_SKILL_ROOTS) {
+    return process.env.ORACLE_SKILL_ROOTS
+      .split(path.delimiter)
+      .map((root) => root.trim())
+      .filter(Boolean);
+  }
   const roots = [
-    path.join(HOME, '.claude', 'skills'),
     path.join(HOME, '.codex', 'skills'),
     path.join(HOME, '.agents', 'skills'),
+    path.join(HOME, '.codex', 'skills', '.system'),
   ];
+  if (process.env.ORACLE_INCLUDE_CLAUDE_SKILLS === '1') {
+    roots.push(path.join(HOME, '.claude', 'skills'));
+  }
+  return roots;
+}
+
+function skillNameVariants(name) {
+  const raw = String(name || '').trim();
+  const variants = new Set([raw]);
+  if (raw.includes(':')) variants.add(raw.replace(/:/g, '-'));
+  if (raw.includes('/')) variants.add(raw.replace(/\//g, '-'));
+  if (raw === 'react:components') variants.add('react-components');
+  if (raw === 'higgsfield') variants.add('higgs-field');
+  if (raw === 'higgs-field') variants.add('higgsfield');
+  return Array.from(variants).filter(Boolean);
+}
+
+function findLocalSkill(name) {
+  const roots = configuredRuntimeSkillRoots();
   for (const root of roots) {
-    const skillPath = path.join(root, name, 'SKILL.md');
-    if (fs.existsSync(skillPath)) return skillPath;
+    for (const variant of skillNameVariants(name)) {
+      const skillPath = path.join(root, variant, 'SKILL.md');
+      if (fs.existsSync(skillPath)) return skillPath;
+    }
   }
   return null;
+}
+
+function resolveRuntimeAvailability(asset, executor = null) {
+  if (asset.type !== 'skill') {
+    return { available: true, path: asset.path || null, roots: [], reason: 'non-skill asset' };
+  }
+  const roots = configuredRuntimeSkillRoots();
+  for (const root of roots) {
+    for (const variant of skillNameVariants(asset.name)) {
+      const skillPath = path.join(root, variant, 'SKILL.md');
+      if (fs.existsSync(skillPath)) {
+        return {
+          available: true,
+          path: skillPath,
+          roots,
+          reason: 'installed in current runtime skill roots',
+        };
+      }
+    }
+  }
+  const executorName = normalize(executor?.name || process.env.ORACLE_EXECUTOR || '');
+  return {
+    available: false,
+    path: null,
+    roots,
+    reason: executorName === 'task'
+      ? 'not found in configured runtime skill roots'
+      : 'indexed but not invocable in current Codex/Overclock skill roots',
+  };
 }
 
 function fallbackGuidance(task) {
@@ -900,6 +956,7 @@ function scoreAsset(asset, taskTokens, activeCapabilityIntents = []) {
 
 function enrichRankedAsset(asset, domain, result, executor = null) {
   const segments = semanticSegments(asset);
+  const availability = resolveRuntimeAvailability(asset, executor);
   return {
     id: asset.id,
     name: asset.name,
@@ -920,8 +977,11 @@ function enrichRankedAsset(asset, domain, result, executor = null) {
       capability: segments.capability.length,
     },
     path: asset.path,
+    runtime_path: availability.path,
     source: asset.source,
-    invoke: invocationHint(asset, executor),
+    available: availability.available,
+    availability,
+    invoke: invocationHint(asset, executor, availability),
   };
 }
 
@@ -946,8 +1006,14 @@ function assetTypeFit(asset, task) {
   return 0;
 }
 
-function invocationHint(asset, executor = null) {
-  if (asset.type === 'skill') return `Skill("${asset.name}")`;
+function invocationHint(asset, executor = null, availability = null) {
+  if (asset.type === 'skill') {
+    const resolved = availability || resolveRuntimeAvailability(asset, executor);
+    if (!resolved.available) {
+      return `not invocable: install/sync ${asset.name} into ${resolved.roots.join(' or ')}`;
+    }
+    return `Skill("${asset.name}")`;
+  }
   if (asset.type === 'agent') {
     const executorName = normalize(executor?.name || process.env.ORACLE_EXECUTOR || '');
     if (executorName === 'pane_spawn') {
@@ -1166,14 +1232,17 @@ function workflowRecommendations(idx, task, domains) {
     })
     .map((name) => {
       const asset = findAssetByName(idx, name);
+      const availability = resolveRuntimeAvailability(asset || { name, type: 'skill', path: null });
       return {
         name,
         type: asset?.type || 'skill',
         domain: asset?.domain || 'tooling-meta',
         source: asset?.source || 'expected-local-skill',
         path: asset?.path || null,
-        invoke: `Skill("${name}")`,
-        available: Boolean(asset),
+        runtime_path: availability.path,
+        invoke: availability.available ? `Skill("${name}")` : `not invocable: install/sync ${name} into ${availability.roots.join(' or ')}`,
+        available: Boolean(asset) && availability.available,
+        availability,
       };
     });
 }
@@ -1291,6 +1360,7 @@ async function selectAssets(idx, task, options = {}) {
   }
 
   const byKey = new Map();
+  const unavailableByKey = new Map();
   const domainReports = [];
 
   for (const domainId of finalDomainIds) {
@@ -1327,9 +1397,18 @@ async function selectAssets(idx, task, options = {}) {
       })
       .slice(0, 10);
 
-    domainReports.push(buildVirtualMasterReport(domain, ranked, task));
-
     for (const asset of ranked) {
+      if (asset.type === 'skill' && asset.available === false && asset.score >= STRONG_MATCH_THRESHOLD) {
+        const key = canonicalAssetKey(asset);
+        const existing = unavailableByKey.get(key);
+        if (!existing || asset.score > existing.score) unavailableByKey.set(key, asset);
+      }
+    }
+
+    const availableRanked = ranked.filter((asset) => asset.available !== false);
+    domainReports.push(buildVirtualMasterReport(domain, availableRanked, task));
+
+    for (const asset of availableRanked) {
       const key = canonicalAssetKey(asset);
       const existing = byKey.get(key);
       if (!existing || asset.score > existing.score) {
@@ -1346,6 +1425,9 @@ async function selectAssets(idx, task, options = {}) {
     .slice(0, options.limit || DEFAULT_LIMIT);
   const bundle = buildRecommendedBundle(domainReports, rankedPicks, task);
   const picks = mergeBundleIntoPicks(bundle, rankedPicks, options.limit || DEFAULT_LIMIT);
+  const unavailable = Array.from(unavailableByKey.values())
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 12);
 
   let synthesis = null;
   const topGap = rankedPicks.length >= 2 ? rankedPicks[0].score - rankedPicks[1].score : Infinity;
@@ -1387,6 +1469,8 @@ async function selectAssets(idx, task, options = {}) {
     embeddingUsed: queryVector !== null,
     picks,
     bundle,
+    unavailable,
+    runtimeSkillRoots: configuredRuntimeSkillRoots(),
     domainReports,
     virtualMasters: domainReports.map((report) => ({
       domain: report.domain,
@@ -1459,6 +1543,9 @@ function formatResult(result) {
   if (result.modelHints) {
     lines.push(`Model hint: ${result.modelHints.complexity} | Claude=${result.modelHints.claude} | Codex=${result.modelHints.codex}`);
   }
+  if (result.runtimeSkillRoots?.length) {
+    lines.push(`Runtime skill roots: ${result.runtimeSkillRoots.join(' | ')}`);
+  }
   if (result.synthesis && result.synthesis.reasoning) {
     lines.push('LLM synthesis: active');
     lines.push(`Synthesis: ${result.synthesis.reasoning}`);
@@ -1507,6 +1594,15 @@ function formatResult(result) {
       lines.push(`${index + 1}. ${asset.name} - ${asset.type} - score ${asset.score} - ${asset.domain}`);
       lines.push(`   Why: matched ${asset.matched.join(', ') || 'task context'}`);
       lines.push(`   Invoke: ${asset.invoke}`);
+    });
+  }
+
+  if (result.unavailable && result.unavailable.length) {
+    lines.push('');
+    lines.push('Indexed but not available in this runtime:');
+    result.unavailable.slice(0, 8).forEach((asset) => {
+      lines.push(`- ${asset.name} (${asset.type}, score ${asset.score}) indexed at ${asset.path || 'unknown path'}`);
+      lines.push(`  Install/sync into: ${(asset.availability?.roots || result.runtimeSkillRoots || []).join(' or ')}`);
     });
   }
 
