@@ -77,8 +77,26 @@ function copyDir(src, dst) {
   }
 }
 
+function sleepMs(ms) {
+  const shared = new SharedArrayBuffer(4);
+  const view = new Int32Array(shared);
+  Atomics.wait(view, 0, 0, ms);
+}
+
 function removeDir(dir) {
-  if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
+  if (!fs.existsSync(dir)) return;
+  let lastError = null;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+      return;
+    } catch (error) {
+      lastError = error;
+      if (!error || !['ENOTEMPTY', 'EPERM', 'EBUSY'].includes(error.code)) throw error;
+      sleepMs(60 * (attempt + 1));
+    }
+  }
+  if (lastError) throw lastError;
 }
 
 function parseFrontmatterName(skillMd) {

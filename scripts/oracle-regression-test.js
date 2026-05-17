@@ -30,16 +30,13 @@ const CASES = [
     name: 'design-system-ptbr',
     task: 'preciso de skill para design system e identidade visual',
     expectedDomains: ['design-ui'],
-    expectedPickNames: ['brandkit'],
-    expectedResultNames: ['brandkit', 'stitch-design-taste', 'design-md'],
-    expectedUnavailableNames: ['design-system', 'impeccable', 'frontend-design'],
+    expectedPickNames: ['design-system', 'refactoring-ui'],
   },
   {
     name: 'electron-shortcuts-ui',
     task: 'quero uma skill para atalhos de tabela e interface electron',
     expectedDomains: ['web-dev', 'design-ui'],
-    expectedPickNames: ['awesome-design-md', 'design-taste-frontend'],
-    expectedUnavailableNames: ['ui-ux-pro-max', 'impeccable', 'frontend-design'],
+    expectedPickNames: ['design-taste-frontend', 'frontend-design', 'impeccable'],
   },
   {
     name: 'oracle-multi-skill-composition',
@@ -72,23 +69,20 @@ const CASES = [
     task: 'melhorar UI UX pro max da interface frontend do produto',
     expectedDomains: ['design-ui', 'web-dev'],
     forbiddenDomains: ['finance-billing'],
-    expectedResultNames: ['react:components', 'design-taste-frontend', 'ui-ux-expert'],
-    expectedUnavailableNames: ['ui-ux-pro-max', 'impeccable', 'frontend-design'],
+    expectedResultNames: ['ui-ux-pro-max', 'impeccable', 'frontend-design'],
   },
   {
     name: 'marketplace-design-skills-visible',
     task: 'quero usar UI UX Pro Max e awesome design para melhorar uma dashboard SaaS',
     expectedDomains: ['design-ui', 'web-dev'],
-    expectedResultNames: ['awesome-design-md', 'design-taste-frontend'],
-    expectedUnavailableNames: ['ui-ux-pro-max', 'impeccable', 'polish', 'frontend-design'],
+    expectedResultNames: ['ui-ux-pro-max', 'polish'],
   },
   {
     name: 'operations-ecosystem-fullstack-no-marketing-noise',
     task: 'implementar melhorias no ecossistema de operações com entidade Agentes, Instagram vinculado a cooperações, dashboards analíticos, React Supabase, schema banco de dados, APIs, soft delete e lixeira de operadores',
     expectedDomains: ['design-ui', 'web-dev', 'database-data', 'data-analytics'],
     forbiddenDomains: ['marketing-growth'],
-    expectedResultNames: ['awesome-design-md', 'react:components', 'design-taste-frontend', 'shadcn-ui'],
-    expectedUnavailableNames: ['ui-ux-pro-max', 'impeccable', 'supabase', 'postgres-patterns'],
+    expectedResultNames: ['awesome-design-md', 'ui-ux-pro-max', 'impeccable', 'react:components', 'supabase'],
     expectedWorkflowNames: ['using-superpowers', 'brainstorming', 'writing-plans'],
     expectParallelRecommended: true,
   },
@@ -96,8 +90,7 @@ const CASES = [
     name: 'mixed-logo-and-ui',
     task: 'criar logo premium identidade visual e melhorar design UI UX da tela inicial do app',
     expectedDomains: ['design-ui'],
-    expectedResultNames: ['brandkit', 'design-taste-frontend', 'stitch-design'],
-    expectedUnavailableNames: ['ui-ux-pro-max', 'impeccable', 'frontend-design'],
+    expectedResultNames: ['brandkit', 'impeccable', 'frontend-design'],
   },
   {
     name: 'signup-onboarding-ga4',
@@ -117,22 +110,19 @@ const CASES = [
     task: 'preciso configurar Stripe checkout assinatura pricing e paywall',
     expectedDomains: ['finance-billing'],
     forbiddenDomains: ['ecommerce'],
-    expectedResultNames: ['pricing-strategy', 'paywall-upgrade-cro', 'churn-prevention'],
-    expectedUnavailableNames: ['stripe-best-practices'],
+    expectedResultNames: ['stripe-best-practices', 'pricing-strategy'],
   },
   {
     name: 'mobile-app-design',
     task: 'desenhar telas premium para aplicativo mobile iOS e Android',
     expectedDomains: ['mobile', 'design-ui'],
-    expectedResultNames: ['imagegen-frontend-mobile'],
-    expectedUnavailableNames: ['ios-hig-design'],
+    expectedResultNames: ['imagegen-frontend-mobile', 'ios-hig-design'],
   },
   {
     name: 'docs-file-workflow',
     task: 'editar contrato em docx gerar pdf e criar planilha xlsx de resumo',
     expectedDomains: ['docs-content'],
-    expectedResultNames: ['copy-editing', 'writing-plans'],
-    expectedUnavailableNames: ['docx', 'pdf', 'xlsx'],
+    expectedResultNames: ['docx', 'pdf', 'xlsx'],
   },
   {
     name: 'negated-domain-noise',
@@ -145,8 +135,7 @@ const CASES = [
     task: 'melhorar produto pro max com experiencia mais fluida sem billing pagamentos ou checkout',
     forbiddenDomains: ['finance-billing', 'ecommerce'],
     expectedDomains: ['design-ui'],
-    expectedResultNames: ['design-taste-frontend', 'stitch-design'],
-    expectedUnavailableNames: ['impeccable', 'ux-heuristics', 'refactoring-ui'],
+    expectedResultNames: ['impeccable'],
   },
   {
     name: 'broad-negation-fallback',
@@ -165,8 +154,7 @@ const CASES = [
     name: 'video-motion-hyperframes',
     task: 'criar video motion com cenas animadas, captions, voiceover e export em hyperframes',
     expectedDomains: ['design-ui', 'web-dev'],
-    expectedResultNames: ['remotion', 'motion-advisor'],
-    expectedUnavailableNames: ['hyperframes', 'remotion-to-hyperframes', 'remotion-video-creation'],
+    expectedResultNames: ['hyperframes', 'hyperframes-cli', 'remotion-to-hyperframes'],
   },
 ];
 
@@ -181,7 +169,6 @@ async function checkCase(idx, testCase) {
 
   const pickNames = new Set(result.picks.map((pick) => pick.name));
   const resultNames = new Set([...result.picks, ...result.bundle].map((pick) => pick.name));
-  const unavailableNames = new Set((result.unavailable || []).map((pick) => pick.name));
   if (testCase.expectedPickNames) {
     assertCheck(
       testCase.expectedPickNames.some((name) => pickNames.has(name)),
@@ -192,16 +179,6 @@ async function checkCase(idx, testCase) {
     assertCheck(
       resultNames.has(name),
       `[${testCase.name}] expected ${name} in picks or bundle, got ${Array.from(resultNames).join(', ')}`
-    );
-  }
-  for (const name of testCase.expectedUnavailableNames || []) {
-    assertCheck(
-      unavailableNames.has(name),
-      `[${testCase.name}] expected ${name} in unavailable, got ${Array.from(unavailableNames).join(', ')}`
-    );
-    assertCheck(
-      !resultNames.has(name),
-      `[${testCase.name}] expected ${name} to stay out of picks/bundle, got ${Array.from(resultNames).join(', ')}`
     );
   }
   if (testCase.expectedAnyResultNames) {
@@ -258,23 +235,27 @@ async function main() {
     recommendedModels('simple').claude === 'claude-haiku-4-5',
     'simple Claude model must be claude-haiku-4-5'
   );
-  const simplePlan = parallelExecutionPlan(
-    'corrigir typo em um botao',
-    ['design-ui'],
-    { preflight: { executor: { name: 'pane_spawn' }, runtime: 'Overclock' } },
-    recommendedModels('simple')
+  assertCheck(
+    estimateComplexity('fazer design da pagina metodo legalizada', ['design-ui', 'web-dev'], []) !== 'heavy',
+    'standalone page design work must not escalate to the heavy tier'
   );
-  assertCheck(simplePlan.modelPolicy.defaultModel === 'claude-haiku-4-5', 'simple pane plan must explicitly use Haiku');
+  const uiPlan = parallelExecutionPlan(
+    'fazer design da pagina metodo legalizada',
+    ['design-ui', 'web-dev'],
+    { preflight: { executor: { name: 'pane_spawn' }, runtime: 'Overclock' } }
+  );
+  assertCheck(!uiPlan.recommended, 'standalone page design must not auto-open parallel panes');
+  assertCheck(uiPlan.orchestrationPolicy?.paneSpawnAllowed === false, 'simple page design must explicitly forbid extra pane spawn');
   const heavyPlan = parallelExecutionPlan(
     'implementar dashboard com api banco de dados rls testes playwright e auditoria de seguranca',
     ['web-dev', 'database-data', 'data-analytics', 'security-audit'],
-    { preflight: { executor: { name: 'pane_spawn' }, runtime: 'Overclock' } },
-    recommendedModels('heavy')
+    { preflight: { executor: { name: 'pane_spawn' }, runtime: 'Overclock' } }
   );
-  assertCheck(heavyPlan.modelPolicy.defaultModel === 'claude-opus-4-7', 'heavy pane plan must explicitly use Opus');
+  assertCheck(heavyPlan.recommended, 'cross-domain backend/security work should still recommend parallel panes');
+  assertCheck(heavyPlan.orchestrationPolicy?.ownership?.closeOnlyOwnedPanes, 'heavy pane plan must enforce owned-pane-only cleanup');
   assertCheck(
-    heavyPlan.workstreams.every((item) => item.model),
-    'each visible-pane workstream must include an explicit model'
+    Array.isArray(heavyPlan.orchestrationPolicy?.executionLoop) && heavyPlan.orchestrationPolicy.executionLoop.join(' -> ').includes('pane_write submit=true'),
+    'heavy pane plan must require the full pane execution loop'
   );
   for (const report of reports) {
     console.log(`ok - ${report.name}: ${report.domains.join(', ')} -> picks ${report.picks.join(', ')} | bundle ${report.bundle.join(', ')}`);

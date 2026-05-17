@@ -8,17 +8,6 @@ allowed-tools: Read, Bash, Task, Glob
 
 # Skill Oracle — Universal Dynamic Orchestrator
 
-## Source of truth
-
-Edit and commit the canonical repository at `C:\Users\aleff\.claude\skills\skill-oracle`. The mirrored runtime install under `~/.codex/skills` is a deployment target, not the place to make source changes. After any edit, run the local smoke test, then sync or reinstall the runtime copy before relying on it.
-
-**Mirror rule:** every change to Oracle must be reflected in both installed runtimes before the work is considered done:
-
-- `C:\Users\aleff\.claude\skills\skill-oracle`
-- `C:\Users\aleff\.codex\skills\skill-oracle`
-
-If one copy drifts, refresh it from the canonical repo immediately. Do not leave one runtime ahead of the other.
-
 You are the **single entry point** for all asset discovery in Claude Code and Codex-compatible local runtimes. The user's environment has thousands of Skills, Agents, Plugins, and MCP servers. Loading them all at boot is impossible. Your job:
 
 1. Keep a fresh **unified index** of every asset.
@@ -61,43 +50,14 @@ You are the **single entry point** for all asset discovery in Claude Code and Co
 Before routing, identify the current host runtime:
 
 - **Claude Code runtime:** `Task` subagents are available and `~/.claude/agents/oracle-master-*.md` can be discovered. Use the Master Agent procedure below.
-- **Overclock runtime:** visible panes are available and invisible `Task` subagents may be blocked. Use `scripts/oracle-query.js` for ranking, then delegate through visible `pane_spawn` panes whenever the task can be split into independent workstreams or needs separate review. Do not keep multi-part work inside one pane when parallel panes would reduce risk or latency.
+- **Overclock runtime:** visible panes are available and invisible `Task` subagents may be blocked. Use `scripts/oracle-query.js` for ranking, then delegate only through visible `pane_spawn` panes when deeper review is needed. Do not open panes for simple local edits or standalone page-design work that one pane can finish safely.
 - **Codex or generic local runtime:** `Task(subagent_type=...)` is not available. Do not pretend to dispatch subagents. Use the local runner instead:
 
 ```bash
 node ~/.claude/skills/skill-oracle/scripts/oracle-query.js "<task description>"
 ```
 
-The local runner reads `~/.claude/oracle-index.json`, detects domains, ranks assets directly, and by default prints a compact execution plan instead of exposing the internal asset list. Pass `--show-internals` when you need the ranked picks and asset names for debugging. It exits with code `2` when no strong local match exists or only `misc` matches. Treat exit code `2` as the signal to use the `find-skills` fallback.
-
-### Provider selection
-
-Before spawning any visible panes or delegating a task outside the current pane, confirm which providers are actually usable in this Overclock install.
-
-- Call `pane_list_providers` first when the current provider is uncertain or has already failed.
-- Prefer a provider that is explicitly enabled and known to work for the current session.
-- If the current provider is blocked, unavailable, or fails authentication, switch to another enabled provider instead of retrying blindly.
-- If two or more enabled providers look viable and the task is sensitive or long-running, ask the user which one to use before spawning panes.
-- Never open panes on a provider that is known to be unavailable for the current session.
-
-### Availability contract
-
-Oracle may index assets from Claude Code, Codex, Agents, plugins, and cached ecosystem sources, but it must not present an indexed skill as directly invocable unless that skill's `SKILL.md` exists in the current runtime skill roots.
-
-For Codex/Overclock local routing, the default invocable roots are:
-
-- `~/.codex/skills`
-- `~/.agents/skills`
-- `~/.codex/skills/.system`
-
-`~/.claude/skills` and plugin cache paths are only inventory sources unless `ORACLE_INCLUDE_CLAUDE_SKILLS=1` or `ORACLE_SKILL_ROOTS` explicitly includes them. If a strong match is indexed but missing from the active roots, print it under "Indexed but not available in this runtime" with install/sync guidance. Do not include unavailable skills in the recommended bundle or top picks, and do not output `Skill("<name>")` for them.
-
-### Update discipline
-
-- Make changes in the canonical repo only.
-- Keep generated runtime state out of Git.
-- After changes, validate with `node scripts/oracle-smoke-test.js` and `node scripts/oracle-query.js --preflight`.
-- After validation, refresh both runtime mirrors from the canonical repo instead of editing either runtime by hand.
+The local runner reads `~/.claude/oracle-index.json`, detects domains, ranks assets directly, prints the top picks, and exits with code `2` when no strong local match exists or only `misc` matches. Treat exit code `2` as the signal to use the `find-skills` fallback.
 
 ### Model policy
 
@@ -109,13 +69,14 @@ Use the smallest model that can safely finish the work.
 
 If the task is clearly local and low-risk, do not spend an expensive model on it. Escalate only when the task spans multiple domains, needs deep reasoning, or the cheaper model cannot close the loop cleanly.
 
-For Overclock visible panes, the model hint is mandatory execution metadata, not advisory text. When opening a pane with `pane_spawn`, pass the selected `model` explicitly:
+For Overclock visible panes, the model hint is mandatory execution metadata, not advisory text. Pass the selected `model` explicitly to `pane_spawn`. Never let a simple task inherit the current premium session model.
 
-- `baixo/simple` -> `model: "claude-haiku-4-5"` or `model: "gpt-5.4-mini"`
-- `medio/medium` -> `model: "claude-sonnet-4-6"` or `model: "gpt-5.4"`
-- `alto/heavy` -> `model: "claude-opus-4-7"` or `model: "gpt-5.5"`
+### Overclock pane safety contract
 
-Never let a simple task inherit the current session's default premium model. Only escalate a spawned pane above the task-level hint when that pane has a specific high-risk scope such as architecture, security, RLS, migrations, or production billing.
+- Only spawn panes for genuinely independent workstreams. Simple page polish, local UI edits, copy tweaks, and single-surface design tasks stay in the current pane.
+- Track every pane id you spawn for the current task. Those are the only panes Oracle may treat as disposable.
+- Never close panes you did not spawn in the current task. Never close the caller pane. If the user asks to close idle panes, list the Oracle-owned candidates first unless the user named exact pane ids.
+- A spawned pane is not considered active until Oracle completes `pane_write` with submission, then `pane_wait_idle`, then `pane_read`. If that loop does not complete, treat the pane as failed orchestration instead of "done".
 
 The bootstrap preflight should report the detected executor explicitly:
 
@@ -203,7 +164,7 @@ node ~/.claude/skills/skill-oracle/scripts/oracle-query.js --rebuild
 node ~/.claude/skills/skill-oracle/scripts/oracle-smoke-test.js
 ```
 
-When using Overclock or Codex, summarize the `oracle-query.js` output to the user and then invoke the recommended skill or tool according to the host's available mechanism. For Overclock, agent recommendations should be treated as visible `pane_spawn` follow-up work; split them into separate panes when the workstreams are independent. Direct `Task(subagent_type=...)` is only valid in Claude Code.
+When using Overclock or Codex, summarize the `oracle-query.js` output to the user and then invoke the recommended skill or tool according to the host's available mechanism. For Overclock, agent recommendations should be treated as visible `pane_spawn` follow-up work; direct `Task(subagent_type=...)` is only valid in Claude Code. After every `pane_spawn`, immediately execute the full loop `pane_write -> pane_wait_idle -> pane_read`; do not leave spawned panes parked at an untouched prompt.
 
 ### Step 4 — Synthesize
 
@@ -213,13 +174,7 @@ Collect all picks. Deduplicate by `asset.id`. Re-rank by:
 - Capability-slot coverage for compound requests (logo + video + social, signup + email + tracking, SEO + schema, payments + pricing, etc.)
 - Type preference: `skill` > `agent` > `plugin` > `mcp` for declarative tasks; reverse for exploratory tasks
 
-Before any recommendation list, publish an **analysis block** that covers:
-- the inferred scope and active domains
-- what is already covered by the current picks
-- what is still missing or weak
-- whether the task is fully covered, partial, or needs fallback
-
-Then present the final recommendations with invocation guidance:
+Present **top 5 final** with invocation guidance:
 
 ```
 ## Oracle picks for: <task summary>
@@ -234,7 +189,7 @@ Then present the final recommendations with invocation guidance:
 
 ### Step 5 — Proactive consulting (gap analysis)
 
-After the analysis block but before the final skill list, scan for **forgotten domains** and call them out as gaps:
+After main picks, scan for **forgotten domains**:
 
 | If task involves | Suggest |
 |------------------|---------|

@@ -16,8 +16,6 @@
 
 Loads minutes-of-overhead environments in seconds. Built for Claude Code users who have hundreds of plugins and don't want to pay token cost on every prompt.
 
-Canonical source: this Git repository at `~/.claude/skills/skill-oracle`. The mirrored runtime install under `~/.codex/skills` is refreshed from this repo and should not be edited directly. Keep both installed runtimes aligned after every change: `~/.claude/skills/skill-oracle` and `~/.codex/skills/skill-oracle`.
-
 ---
 
 ## What changed in v2
@@ -65,9 +63,7 @@ The old `build-index.js` is preserved for backward compat. New pipeline is `scan
               final answer
 ```
 
-Every asset carries a `domain` and `master_agent` tag in the index. In Claude Code, the Oracle dispatches in parallel and each master sees only its own cluster. In Overclock/Codex/local runtimes, `scripts/oracle-query.js` reads the same index, evaluates enriched semantic fields extracted from each `SKILL.md`, and ranks assets deterministically without requiring Claude Code's `Task` dispatcher. In Overclock, follow-up agent work should be delegated through visible `pane_spawn` panes, and multi-part work should be split across separate panes whenever the workstreams are independent.
-
-The local runner defaults to a compact execution plan. It hides internal skill names unless you pass `--show-internals`, which is meant for debugging and maintenance only.
+Every asset carries a `domain` and `master_agent` tag in the index. In Claude Code, the Oracle dispatches in parallel and each master sees only its own cluster. In Overclock/Codex/local runtimes, `scripts/oracle-query.js` reads the same index, evaluates enriched semantic fields extracted from each `SKILL.md`, and ranks assets deterministically without requiring Claude Code's `Task` dispatcher. In Overclock, follow-up agent work should be delegated through visible `pane_spawn` panes only when the work genuinely splits into independent streams.
 
 The local path is not a per-domain LLM orchestration layer. It is a semantic selector that approximates the master-agent bundle by combining:
 
@@ -82,13 +78,13 @@ When an OpenAI API key and the embedding index are available, ambiguous multi-do
 
 The local runner also emits a model hint so simple tasks can stay on a cheaper model by default:
 
-- **baixo/simple** -> `claude-haiku-4-5` / `gpt-5.4-mini`
-- **medio/medium** -> `claude-sonnet-4-6` / `gpt-5.4`
-- **alto/heavy** -> `claude-opus-4-7` / `gpt-5.5`
+- **simple** -> `claude-haiku-4-5` / `gpt-5.4-mini`
+- **medium** -> `claude-sonnet-4-6` / `gpt-5.4`
+- **heavy** -> `claude-opus-4-7` / `gpt-5.5`
 
 Rule of thumb: start with the smallest model that can safely close the task, and only escalate when the task is multi-domain, long-running, or architecture-heavy.
 
-In Overclock, this hint must be passed as the explicit `model` argument to `pane_spawn`. Do not let simple tasks inherit the current session's default premium model.
+Simple page-design work, local UI polish, and other single-surface tasks should usually stay in the current pane. Opening premium-model panes for that class of work is a policy violation, not an optimization.
 
 ---
 
@@ -172,29 +168,6 @@ The preflight report now states which dispatch mechanism the host is expected to
 
 When preflight is not ready, Oracle stops before routing and prints the exact repair steps instead of trying to continue with a broken host setup.
 
-### Overclock delegation rule
-
-When the task has two or more independent workstreams, Oracle must open visible panes before the final recommendation step. Use one pane per workstream when possible. Typical splits are:
-
-- backend or logic analysis
-- UI or layout review
-- security or risk review
-- documentation or release review
-- validation or smoke testing
-
-Do not keep a compound task in a single pane if separate panes would let the work happen in parallel. The point is to make the orchestration visible and reduce the chance of missing a branch of the task.
-
-Each workstream in the local execution plan includes a model. Use it directly when spawning panes. Simple tasks should use Haiku/mini, medium tasks should use Sonnet/full GPT, and only high-risk or deeply cross-domain workstreams should use Opus/highest GPT.
-
-### Provider fallback rule
-
-If the current provider cannot execute panes reliably, Oracle must confirm the active provider list before spawning anything else. Use `pane_list_providers` to check what is actually enabled in this install.
-
-- If the provider already failed or is known to be blocked, switch to an enabled provider instead of retrying the same one.
-- If more than one provider is viable and the task is important, ask the user which provider to use.
-- Do not assume a provider is usable just because it appears in the UI or was usable earlier in the session.
-- The goal is to avoid opening panes that cannot run and to fail fast before wasting time.
-
 ### Step 3 — Add the auto-rebuild hook (one-time, optional if you used `--install`)
 
 If you did not run `--install`, add the SessionStart hook in `~/.claude/settings.json`:
@@ -271,6 +244,13 @@ node ~/.claude/skills/skill-oracle/scripts/oracle-query.js --preflight
 node ~/.claude/skills/skill-oracle/scripts/oracle-query.js --rebuild
 node ~/.claude/skills/skill-oracle/scripts/oracle-smoke-test.js
 ```
+
+### Pane ownership and execution
+
+- Keep a list of pane ids spawned by Oracle for the current task. Only those panes may be considered for cleanup.
+- Never close panes that Oracle did not spawn for the current task, and never close the pane that is coordinating the work.
+- If the user asks to clean up idle panes, only close Oracle-owned panes after verifying they are idle; otherwise present the candidate ids first.
+- After every `pane_spawn`, Oracle must immediately complete `pane_write` with submission, then `pane_wait_idle`, then `pane_read`. A pane that was spawned but never received a submitted prompt counts as an orchestration failure.
 
 Exit codes:
 

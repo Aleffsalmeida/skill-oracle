@@ -69,73 +69,17 @@ const NEGATION_BREAKS = new Set([
   'mas', 'entao', 'então', 'com', 'usando',
 ]);
 
-function configuredRuntimeSkillRoots() {
-  if (process.env.ORACLE_SKILL_ROOTS) {
-    return process.env.ORACLE_SKILL_ROOTS
-      .split(path.delimiter)
-      .map((root) => root.trim())
-      .filter(Boolean);
-  }
+function findLocalSkill(name) {
   const roots = [
+    path.join(HOME, '.claude', 'skills'),
     path.join(HOME, '.codex', 'skills'),
     path.join(HOME, '.agents', 'skills'),
-    path.join(HOME, '.codex', 'skills', '.system'),
   ];
-  if (process.env.ORACLE_INCLUDE_CLAUDE_SKILLS === '1') {
-    roots.push(path.join(HOME, '.claude', 'skills'));
-  }
-  return roots;
-}
-
-function skillNameVariants(name) {
-  const raw = String(name || '').trim();
-  const variants = new Set([raw]);
-  if (raw.includes(':')) variants.add(raw.replace(/:/g, '-'));
-  if (raw.includes('/')) variants.add(raw.replace(/\//g, '-'));
-  if (raw === 'react:components') variants.add('react-components');
-  if (raw === 'higgsfield') variants.add('higgs-field');
-  if (raw === 'higgs-field') variants.add('higgsfield');
-  return Array.from(variants).filter(Boolean);
-}
-
-function findLocalSkill(name) {
-  const roots = configuredRuntimeSkillRoots();
   for (const root of roots) {
-    for (const variant of skillNameVariants(name)) {
-      const skillPath = path.join(root, variant, 'SKILL.md');
-      if (fs.existsSync(skillPath)) return skillPath;
-    }
+    const skillPath = path.join(root, name, 'SKILL.md');
+    if (fs.existsSync(skillPath)) return skillPath;
   }
   return null;
-}
-
-function resolveRuntimeAvailability(asset, executor = null) {
-  if (asset.type !== 'skill') {
-    return { available: true, path: asset.path || null, roots: [], reason: 'non-skill asset' };
-  }
-  const roots = configuredRuntimeSkillRoots();
-  for (const root of roots) {
-    for (const variant of skillNameVariants(asset.name)) {
-      const skillPath = path.join(root, variant, 'SKILL.md');
-      if (fs.existsSync(skillPath)) {
-        return {
-          available: true,
-          path: skillPath,
-          roots,
-          reason: 'installed in current runtime skill roots',
-        };
-      }
-    }
-  }
-  const executorName = normalize(executor?.name || process.env.ORACLE_EXECUTOR || '');
-  return {
-    available: false,
-    path: null,
-    roots,
-    reason: executorName === 'task'
-      ? 'not found in configured runtime skill roots'
-      : 'indexed but not invocable in current Codex/Overclock skill roots',
-  };
 }
 
 function fallbackGuidance(task) {
@@ -172,12 +116,6 @@ const MODEL_HINTS = {
     medium: 'gpt-5.4',
     heavy: 'gpt-5.5',
   },
-};
-
-const COMPLEXITY_LEVELS = {
-  simple: { level: 'low', label_pt: 'baixo' },
-  medium: { level: 'medium', label_pt: 'medio' },
-  heavy: { level: 'high', label_pt: 'alto' },
 };
 
 const DOMAIN_KEYWORDS = [
@@ -585,7 +523,6 @@ function usage() {
     '  --limit <n>       Number of final picks to print (default: 5)',
     '  --domain <id>     Force one or more domains; repeatable',
     '  --json            Print machine-readable JSON',
-    '  --show-internals  Include internal skill/agent picks in text output',
     '  --index <path>    Use a custom oracle-index.json',
     '  --no-embed        Disable embedding enhancement for this query',
   ].join('\n');
@@ -604,7 +541,6 @@ function parseArgs(argv) {
     rebuild: false,
     help: false,
     noEmbed: false,
-    showInternals: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -616,7 +552,6 @@ function parseArgs(argv) {
     else if (arg === '--list-domains') out.listDomains = true;
     else if (arg === '--rebuild') out.rebuild = true;
     else if (arg === '--no-embed') out.noEmbed = true;
-    else if (arg === '--show-internals') out.showInternals = true;
     else if (arg === '--limit') out.limit = Number(argv[++i] || DEFAULT_LIMIT);
     else if (arg === '--domain') out.domains.push(argv[++i]);
     else if (arg === '--index') out.indexPath = path.resolve(argv[++i]);
@@ -866,21 +801,27 @@ function estimateComplexity(task, domains, picks) {
   const text = normalize(task);
   const tokens = tokenize(task);
   let score = 0;
-
-  const simpleLocalEdit = /\b(typo|copy|texto|label|r[oó]tulo|botao|botão|cor|padding|margin|espacamento|espaçamento|icone|ícone)\b/.test(text)
+  const simpleLocalEdit = /\b(typo|copy|texto|label|rotulo|r[oó]tulo|botao|botão|cor|padding|margin|espacamento|espaçamento|icone|ícone)\b/.test(text)
     && /\b(corrigir|ajustar|trocar|mudar|renomear|alterar|fix)\b/.test(text)
     && !/\b(api|database|banco|schema|migration|migracao|migração|security|seguranca|segurança|auth|rls|test|teste|playwright|dashboard|arquitetura|architecture|refactor|rewrite)\b/.test(text);
+  const standaloneUiTask = /\b(ui|ux|design|frontend|pagina|página|page|layout|form|modal|componente|landing)\b/.test(text)
+    && !/\b(api|database|banco|schema|migration|migracao|migração|security|seguranca|segurança|auth|rls|test|teste|playwright|checkout|payment|pagamento|stripe|pix|arquitetura|architecture|refactor|rewrite)\b/.test(text);
+  const riskyReview = /\b(review|audit|auditoria|validate)\b/.test(text)
+    && /\b(security|seguranca|segurança|auth|rls|payment|pagamento|stripe|pix|production|producao|produção|database|banco|schema|migration|migracao|migração)\b/.test(text);
 
   if (domains.length >= 3) score += 2;
   else if (domains.length >= 2) score += 1;
 
-  if (picks.length >= 5) score += 1;
+  if (picks.length >= 5 && !standaloneUiTask) score += 1;
   if (tokens.length >= 18) score += 1;
   if (/\b(parallel|architecture|arquitetura|system|migration|migracao|migração|refactor|rewrite|end-to-end|multi-step|cross-domain)\b/.test(text)) score += 1;
-  if (/\b(debug|repair|review|audit|auditoria|validate)\b/.test(text)) score += 1;
-  if (/\b(test|tests|teste|testes|playwright|security|seguranca|segurança|auth|rls)\b/.test(text)) score += 1;
+  if (/\b(debug|fix|repair)\b/.test(text)) score += 1;
+  if (riskyReview) score += 1;
+  if (/\b(test|tests|teste|testes|playwright)\b/.test(text) && !standaloneUiTask) score += 1;
+  if (/\b(security|seguranca|segurança|auth|rls)\b/.test(text)) score += 1;
   if (/\b(production|producao|produção|payments|pagamentos|billing|checkout|dados sensiveis|dados sensíveis)\b/.test(text)) score += 1;
   if (simpleLocalEdit) score = Math.min(score, 1);
+  else if (standaloneUiTask) score = Math.min(score, 2);
 
   if (score <= 1) return 'simple';
   if (score <= 3) return 'medium';
@@ -890,8 +831,6 @@ function estimateComplexity(task, domains, picks) {
 function recommendedModels(complexity) {
   return {
     complexity,
-    level: COMPLEXITY_LEVELS[complexity]?.level || complexity,
-    label_pt: COMPLEXITY_LEVELS[complexity]?.label_pt || complexity,
     claude: MODEL_HINTS.claude[complexity],
     codex: MODEL_HINTS.codex[complexity],
   };
@@ -974,7 +913,6 @@ function scoreAsset(asset, taskTokens, activeCapabilityIntents = []) {
 
 function enrichRankedAsset(asset, domain, result, executor = null) {
   const segments = semanticSegments(asset);
-  const availability = resolveRuntimeAvailability(asset, executor);
   return {
     id: asset.id,
     name: asset.name,
@@ -995,11 +933,8 @@ function enrichRankedAsset(asset, domain, result, executor = null) {
       capability: segments.capability.length,
     },
     path: asset.path,
-    runtime_path: availability.path,
     source: asset.source,
-    available: availability.available,
-    availability,
-    invoke: invocationHint(asset, executor, availability),
+    invoke: invocationHint(asset, executor),
   };
 }
 
@@ -1024,14 +959,8 @@ function assetTypeFit(asset, task) {
   return 0;
 }
 
-function invocationHint(asset, executor = null, availability = null) {
-  if (asset.type === 'skill') {
-    const resolved = availability || resolveRuntimeAvailability(asset, executor);
-    if (!resolved.available) {
-      return `not invocable: install/sync ${asset.name} into ${resolved.roots.join(' or ')}`;
-    }
-    return `Skill("${asset.name}")`;
-  }
+function invocationHint(asset, executor = null) {
+  if (asset.type === 'skill') return `Skill("${asset.name}")`;
   if (asset.type === 'agent') {
     const executorName = normalize(executor?.name || process.env.ORACLE_EXECUTOR || '');
     if (executorName === 'pane_spawn') {
@@ -1044,6 +973,32 @@ function invocationHint(asset, executor = null, availability = null) {
   }
   if (asset.type === 'mcp') return `mcp__${asset.name}__*`;
   return `plugin:${asset.name}`;
+}
+
+function overclockOrchestrationPolicy(recommended) {
+  return {
+    paneSpawnAllowed: Boolean(recommended),
+    spawnScope: recommended
+      ? 'Open panes only for independent workstreams in the current task.'
+      : 'Do not open extra panes; keep execution in the current pane.',
+    ownership: {
+      trackSpawnedPaneIds: true,
+      closeOnlyOwnedPanes: true,
+      forbidClosingCallerPane: true,
+      requireExplicitUserSelectionForForeignPanes: true,
+    },
+    executionLoop: [
+      'pane_spawn',
+      'pane_write submit=true',
+      'pane_wait_idle',
+      'pane_read',
+    ],
+    cleanupPolicy: {
+      requireIdleCheck: true,
+      requireExecutionLoopCompletion: true,
+      failureMode: 'If the loop is incomplete, report failed orchestration instead of treating the pane as done or disposable.',
+    },
+  };
 }
 
 function scoreSupportingFit(asset, domainId, intents) {
@@ -1250,94 +1205,56 @@ function workflowRecommendations(idx, task, domains) {
     })
     .map((name) => {
       const asset = findAssetByName(idx, name);
-      const availability = resolveRuntimeAvailability(asset || { name, type: 'skill', path: null });
       return {
         name,
         type: asset?.type || 'skill',
         domain: asset?.domain || 'tooling-meta',
         source: asset?.source || 'expected-local-skill',
         path: asset?.path || null,
-        runtime_path: availability.path,
-        invoke: availability.available ? `Skill("${name}")` : `not invocable: install/sync ${name} into ${availability.roots.join(' or ')}`,
-        available: Boolean(asset) && availability.available,
-        availability,
+        invoke: `Skill("${name}")`,
+        available: Boolean(asset),
       };
     });
 }
 
-function paneModelForWorkstream(workstream, modelHints) {
-  const hint = modelHints || recommendedModels('simple');
-  const text = normalize(workstream);
-
-  if (hint.complexity === 'simple') return hint.claude;
-  if (hint.complexity === 'medium') return hint.claude;
-
-  if (/\b(security|audit|rls|architecture|schema|migration|banco de dados|database)\b/.test(text)) {
-    return hint.claude;
-  }
-
-  return MODEL_HINTS.claude.medium;
-}
-
-function makeWorkstream(description, modelHints) {
-  return {
-    description,
-    model: paneModelForWorkstream(description, modelHints),
-    complexity: modelHints?.complexity || 'simple',
-    level: modelHints?.level || 'low',
-    label_pt: modelHints?.label_pt || 'baixo',
-  };
-}
-
-function parallelExecutionPlan(task, domains, preflight, modelHints = recommendedModels('simple')) {
+function parallelExecutionPlan(task, domains, preflight) {
   const text = normalize(task);
   const executorName = normalize(preflight?.preflight?.executor?.name || preflight?.executor?.name || '');
   const visiblePaneExecutor = executorName === 'pane_spawn' || /\boverclock\b/.test(normalize(preflight?.preflight?.runtime || ''));
-  const heavy = domains.length >= 3 || /\b(schema|migration|dashboard|ui|ux|api|soft delete|lixeira|rls|security|test|playwright|multi-step|end-to-end|banco de dados)\b/.test(text);
+  const multiStepRisk = /\b(parallel|architecture|arquitetura|api|schema|migration|migracao|migração|soft delete|lixeira|rls|security|seguranca|segurança|test|tests|teste|testes|playwright|multi-step|end-to-end|cross-domain|banco de dados|database|auth|checkout|payment|pagamento|stripe|pix)\b/.test(text);
+  const heavy = domains.length >= 3 || (domains.length >= 2 && multiStepRisk);
 
   if (!heavy) {
     return {
       recommended: false,
       executor: visiblePaneExecutor ? 'pane_spawn' : 'none',
-      modelPolicy: {
-        defaultModel: modelHints.claude,
-        complexity: modelHints.complexity,
-        level: modelHints.level,
-        label_pt: modelHints.label_pt,
-        rule: 'Pass this model explicitly to pane_spawn if a pane is opened; do not rely on the current session default.',
-      },
       reason: 'Task does not clearly split into independent workstreams.',
+      orchestrationPolicy: overclockOrchestrationPolicy(false),
       workstreams: [],
     };
   }
 
   const workstreams = [];
   if (domains.includes('database-data') || /\b(supabase|schema|postgres|migration|rls|soft delete|banco de dados)\b/.test(text)) {
-    workstreams.push(makeWorkstream('Database/Supabase schema, RLS, migrations, soft delete, restore semantics', modelHints));
+    workstreams.push('Database/Supabase schema, RLS, migrations, soft delete, restore semantics');
   }
   if (domains.includes('design-ui') || domains.includes('web-dev') || /\b(ui|ux|react|frontend|form|modal|pagina|página)\b/.test(text)) {
-    workstreams.push(makeWorkstream('React UI/UX components, forms, page flows, shadcn integration', modelHints));
+    workstreams.push('React UI/UX components, forms, page flows, shadcn integration');
   }
   if (domains.includes('data-analytics') || /\b(dashboard|grafico|gráfico|metricas|métricas|kpi|funil|comparativo)\b/.test(text)) {
-    workstreams.push(makeWorkstream('Analytics dashboards, grouping, period comparison, funnel metrics', modelHints));
+    workstreams.push('Analytics dashboards, grouping, period comparison, funnel metrics');
   }
-  if (/\b(test|qa|security|audit|playwright|rls|delete|exclusao|exclusão)\b/.test(text) || heavy) {
-    workstreams.push(makeWorkstream('QA/security review, Playwright checks, RLS and destructive-action audit', modelHints));
+  if (/\b(test|qa|security|audit|auditoria|playwright|rls|delete|exclusao|exclusão)\b/.test(text)) {
+    workstreams.push('QA/security review, Playwright checks, RLS and destructive-action audit');
   }
 
   return {
     recommended: workstreams.length >= 2,
     executor: visiblePaneExecutor ? 'pane_spawn' : 'visible-pane-required',
-    modelPolicy: {
-      defaultModel: modelHints.claude,
-      complexity: modelHints.complexity,
-      level: modelHints.level,
-      label_pt: modelHints.label_pt,
-      rule: 'Pass this model explicitly to pane_spawn; do not rely on the current session default.',
-    },
     reason: visiblePaneExecutor
       ? 'Independent workstreams can run in visible Overclock panes.'
       : 'Use visible panes/agents only; do not use invisible Task subagents in Overclock.',
+    orchestrationPolicy: overclockOrchestrationPolicy(workstreams.length >= 2),
     workstreams: workstreams.slice(0, 4),
   };
 }
@@ -1416,7 +1333,6 @@ async function selectAssets(idx, task, options = {}) {
   }
 
   const byKey = new Map();
-  const unavailableByKey = new Map();
   const domainReports = [];
 
   for (const domainId of finalDomainIds) {
@@ -1453,18 +1369,9 @@ async function selectAssets(idx, task, options = {}) {
       })
       .slice(0, 10);
 
+    domainReports.push(buildVirtualMasterReport(domain, ranked, task));
+
     for (const asset of ranked) {
-      if (asset.type === 'skill' && asset.available === false && asset.score >= STRONG_MATCH_THRESHOLD) {
-        const key = canonicalAssetKey(asset);
-        const existing = unavailableByKey.get(key);
-        if (!existing || asset.score > existing.score) unavailableByKey.set(key, asset);
-      }
-    }
-
-    const availableRanked = ranked.filter((asset) => asset.available !== false);
-    domainReports.push(buildVirtualMasterReport(domain, availableRanked, task));
-
-    for (const asset of availableRanked) {
       const key = canonicalAssetKey(asset);
       const existing = byKey.get(key);
       if (!existing || asset.score > existing.score) {
@@ -1475,17 +1382,12 @@ async function selectAssets(idx, task, options = {}) {
     }
   }
 
-  const selectionLimit = options.limit || (finalDomainIds.length >= 3 || /\b(bot|licen[cs]a|assinatura|download|video|seguran[çc]a|security|stripe|pix|paywall|pagamento|pagina|página)\b/i.test(task) ? 8 : DEFAULT_LIMIT);
-
   const rankedPicks = Array.from(byKey.values())
     .filter((asset) => asset.score >= STRONG_MATCH_THRESHOLD)
     .sort((a, b) => b.score - a.score)
-    .slice(0, selectionLimit);
+    .slice(0, options.limit || DEFAULT_LIMIT);
   const bundle = buildRecommendedBundle(domainReports, rankedPicks, task);
-  const picks = mergeBundleIntoPicks(bundle, rankedPicks, selectionLimit);
-  const unavailable = Array.from(unavailableByKey.values())
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 12);
+  const picks = mergeBundleIntoPicks(bundle, rankedPicks, options.limit || DEFAULT_LIMIT);
 
   let synthesis = null;
   const topGap = rankedPicks.length >= 2 ? rankedPicks[0].score - rankedPicks[1].score : Infinity;
@@ -1519,9 +1421,7 @@ async function selectAssets(idx, task, options = {}) {
 
   const fallbackRecommended = picks.length === 0;
   const processWorkflow = workflowRecommendations(idx, task, finalDomainIds);
-  const parallelPlan = parallelExecutionPlan(task, finalDomainIds, options.preflight || { executor }, modelHints);
-  const skillSuggestions = taskSkillSuggestions(task, finalDomainIds, idx);
-  const analysis = buildTaskAnalysis(task, finalDomainIds, picks, bundle, skillSuggestions);
+  const parallelPlan = parallelExecutionPlan(task, finalDomainIds, options.preflight || { executor });
 
   return {
     task,
@@ -1529,8 +1429,6 @@ async function selectAssets(idx, task, options = {}) {
     embeddingUsed: queryVector !== null,
     picks,
     bundle,
-    unavailable,
-    runtimeSkillRoots: configuredRuntimeSkillRoots(),
     domainReports,
     virtualMasters: domainReports.map((report) => ({
       domain: report.domain,
@@ -1541,8 +1439,6 @@ async function selectAssets(idx, task, options = {}) {
     synthesis,
     synthesisUsed: Boolean(synthesis),
     suggestions: proactiveSuggestions(task, finalDomainIds, idx),
-    skillSuggestions,
-    analysis,
     processWorkflow,
     parallelPlan,
     fallbackRecommended,
@@ -1576,138 +1472,6 @@ function proactiveSuggestions(task, domainIds, idx) {
     });
 }
 
-function taskSkillSuggestions(task, domainIds, idx) {
-  const text = normalize(task);
-  const suggestions = new Set();
-  const rules = [
-    {
-      test: /\b(seguran[çc]a|security|hack|clon|roubo|invas|audit|vulner|auth|senha|token|jwt|csrf|xss|owasp)\b/,
-      skills: ['security-audit', 'testing-qa'],
-    },
-    {
-      test: /\b(assinatura|subscription|licen[cs]a|license|pre[çc]o|pricing|cobrar|pagamento|payment|stripe|pix|paywall|checkout)\b/,
-      skills: ['pricing-strategy', 'paywall-upgrade-cro', 'launch-strategy'],
-    },
-    {
-      test: /\b(pagin[aá]|page|download|video|demo|demonstrativo|landing|site|frontend|ui|ux|design)\b/,
-      skills: ['page-cro', 'copywriting', 'remotion', 'design-taste-frontend', 'react:components', 'shadcn-ui', 'ui-ux-pro-max', 'impeccable', 'frontend-design'],
-    },
-    {
-      test: /\b(lan[cç]amento|launch|go-to-market|gtm)\b/,
-      skills: ['launch-strategy', 'writing-plans', 'brainstorming'],
-    },
-    {
-      test: /\b(copy|texto|conte[úu]do|marketing)\b/,
-      skills: ['copywriting', 'copy-editing'],
-    },
-    {
-      test: /\b(arquitetura|site-architecture|sitemap|navigation|navega)\b/,
-      skills: ['site-architecture'],
-    },
-  ];
-
-  for (const rule of rules) {
-    if (!rule.test.test(text)) continue;
-    for (const skill of rule.skills) suggestions.add(skill);
-  }
-
-  if (domainIds.length >= 3) {
-    for (const skill of ['using-superpowers', 'brainstorming', 'writing-plans']) suggestions.add(skill);
-  }
-
-  return Array.from(suggestions)
-    .filter((name) => !domainIds.includes(name))
-    .slice(0, 10)
-    .map((name) => {
-      const asset = findAssetByName(idx, name);
-      const availability = resolveRuntimeAvailability(asset || { name, type: 'skill', path: null });
-      return {
-        name,
-        type: asset?.type || 'skill',
-        domain: asset?.domain || 'tooling-meta',
-        master_agent: asset?.master_agent || 'oracle-master-tooling',
-        path: asset?.path || null,
-        available: Boolean(asset) && availability.available,
-        runtime_path: availability.path,
-        invoke: asset
-          ? (availability.available ? `Skill("${name}")` : `install/sync ${name} into ${availability.roots.join(' or ')}`)
-          : `not indexed locally: ${name}`,
-      };
-    });
-}
-
-function buildTaskAnalysis(task, domainIds, picks, bundle, skillSuggestions) {
-  const text = normalize(task);
-  const codeLike = /\b(build|create|add|implement|fix|refactor|code|app|api|feature)\b/.test(text);
-  const securityLike = /\b(seguran[çc]a|security|hack|clon|roubo|invas|audit|vulner|auth|senha|token|jwt|csrf|xss|owasp)\b/.test(text);
-  const billingLike = /\b(assinatura|subscription|licen[cs]a|license|pre[çc]o|pricing|cobrar|pagamento|payment|stripe|pix|paywall|checkout)\b/.test(text);
-  const uiLike = /\b(pagin[aá]|page|download|video|demo|demonstrativo|landing|site|frontend|ui|ux|design)\b/.test(text);
-  const launchLike = /\b(lan[cç]amento|launch|go-to-market|gtm)\b/.test(text);
-  const dataLike = /\b(dado|dados|data|database|analytics|métrica|metricas|métricas|tracking|conversao|conversão)\b/.test(text);
-
-  const coverage = [];
-  const gaps = [];
-
-  coverage.push(`Selected domains: ${domainIds.join(', ') || 'misc'}.`);
-  coverage.push(`Selected picks: ${picks.slice(0, 5).map((asset) => asset.name).join(', ') || 'none yet'}.`);
-
-  if (securityLike || codeLike) {
-    if (domainIds.includes('security-audit')) coverage.push('Security review is covered.');
-    else gaps.push('Security review is implied by the task, but `security-audit` is not in the current domain set.');
-
-    if (codeLike) {
-      if (domainIds.includes('testing-qa')) coverage.push('QA and regression coverage are present.');
-      else gaps.push('The task implies code or behavior changes, but `testing-qa` is missing.');
-    }
-  }
-
-  if (billingLike) {
-    if (domainIds.includes('finance-billing')) coverage.push('Billing or licensing coverage is present.');
-    else gaps.push('Monetization or licensing is implied, but `finance-billing` is not in the current domain set.');
-
-    if (!domainIds.includes('security-audit')) {
-      gaps.push('Payments or licensing should also be checked for auth and abuse controls.');
-    }
-  }
-
-  if (uiLike) {
-    if (domainIds.includes('design-ui') || domainIds.includes('web-dev')) coverage.push('UI, page, or demo flow coverage is present.');
-    else gaps.push('A visible page or flow is implied, but UI/web coverage is weak.');
-  }
-
-  if (launchLike) {
-    if (domainIds.includes('marketing-growth')) coverage.push('Launch or distribution coverage is present.');
-    else gaps.push('This looks like a launchable feature, but `launch-strategy` / growth coverage is absent.');
-  }
-
-  if (dataLike) {
-    if (domainIds.includes('database-data') || domainIds.includes('data-analytics')) coverage.push('Data or analytics coverage is present.');
-    else gaps.push('The task touches data or measurement, but the domain coverage is thin there.');
-  }
-
-  if (!gaps.length) gaps.push('No major coverage gap detected from the current local index.');
-
-  const criticalGaps = gaps.filter((line) =>
-    /security|payments|licensing|code|testing|regression|abuse|auth/.test(normalize(line)),
-  );
-
-  const recommendationSummary = [];
-  const uniqueSkillNames = new Set();
-  for (const skill of skillSuggestions) {
-    if (uniqueSkillNames.has(skill.name)) continue;
-    uniqueSkillNames.add(skill.name);
-    if (skill.available) recommendationSummary.push(skill.name);
-  }
-
-  return {
-    status: criticalGaps.length ? 'partial' : 'covered',
-    coverage,
-    gaps,
-    criticalGaps,
-    recommendations: recommendationSummary.slice(0, 8),
-  };
-}
-
 function formatStats(idx) {
   const byType = idx.stats && idx.stats.by_type ? idx.stats.by_type : {};
   const topDomains = Object.entries((idx.stats && idx.stats.by_domain) || {})
@@ -1729,19 +1493,13 @@ function formatDomains(idx) {
     .join('\n');
 }
 
-function formatResult(result, options = {}) {
-  const showInternals = Boolean(options.showInternals);
-  const visibleCount = result.modelHints?.complexity === 'heavy' || (result.domains || []).length >= 3 ? 8 : 5;
-  const visibleBundleCount = Math.max(visibleCount, 6);
+function formatResult(result) {
   const lines = [];
   lines.push(`Oracle local picks for: ${result.task}`);
   lines.push(`Domains: ${result.domains.join(', ')}`);
   if (result.embeddingUsed) lines.push('Mode: semantic (keyword + embedding hybrid)');
   if (result.modelHints) {
-    lines.push(`Model hint: ${result.modelHints.label_pt}/${result.modelHints.complexity} | Claude=${result.modelHints.claude} | Codex=${result.modelHints.codex}`);
-  }
-  if (result.runtimeSkillRoots?.length) {
-    lines.push(`Runtime skill roots: ${result.runtimeSkillRoots.join(' | ')}`);
+    lines.push(`Model hint: ${result.modelHints.complexity} | Claude=${result.modelHints.claude} | Codex=${result.modelHints.codex}`);
   }
   if (result.synthesis && result.synthesis.reasoning) {
     lines.push('LLM synthesis: active');
@@ -1752,55 +1510,6 @@ function formatResult(result, options = {}) {
     lines.push('');
   }
   lines.push('');
-
-  if (result.analysis) {
-    lines.push('Analysis complete:');
-    result.analysis.coverage.forEach((line) => {
-      lines.push(`  - ${line}`);
-    });
-    lines.push('');
-    lines.push('Gap analysis:');
-    result.analysis.gaps.forEach((line) => {
-      lines.push(`  - ${line}`);
-    });
-    if (result.analysis.status) {
-      lines.push(`  Status: ${result.analysis.status}`);
-    }
-    if (result.analysis.criticalGaps && result.analysis.criticalGaps.length) {
-      lines.push('  Critical:');
-      result.analysis.criticalGaps.forEach((line) => lines.push(`    - ${line}`));
-    }
-    lines.push('');
-  }
-
-  if (!showInternals) {
-    lines.push('Execution plan:');
-    if (result.parallelPlan?.modelPolicy?.defaultModel) {
-      lines.push(`  - Pane model policy: ${result.parallelPlan.modelPolicy.defaultModel} (${result.parallelPlan.modelPolicy.label_pt}/${result.parallelPlan.modelPolicy.complexity}); pass model explicitly if any pane is opened.`);
-    }
-    if (!result.picks.length) {
-      lines.push('  - No strong local match; fallback to ecosystem search is required.');
-      if (result.fallback?.available) {
-        lines.push('  - Use find-skills to locate the closest external asset set.');
-      } else {
-        lines.push('  - Install find-skills if you want Oracle to search the external ecosystem automatically.');
-      }
-    } else if (result.parallelPlan && result.parallelPlan.recommended) {
-      lines.push(`  - Orchestrate via ${result.parallelPlan.executor}.`);
-      result.parallelPlan.workstreams.forEach((item) => {
-        if (typeof item === 'string') {
-          lines.push(`  - ${item}`);
-        } else {
-          lines.push(`  - ${item.description} [model=${item.model}]`);
-        }
-      });
-    } else {
-      lines.push('  - Single-route execution is sufficient.');
-    }
-    lines.push('  - Oracle will select and invoke the required assets internally.');
-    lines.push('  - Internal skill names stay hidden unless requested with --show-internals.');
-    return lines.join('\n');
-  }
 
   if (!result.picks.length) {
     lines.push('No strong local match. Fallback required: use find-skills ecosystem search.');
@@ -1824,12 +1533,9 @@ function formatResult(result, options = {}) {
     }
     if (result.bundle && result.bundle.length) {
       lines.push('Recommended bundle:');
-      result.bundle.slice(0, visibleBundleCount).forEach((asset, index) => {
+      result.bundle.slice(0, 6).forEach((asset, index) => {
         lines.push(`  ${index + 1}. ${asset.name} (${asset.domain}) -> ${asset.invoke}`);
       });
-      if (result.bundle.length > visibleBundleCount) {
-        lines.push(`  ... +${result.bundle.length - visibleBundleCount} more`);
-      }
       lines.push('');
     }
     if (result.virtualMasters && result.virtualMasters.length) {
@@ -1839,22 +1545,10 @@ function formatResult(result, options = {}) {
       });
       lines.push('');
     }
-    result.picks.slice(0, visibleCount).forEach((asset, index) => {
+    result.picks.slice(0, 5).forEach((asset, index) => {
       lines.push(`${index + 1}. ${asset.name} - ${asset.type} - score ${asset.score} - ${asset.domain}`);
       lines.push(`   Why: matched ${asset.matched.join(', ') || 'task context'}`);
       lines.push(`   Invoke: ${asset.invoke}`);
-    });
-    if (result.picks.length > visibleCount) {
-      lines.push(`... +${result.picks.length - visibleCount} more picks`);
-    }
-  }
-
-  if (result.unavailable && result.unavailable.length) {
-    lines.push('');
-    lines.push('Indexed but not available in this runtime:');
-    result.unavailable.slice(0, 8).forEach((asset) => {
-      lines.push(`- ${asset.name} (${asset.type}, score ${asset.score}) indexed at ${asset.path || 'unknown path'}`);
-      lines.push(`  Install/sync into: ${(asset.availability?.roots || result.runtimeSkillRoots || []).join(' or ')}`);
     });
   }
 
@@ -1862,6 +1556,11 @@ function formatResult(result, options = {}) {
     lines.push('');
     lines.push(`Parallel execution: ${result.parallelPlan.executor}`);
     lines.push(`Reason: ${result.parallelPlan.reason}`);
+    if (result.parallelPlan.orchestrationPolicy) {
+      lines.push(`Policy: ${result.parallelPlan.orchestrationPolicy.spawnScope}`);
+      lines.push('Ownership guard: close only Oracle-owned panes from the current task; never close the caller pane.');
+      lines.push(`Execution loop: ${result.parallelPlan.orchestrationPolicy.executionLoop.join(' -> ')}`);
+    }
     result.parallelPlan.workstreams.forEach((item, index) => {
       lines.push(`  ${index + 1}. ${item}`);
     });
@@ -1873,16 +1572,6 @@ function formatResult(result, options = {}) {
     for (const s of result.suggestions) {
       lines.push(`- ${s.domain} (${s.master_agent}) - ${s.asset_count} assets`);
     }
-  }
-
-  if (result.skillSuggestions && result.skillSuggestions.length) {
-    lines.push('');
-    lines.push('Suggested skills:');
-    result.skillSuggestions.forEach((skill) => {
-      const status = skill.available ? 'available' : 'not indexed here';
-      lines.push(`- ${skill.name} (${skill.domain}, ${status})`);
-      lines.push(`  Invoke: ${skill.invoke}`);
-    });
   }
 
   return lines.join('\n');
@@ -1978,7 +1667,7 @@ async function main(argv = process.argv.slice(2)) {
 
   const result = await selectAssets(idx, args.task, { ...args, executor: preflight.preflight.executor, preflight });
   if (args.json) console.log(JSON.stringify(result, null, 2));
-  else console.log(formatResult(result, { showInternals: args.showInternals }));
+  else console.log(formatResult(result));
   return result.fallbackRecommended ? 2 : 0;
 }
 
@@ -1996,9 +1685,9 @@ module.exports = {
   DOMAIN_KEYWORDS,
   detectDomains,
   estimateComplexity,
+  selectAssets,
   recommendedModels,
   parallelExecutionPlan,
-  selectAssets,
   loadIndex,
   main,
 };
