@@ -61,7 +61,7 @@ You are the **single entry point** for all asset discovery in Claude Code and Co
 Before routing, identify the current host runtime:
 
 - **Claude Code runtime:** `Task` subagents are available and `~/.claude/agents/oracle-master-*.md` can be discovered. Use the Master Agent procedure below.
-- **Overclock runtime:** visible panes are available and invisible `Task` subagents may be blocked. Use `scripts/oracle-query.js` for ranking, then delegate only through visible `pane_spawn` panes when deeper review is needed.
+- **Overclock runtime:** visible panes are available and invisible `Task` subagents may be blocked. Use `scripts/oracle-query.js` for ranking, then delegate through visible `pane_spawn` panes whenever the task can be split into independent workstreams or needs separate review. Do not keep multi-part work inside one pane when parallel panes would reduce risk or latency.
 - **Codex or generic local runtime:** `Task(subagent_type=...)` is not available. Do not pretend to dispatch subagents. Use the local runner instead:
 
 ```bash
@@ -185,7 +185,7 @@ node ~/.claude/skills/skill-oracle/scripts/oracle-query.js --rebuild
 node ~/.claude/skills/skill-oracle/scripts/oracle-smoke-test.js
 ```
 
-When using Overclock or Codex, summarize the `oracle-query.js` output to the user and then invoke the recommended skill or tool according to the host's available mechanism. For Overclock, agent recommendations should be treated as visible `pane_spawn` follow-up work; direct `Task(subagent_type=...)` is only valid in Claude Code.
+When using Overclock or Codex, summarize the `oracle-query.js` output to the user and then invoke the recommended skill or tool according to the host's available mechanism. For Overclock, agent recommendations should be treated as visible `pane_spawn` follow-up work; split them into separate panes when the workstreams are independent. Direct `Task(subagent_type=...)` is only valid in Claude Code.
 
 ### Step 4 — Synthesize
 

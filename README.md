@@ -65,7 +65,7 @@ The old `build-index.js` is preserved for backward compat. New pipeline is `scan
               final answer
 ```
 
-Every asset carries a `domain` and `master_agent` tag in the index. In Claude Code, the Oracle dispatches in parallel and each master sees only its own cluster. In Overclock/Codex/local runtimes, `scripts/oracle-query.js` reads the same index, evaluates enriched semantic fields extracted from each `SKILL.md`, and ranks assets deterministically without requiring Claude Code's `Task` dispatcher. In Overclock, follow-up agent work should be delegated through visible `pane_spawn` panes.
+Every asset carries a `domain` and `master_agent` tag in the index. In Claude Code, the Oracle dispatches in parallel and each master sees only its own cluster. In Overclock/Codex/local runtimes, `scripts/oracle-query.js` reads the same index, evaluates enriched semantic fields extracted from each `SKILL.md`, and ranks assets deterministically without requiring Claude Code's `Task` dispatcher. In Overclock, follow-up agent work should be delegated through visible `pane_spawn` panes, and multi-part work should be split across separate panes whenever the workstreams are independent.
 
 The local runner defaults to a compact execution plan. It hides internal skill names unless you pass `--show-internals`, which is meant for debugging and maintenance only.
 
@@ -169,6 +169,18 @@ The preflight report now states which dispatch mechanism the host is expected to
 - `none` when no executor is detectable
 
 When preflight is not ready, Oracle stops before routing and prints the exact repair steps instead of trying to continue with a broken host setup.
+
+### Overclock delegation rule
+
+When the task has two or more independent workstreams, Oracle must open visible panes before the final recommendation step. Use one pane per workstream when possible. Typical splits are:
+
+- backend or logic analysis
+- UI or layout review
+- security or risk review
+- documentation or release review
+- validation or smoke testing
+
+Do not keep a compound task in a single pane if separate panes would let the work happen in parallel. The point is to make the orchestration visible and reduce the chance of missing a branch of the task.
 
 ### Step 3 — Add the auto-rebuild hook (one-time, optional if you used `--install`)
 
