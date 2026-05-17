@@ -1419,12 +1419,14 @@ async function selectAssets(idx, task, options = {}) {
     }
   }
 
+  const selectionLimit = options.limit || (finalDomainIds.length >= 3 || /\b(bot|licen[cs]a|assinatura|download|video|seguran[çc]a|security|stripe|pix|paywall|pagamento|pagina|página)\b/i.test(task) ? 8 : DEFAULT_LIMIT);
+
   const rankedPicks = Array.from(byKey.values())
     .filter((asset) => asset.score >= STRONG_MATCH_THRESHOLD)
     .sort((a, b) => b.score - a.score)
-    .slice(0, options.limit || DEFAULT_LIMIT);
+    .slice(0, selectionLimit);
   const bundle = buildRecommendedBundle(domainReports, rankedPicks, task);
-  const picks = mergeBundleIntoPicks(bundle, rankedPicks, options.limit || DEFAULT_LIMIT);
+  const picks = mergeBundleIntoPicks(bundle, rankedPicks, selectionLimit);
   const unavailable = Array.from(unavailableByKey.values())
     .sort((a, b) => b.score - a.score)
     .slice(0, 12);
@@ -1481,6 +1483,7 @@ async function selectAssets(idx, task, options = {}) {
     synthesis,
     synthesisUsed: Boolean(synthesis),
     suggestions: proactiveSuggestions(task, finalDomainIds, idx),
+    skillSuggestions: taskSkillSuggestions(task, finalDomainIds, idx),
     processWorkflow,
     parallelPlan,
     fallbackRecommended,
@@ -1514,6 +1517,66 @@ function proactiveSuggestions(task, domainIds, idx) {
     });
 }
 
+function taskSkillSuggestions(task, domainIds, idx) {
+  const text = normalize(task);
+  const suggestions = new Set();
+  const rules = [
+    {
+      test: /\b(seguran[çc]a|security|hack|clon|roubo|invas|audit|vulner|auth|senha|token|jwt|csrf|xss|owasp)\b/,
+      skills: ['security-audit', 'testing-qa'],
+    },
+    {
+      test: /\b(assinatura|subscription|licen[cs]a|license|pre[çc]o|pricing|cobrar|pagamento|payment|stripe|pix|paywall|checkout)\b/,
+      skills: ['pricing-strategy', 'paywall-upgrade-cro', 'launch-strategy'],
+    },
+    {
+      test: /\b(pagin[aá]|page|download|video|demo|demonstrativo|landing|site|frontend|ui|ux|design)\b/,
+      skills: ['page-cro', 'copywriting', 'remotion', 'design-taste-frontend', 'react:components', 'shadcn-ui', 'ui-ux-pro-max', 'impeccable', 'frontend-design'],
+    },
+    {
+      test: /\b(lan[cç]amento|launch|go-to-market|gtm)\b/,
+      skills: ['launch-strategy', 'writing-plans', 'brainstorming'],
+    },
+    {
+      test: /\b(copy|texto|conte[úu]do|marketing)\b/,
+      skills: ['copywriting', 'copy-editing'],
+    },
+    {
+      test: /\b(arquitetura|site-architecture|sitemap|navigation|navega)\b/,
+      skills: ['site-architecture'],
+    },
+  ];
+
+  for (const rule of rules) {
+    if (!rule.test.test(text)) continue;
+    for (const skill of rule.skills) suggestions.add(skill);
+  }
+
+  if (domainIds.length >= 3) {
+    for (const skill of ['using-superpowers', 'brainstorming', 'writing-plans']) suggestions.add(skill);
+  }
+
+  return Array.from(suggestions)
+    .filter((name) => !domainIds.includes(name))
+    .slice(0, 10)
+    .map((name) => {
+      const asset = findAssetByName(idx, name);
+      const availability = resolveRuntimeAvailability(asset || { name, type: 'skill', path: null });
+      return {
+        name,
+        type: asset?.type || 'skill',
+        domain: asset?.domain || 'tooling-meta',
+        master_agent: asset?.master_agent || 'oracle-master-tooling',
+        path: asset?.path || null,
+        available: Boolean(asset) && availability.available,
+        runtime_path: availability.path,
+        invoke: asset
+          ? (availability.available ? `Skill("${name}")` : `install/sync ${name} into ${availability.roots.join(' or ')}`)
+          : `not indexed locally: ${name}`,
+      };
+    });
+}
+
 function formatStats(idx) {
   const byType = idx.stats && idx.stats.by_type ? idx.stats.by_type : {};
   const topDomains = Object.entries((idx.stats && idx.stats.by_domain) || {})
@@ -1536,6 +1599,8 @@ function formatDomains(idx) {
 }
 
 function formatResult(result) {
+  const visibleCount = result.modelHints?.complexity === 'heavy' || (result.domains || []).length >= 3 ? 8 : 5;
+  const visibleBundleCount = Math.max(visibleCount, 6);
   const lines = [];
   lines.push(`Oracle local picks for: ${result.task}`);
   lines.push(`Domains: ${result.domains.join(', ')}`);
@@ -1578,9 +1643,12 @@ function formatResult(result) {
     }
     if (result.bundle && result.bundle.length) {
       lines.push('Recommended bundle:');
-      result.bundle.slice(0, 6).forEach((asset, index) => {
+      result.bundle.slice(0, visibleBundleCount).forEach((asset, index) => {
         lines.push(`  ${index + 1}. ${asset.name} (${asset.domain}) -> ${asset.invoke}`);
       });
+      if (result.bundle.length > visibleBundleCount) {
+        lines.push(`  ... +${result.bundle.length - visibleBundleCount} more`);
+      }
       lines.push('');
     }
     if (result.virtualMasters && result.virtualMasters.length) {
@@ -1590,11 +1658,14 @@ function formatResult(result) {
       });
       lines.push('');
     }
-    result.picks.slice(0, 5).forEach((asset, index) => {
+    result.picks.slice(0, visibleCount).forEach((asset, index) => {
       lines.push(`${index + 1}. ${asset.name} - ${asset.type} - score ${asset.score} - ${asset.domain}`);
       lines.push(`   Why: matched ${asset.matched.join(', ') || 'task context'}`);
       lines.push(`   Invoke: ${asset.invoke}`);
     });
+    if (result.picks.length > visibleCount) {
+      lines.push(`... +${result.picks.length - visibleCount} more picks`);
+    }
   }
 
   if (result.unavailable && result.unavailable.length) {
@@ -1621,6 +1692,16 @@ function formatResult(result) {
     for (const s of result.suggestions) {
       lines.push(`- ${s.domain} (${s.master_agent}) - ${s.asset_count} assets`);
     }
+  }
+
+  if (result.skillSuggestions && result.skillSuggestions.length) {
+    lines.push('');
+    lines.push('Suggested skills:');
+    result.skillSuggestions.forEach((skill) => {
+      const status = skill.available ? 'available' : 'not indexed here';
+      lines.push(`- ${skill.name} (${skill.domain}, ${status})`);
+      lines.push(`  Invoke: ${skill.invoke}`);
+    });
   }
 
   return lines.join('\n');
