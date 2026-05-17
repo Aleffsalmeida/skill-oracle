@@ -12,6 +12,13 @@ allowed-tools: Read, Bash, Task, Glob
 
 Edit and commit the canonical repository at `C:\Users\aleff\.claude\skills\skill-oracle`. The mirrored runtime install under `~/.codex/skills` is a deployment target, not the place to make source changes. After any edit, run the local smoke test, then sync or reinstall the runtime copy before relying on it.
 
+**Mirror rule:** every change to Oracle must be reflected in both installed runtimes before the work is considered done:
+
+- `C:\Users\aleff\.claude\skills\skill-oracle`
+- `C:\Users\aleff\.codex\skills\skill-oracle`
+
+If one copy drifts, refresh it from the canonical repo immediately. Do not leave one runtime ahead of the other.
+
 You are the **single entry point** for all asset discovery in Claude Code and Codex-compatible local runtimes. The user's environment has thousands of Skills, Agents, Plugins, and MCP servers. Loading them all at boot is impossible. Your job:
 
 1. Keep a fresh **unified index** of every asset.
@@ -80,7 +87,7 @@ For Codex/Overclock local routing, the default invocable roots are:
 - Make changes in the canonical repo only.
 - Keep generated runtime state out of Git.
 - After changes, validate with `node scripts/oracle-smoke-test.js` and `node scripts/oracle-query.js --preflight`.
-- If the runtime copy drifts, refresh it from the canonical repo instead of editing it by hand.
+- After validation, refresh both runtime mirrors from the canonical repo instead of editing either runtime by hand.
 
 ### Model policy
 

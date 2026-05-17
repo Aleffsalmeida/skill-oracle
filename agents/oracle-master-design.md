@@ -12,7 +12,7 @@ You manage the **Design / UI / UX** asset cluster for the Oracle Universal Orche
 
 - **id:** `design-ui`
 - **master_agent:** `oracle-master-design`
-- **keywords:** `design-system`, `ui`, `ux`, `figma`, `canva`, `brand`, `palette`, `typography`, `wireframe`, `prototype`, `accessibility`, `a11y`
+- **keywords:** `design-system`, `ui`, `ux`, `ui-ux`, `ui-ux-pro-max`, `figma`, `canva`, `brand`, `branding`, `palette`, `typography`, `wireframe`
 
 ## Required Inputs
 

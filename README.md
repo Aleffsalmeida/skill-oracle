@@ -16,7 +16,7 @@
 
 Loads minutes-of-overhead environments in seconds. Built for Claude Code users who have hundreds of plugins and don't want to pay token cost on every prompt.
 
-Canonical source: this Git repository at `~/.claude/skills/skill-oracle`. The mirrored runtime install under `~/.codex/skills` is refreshed from this repo and should not be edited directly.
+Canonical source: this Git repository at `~/.claude/skills/skill-oracle`. The mirrored runtime install under `~/.codex/skills` is refreshed from this repo and should not be edited directly. Keep both installed runtimes aligned after every change: `~/.claude/skills/skill-oracle` and `~/.codex/skills/skill-oracle`.
 
 ---
 
