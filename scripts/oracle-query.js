@@ -33,6 +33,7 @@ const PREFERRED_SKILLS = new Set([
   'awesome-design-md',
   'ui-ux-pro-max',
   'impeccable',
+  'motion',
   'imagegen-frontend-web',
   'imagegen-frontend-mobile',
   'high-end-visual-design',
@@ -239,9 +240,15 @@ const CAPABILITY_INTENTS = [
   },
   {
     id: 'video-motion',
-    re: /\b(video|videos|motion|animacao|animar|animated|animation|reel|shorts|story|stories|apresentacao|brand video|demo video|walkthrough|trailer|redes sociais|hyperframes|hyperframe|higgsfield|higgs field)\b/,
+    re: /\b(video|videos|reel|shorts|story|stories|apresentacao|brand video|demo video|walkthrough|trailer|redes sociais|hyperframes|hyperframe|higgsfield|higgs field|remotion|render|timeline|captions|voiceover)\b/,
     domains: ['design-ui', 'web-dev'],
     skills: ['hyperframes', 'hyperframes-cli', 'higgsfield', 'higgs-field', 'remotion', 'remotion-video-creation', 'remotion-to-hyperframes', 'website-to-hyperframes', 'frontend-slides'],
+  },
+  {
+    id: 'ui-motion-live',
+    re: /\b(motion|animacao|animar|animated|animation|transition|transicao|transição|micro-interaction|microinteracao|microinteração|spring|gesture|shared layout|orbitas|órbitas|orbita|órbita|explosao|explosão|shockwave|reveal|fade-in|fade out|fade-out|logo energetica|logo energética|pulse|pulsar|authenticate|autenticar|login transition)\b/,
+    domains: ['design-ui', 'web-dev'],
+    skills: ['motion', 'impeccable', 'design-taste-frontend', 'frontend-design', 'frontend-slides', 'react:components'],
   },
   {
     id: 'social-creative',
@@ -339,6 +346,7 @@ const TYPE_PRIORITY = { skill: 4, agent: 3, mcp: 2, plugin: 1 };
 const EXPLICIT_SIGNAL_DOMAINS = new Set([
   'security-audit',
   'finance-billing',
+  'database-data',
   'ecommerce',
   'crypto-web3',
   'crm-sales',
@@ -346,6 +354,7 @@ const EXPLICIT_SIGNAL_DOMAINS = new Set([
 const STRICT_DOMAIN_SIGNALS = {
   'security-audit': /\b(seguranca|segurança|security|auth|oauth|jwt|xss|csrf|owasp|pentest|secret|secrets|compliance|soc2|pci|gdpr|vulnerability|vulnerabilidade|audit|auditoria)\b/,
   'finance-billing': /\b(stripe|billing|invoice|payment|payments|pagamento|pagamentos|assinatura|subscription|revenue|tax|finance|pricing|paywall|checkout|churn|cancelamento)\b/,
+  'database-data': /\b(supabase|database|banco de dados|banco|sql|postgres|postgresql|schema|migration|migracao|migração|rls|foreign key|soft delete|edge function|edge functions|relacionamento|entidade|api)\b/,
   ecommerce: /\b(shopify|woocommerce|wordpress|ecommerce|e-commerce|loja online|cart|carrinho|product-catalog|inventory|sku|storefront)\b/,
   'crypto-web3': /\b(crypto|blockchain|ethereum|solana|defi|nft|wallet|token|dex|dao|smart contract|solidity|web3|metamask|onchain)\b/,
   'crm-sales': /\b(crm|sales|hubspot|salesforce|pipedrive|attio|intercom|lead|leads|pipeline|prospect|outbound|cold email|revops)\b/,
@@ -364,6 +373,9 @@ const DOMAIN_NEGATION_SIGNALS = {
   'testing-qa': /\b(test|tests|teste|testes|qa|playwright|cypress|e2e|coverage)\b/,
   'data-analytics': /\b(analytics|dados|metricas|métricas|dashboard|ga4|tracking|eventos|conversao|conversão)\b/,
 };
+
+const ANALYTICS_EXPLICIT_SIGNALS = /\b(analytics|analitico|analiticos|analítica|analíticas|metricas|métricas|kpi|chart|charts|grafico|gráfico|grafico[s]?|gráfico[s]?|tracking|ga4|gtm|google analytics|tag manager|utm|utms|attribution|funnel|funil|posthog|mixpanel|amplitude|looker|tableau|metabase|comparativo|tendencia|tendência|periodo|período|lucro|percentual)\b/;
+const UI_SHELL_TRANSITION_SIGNALS = /\b(login|auth|autenticar|autenticacao|autenticação|topbar|top bar|header|background|logo|identidade visual|configuracao|configuração|painel de configuracao|painel de configuração|dashboard shell|app shell|transicao|transição|fade|explosao|explosão|orbitas|órbitas|reveal)\b/;
 
 // Lazy-load embedding modules — silently skipped if not installed
 let _embedMods = null;
@@ -746,20 +758,45 @@ function hasMarketingExecutionIntent(task) {
   return /\b(marketing|seo|ads|anuncio|anuncios|copywriting|copy|conteudo|content|post|reel|story|stories|social media|redes sociais|campanha|growth|cro|email|newsletter|launch|lancamento|lançamento|paid ads|google ads|meta ads|linkedin ads|instagram ads|criativo|criativos)\b/.test(text);
 }
 
+function hasExplicitAnalyticsIntent(task) {
+  return ANALYTICS_EXPLICIT_SIGNALS.test(normalize(task));
+}
+
+function isUiShellTransitionContext(task) {
+  const text = normalize(task);
+  return UI_SHELL_TRANSITION_SIGNALS.test(text)
+    && /\b(dashboard|painel|interface|ui|ux|frontend|electron|app)\b/.test(text);
+}
+
 function adjustDomainScoreForContext(task, domainScore) {
-  if (domainScore.id !== 'marketing-growth') return domainScore;
-  if (!isProductImplementationContext(task) || hasMarketingExecutionIntent(task)) return domainScore;
+  if (domainScore.id === 'marketing-growth') {
+    if (!isProductImplementationContext(task) || hasMarketingExecutionIntent(task)) return domainScore;
 
-  const noisyOnly = domainScore.matched.length > 0
-    && domainScore.matched.every((kw) => ['instagram', 'social', 'linkedin', 'facebook', 'tiktok'].includes(normalize(kw)));
+    const noisyOnly = domainScore.matched.length > 0
+      && domainScore.matched.every((kw) => ['instagram', 'social', 'linkedin', 'facebook', 'tiktok'].includes(normalize(kw)));
 
-  if (!noisyOnly) return domainScore;
+    if (!noisyOnly) return domainScore;
 
-  return {
-    ...domainScore,
-    score: 0,
-    matched: [],
-  };
+    return {
+      ...domainScore,
+      score: 0,
+      matched: [],
+    };
+  }
+
+  if (
+    domainScore.id === 'data-analytics'
+    && isUiShellTransitionContext(task)
+    && !hasExplicitAnalyticsIntent(task)
+  ) {
+    return {
+      ...domainScore,
+      score: 0,
+      matched: [],
+    };
+  }
+
+  return domainScore;
 }
 
 function detectDomains(task, idx, forcedDomains = []) {
@@ -777,6 +814,7 @@ function detectDomains(task, idx, forcedDomains = []) {
         .reduce((sum, _rule) => sum + 4, 0);
       const capabilityBoost = matchedCapabilityIntents(task)
         .filter((intent) => intent.domains.includes(domain.id))
+        .filter(() => !EXPLICIT_SIGNAL_DOMAINS.has(domain.id) || hasExplicitDomainSignal(task, domain.id))
         .reduce((sum, _intent) => sum + 8, 0);
       return {
         ...domain,
@@ -878,6 +916,8 @@ function scoreAsset(asset, taskTokens, activeCapabilityIntents = []) {
   const assetName = normalize(asset.name);
   const intents = intentBoosts(taskTokens.join(' '));
   const capabilityMatches = activeCapabilityIntents.filter((intent) => intent.skills.some((name) => normalize(name) === assetName));
+  const hasUiMotionLive = activeCapabilityIntents.some((intent) => intent.id === 'ui-motion-live');
+  const hasVideoMotion = activeCapabilityIntents.some((intent) => intent.id === 'video-motion');
   if (STRONG_AUTHOR_SOURCES.some((prefix) => sourceText.startsWith(prefix))) score *= 1.12;
   if (PREFERRED_SKILLS.has(asset.name)) score *= 1.18;
   if (/\bawesome design\b/.test(taskText) && assetName === 'awesome-design-md') {
@@ -902,7 +942,9 @@ function scoreAsset(asset, taskTokens, activeCapabilityIntents = []) {
     && activeCapabilityIntents.some((intent) => intent.id === 'logo-brand')
     && assetName === 'brandkit'
   ) score *= 0.92;
-  if (intents.videoMotion && /hyperframe|higgsfield|higgs-field|remotion|video|motion|slides|lottie|gsap|animejs/.test(assetName)) score *= 1.32;
+  if (hasUiMotionLive && /motion|impeccable|design-taste|frontend-design|frontend-slides|react:components/.test(assetName)) score *= 1.34;
+  if (hasUiMotionLive && /remotion|hyperframe|higgsfield|website-to-hyperframes/.test(assetName)) score *= 0.9;
+  if (hasVideoMotion && /hyperframe|higgsfield|higgs-field|remotion|video|slides|lottie|gsap|animejs/.test(assetName)) score *= 1.32;
   if (intents.analytics && /analytics|tracking|experiment|posthog|event/.test(assetName)) score *= 1.18;
   if ((intents.ui || intents.shortcuts) && /ui-ux-pro-max|ui-styling|frontend|design-taste|impeccable|ui-toolkit|design/.test(assetName)) score *= 1.2;
   if (intents.desktop && /electron|frontend|ui|design/.test(assetName)) score *= 1.12;
@@ -1074,7 +1116,12 @@ function buildRecommendedBundle(domainReports, picks, task) {
   if (intents.branding) preferredByIntent.push(['brandkit', 'design', 'brand', 'impeccable', 'high-end-visual-design']);
   if (intents.ui || intents.shortcuts) preferredByIntent.push(['awesome-design-md', 'ui-ux-pro-max', 'impeccable', 'design-taste-frontend', 'frontend-design', 'high-end-visual-design', 'emil-design-eng', 'shadcn-ui', 'react:components']);
   if (intents.desktop) preferredByIntent.push(['design-taste-frontend', 'frontend-design', 'zoom-meeting-sdk-electron']);
-  if (intents.videoMotion) preferredByIntent.push(['hyperframes', 'higgsfield', 'higgs-field', 'remotion', 'remotion-video-creation', 'remotion-to-hyperframes', 'website-to-hyperframes', 'frontend-slides']);
+  if (activeCapabilityIntents.some((intent) => intent.id === 'ui-motion-live')) {
+    preferredByIntent.push(['motion', 'impeccable', 'design-taste-frontend', 'frontend-design', 'frontend-slides', 'react:components']);
+  }
+  if (activeCapabilityIntents.some((intent) => intent.id === 'video-motion')) {
+    preferredByIntent.push(['hyperframes', 'higgsfield', 'higgs-field', 'remotion', 'remotion-video-creation', 'remotion-to-hyperframes', 'website-to-hyperframes', 'frontend-slides']);
+  }
   if (/\bawesome design\b/.test(taskText)) preferredByIntent.unshift(['awesome-design-md', 'polish']);
   if (isProductImplementationContext(task)) {
     preferredByIntent.unshift(['awesome-design-md', 'ui-ux-pro-max', 'impeccable', 'design-taste-frontend']);

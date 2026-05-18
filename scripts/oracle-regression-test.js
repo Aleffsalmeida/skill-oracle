@@ -156,6 +156,20 @@ const CASES = [
     expectedDomains: ['design-ui', 'web-dev'],
     expectedResultNames: ['hyperframes', 'hyperframes-cli', 'remotion-to-hyperframes'],
   },
+  {
+    name: 'electron-login-ui-motion-not-video',
+    task: 'reestruturar identidade visual e fluxo de transicao da tela de login e dashboard do bot electron com logo atomica, background cosmico, top bar, painel de configuracao e animacao de autenticacao com fade-out, centralizacao da logo, explosao e reveal do dashboard',
+    expectedDomains: ['design-ui', 'web-dev'],
+    forbiddenDomains: ['data-analytics'],
+    expectedResultNames: ['motion', 'impeccable', 'design-taste-frontend'],
+  },
+  {
+    name: 'motion-division-explicit-prompt',
+    task: 'implementar transicao de login do bot electron usando Motion Division Motion com motion react para orbitas, explosao, centralizacao da logo e reveal do dashboard',
+    expectedDomains: ['design-ui', 'web-dev'],
+    forbiddenDomains: ['data-analytics'],
+    expectedResultNames: ['motion', 'frontend-design'],
+  },
 ];
 
 async function checkCase(idx, testCase) {
@@ -246,6 +260,9 @@ async function main() {
   );
   assertCheck(!uiPlan.recommended, 'standalone page design must not auto-open parallel panes');
   assertCheck(uiPlan.orchestrationPolicy?.paneSpawnAllowed === false, 'simple page design must explicitly forbid extra pane spawn');
+  const pageResult = await selectAssets(idx, 'fazer design da pagina metodo legalizada', { limit: 8 });
+  assertCheck(!pageResult.domains.includes('database-data'), 'standalone page design must not pull database-data without explicit db signal');
+  assertCheck(!pageResult.parallelPlan?.recommended, 'standalone page design result must not recommend parallel panes');
   const heavyPlan = parallelExecutionPlan(
     'implementar dashboard com api banco de dados rls testes playwright e auditoria de seguranca',
     ['web-dev', 'database-data', 'data-analytics', 'security-audit'],
