@@ -169,6 +169,7 @@ node ~/.claude/skills/skill-oracle/scripts/oracle-smoke-test.js
 ```
 
 When using Overclock or Codex, summarize the `oracle-query.js` output to the user and then invoke every recommended skill or tool according to the host's available mechanism. For Overclock, agent recommendations should be treated as visible `pane_spawn` follow-up work; direct `Task(subagent_type=...)` is only valid in Claude Code. After every `pane_spawn`, immediately execute the full loop `pane_write -> pane_wait_idle -> pane_read`; do not leave spawned panes parked at an untouched prompt.
+The pane must receive the exact workstream prompt before waiting idle; spawning alone is not enough.
 
 ### Step 4 — Synthesize and dispatch
 

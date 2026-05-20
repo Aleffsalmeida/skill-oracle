@@ -1315,6 +1315,24 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
     ? modelHints?.claude || null
     : modelHints?.codex || modelHints?.claude || null;
   const mode = parallelPlan?.recommended ? 'parallel' : 'single';
+  const taskPrompt = String(task || '').trim();
+
+  const buildPanePrompt = (description, index) => {
+    const lines = [
+      `Execute this Oracle workstream: ${description}.`,
+      `User task: ${taskPrompt}`,
+      '',
+      'Instructions:',
+      '1. Follow the user task exactly.',
+      '2. Use the selected model for the pane.',
+      '3. Produce only the result needed for this workstream.',
+      '4. If you need to touch files, make the minimal safe change.',
+    ];
+    if (index === 0) {
+      lines.splice(1, 0, 'This is the first workstream in the current dispatch plan.');
+    }
+    return lines.join('\n');
+  };
 
   return {
     mode,
@@ -1340,10 +1358,11 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
       model: selectedModel,
     })),
     parallel_workstreams: parallelPlan?.recommended
-      ? parallelPlan.workstreams.map((item) => ({
+      ? parallelPlan.workstreams.map((item, index) => ({
           description: item,
           executor: parallelPlan.executor,
           model: selectedModel,
+          pane_prompt: buildPanePrompt(item, index),
         }))
       : [],
     notes: [
@@ -1696,6 +1715,7 @@ function formatResult(result) {
     lines.push('Dispatch workstreams:');
     result.dispatchPlan.parallel_workstreams.forEach((item, index) => {
       lines.push(`  ${index + 1}. ${item.description} -> ${item.executor} using ${item.model || 'runtime-default model'}`);
+      lines.push(`     Prompt: ${item.pane_prompt}`);
     });
   }
 

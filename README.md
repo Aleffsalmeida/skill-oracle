@@ -344,7 +344,7 @@ Safety filters applied to every ecosystem result:
 
 Accepted recommendations get **auto-indexed** on the next Oracle run because the inventory signature changes. No manual scanner/classifier command is required after the skill is installed.
 
-Overclock/Codex/local note: `oracle-query.js` cannot directly invoke another runtime skill by itself, so it exits with code `2` and prints the exact `find-skills` invocation. Claude Code skill orchestration should invoke `find-skills` immediately when it sees that fallback signal. In Overclock, visible panes are the supported delegation path for deeper agent review. When Oracle returns a non-fallback bundle, treat every selected skill and agent as mandatory execution, not advisory reference material.
+Overclock/Codex/local note: `oracle-query.js` cannot directly invoke another runtime skill by itself, so it exits with code `2` and prints the exact `find-skills` invocation. Claude Code skill orchestration should invoke `find-skills` immediately when it sees that fallback signal. In Overclock, visible panes are the supported delegation path for deeper agent review. When Oracle returns a non-fallback bundle, treat every selected skill and agent as mandatory execution, not advisory reference material, and write the exact workstream prompt into each spawned pane before waiting for completion.
 
 ### Privacy and repository safety
 
