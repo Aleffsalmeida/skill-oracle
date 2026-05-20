@@ -42,8 +42,12 @@ function formatExecutionManifest(manifest) {
     lines.push(`  state: ${workstream.state}`);
     lines.push(`  provider: ${workstream.provider_id || 'n/a'}`);
     lines.push(`  model: ${workstream.model || 'n/a'}`);
+    lines.push(`  spawn provider: ${workstream.pane_spawn?.provider_id || 'n/a'}`);
+    lines.push(`  spawn model: ${workstream.pane_spawn?.model || 'n/a'}`);
     lines.push(`  prompt: ${workstream.pane_prompt}`);
     lines.push(`  submit: ${workstream.pane_write?.submit ? 'true' : 'false'}`);
+    lines.push(`  read retry: ${workstream.output_capture_policy?.empty_read_is_failure ? 'enabled' : 'disabled'}`);
+    lines.push(`  probe: ${workstream.output_capture_policy?.probe_sentinel || 'n/a'}`);
   }
   return lines.join('\n');
 }

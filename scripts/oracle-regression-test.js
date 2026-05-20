@@ -318,6 +318,25 @@ async function main() {
     'Overclock workstreams must require pane_write submit=true'
   );
   assertCheck(
+    Array.isArray(overclockResult.executionManifest?.workstreams) &&
+      overclockResult.executionManifest.workstreams.every((workstream) => workstream.pane_spawn?.override_host_session === true),
+    'Overclock workstreams must override the host session when spawning panes'
+  );
+  assertCheck(
+    Array.isArray(overclockResult.executionManifest?.workstreams) &&
+      overclockResult.executionManifest.workstreams.every((workstream) => workstream.output_capture_policy?.empty_read_is_failure === true),
+    'Overclock workstreams must treat empty read as failure'
+  );
+  assertCheck(
+    Array.isArray(overclockResult.executionManifest?.workstreams) &&
+      overclockResult.executionManifest.workstreams.every((workstream) => workstream.output_capture_policy?.probe_sentinel === 'PING_OMEGA_123'),
+    'Overclock workstreams must carry the probe sentinel'
+  );
+  assertCheck(
+    overclockResult.executionManifest?.host_contract?.output_capture_required === true,
+    'Overclock host contract must require output capture'
+  );
+  assertCheck(
     detectExecutor('antigravity').name === 'agy',
     `expected antigravity runtime to resolve to agy, got ${detectExecutor('antigravity').name}`
   );

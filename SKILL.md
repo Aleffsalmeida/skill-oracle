@@ -99,6 +99,7 @@ For Overclock visible panes, the model hint is mandatory execution metadata, not
 - Never close panes you did not spawn in the current task. Never close the caller pane. If the user asks to close idle panes, list the Oracle-owned candidates first unless the user named exact pane ids.
 - A spawned pane is not considered active until Oracle completes `pane_write` with submission, then `pane_wait_idle`, then `pane_read`. If that loop does not complete, treat the pane as failed orchestration instead of "done".
 - The prompt sent to a spawned pane must be submitted with `pane_write submit=true`. A visible prompt that was not submitted is a failure.
+- If `pane_read` returns no readable output after idle, retry once with the same prompt and then fall back to the next verified provider. Treat empty reads as orchestration failure, not success.
 - If the host is not one of the first-class standards, Oracle should recommend the standards instead of pretending to support the unknown host.
 
 The bootstrap preflight should report the detected executor explicitly:

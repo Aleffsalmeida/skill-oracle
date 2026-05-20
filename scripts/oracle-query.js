@@ -26,6 +26,7 @@ const OVERCLOCK_PROVIDERS_PATH = path.join(OVERCLOCK_APPDATA_DIR, 'providers.jso
 const OVERCLOCK_MCP_CONFIG_PATH = path.join(OVERCLOCK_APPDATA_DIR, 'mcp-config.json');
 const OVERCLOCK_MAIN_LOG_PATH = path.join(OVERCLOCK_APPDATA_DIR, 'logs', 'main.log');
 const SYNTHESIS_MODEL = process.env.ORACLE_SYNTHESIS_MODEL || 'gpt-5.4-mini';
+const OUTPUT_PROBE_SENTINEL = process.env.ORACLE_OUTPUT_PROBE || 'PING_OMEGA_123';
 const STRONG_MATCH_THRESHOLD = 5;
 const MAX_DOMAINS = 5;
 const DEFAULT_LIMIT = 5;
@@ -1527,6 +1528,13 @@ function overclockOrchestrationPolicy(recommended) {
       'pane_wait_idle',
       'pane_read',
     ],
+    outputCapture: {
+      required: true,
+      probeSentinel: OUTPUT_PROBE_SENTINEL,
+      emptyReadIsFailure: true,
+      retryStrategy: 'same-pane-once-then-fallback-provider',
+      maxAttempts: 2,
+    },
     cleanupPolicy: {
       requireIdleCheck: true,
       requireExecutionLoopCompletion: true,
@@ -1850,6 +1858,21 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
     return matched.length ? matched.slice(0, 3) : picks.slice(0, 3);
   };
 
+  const buildFallbackProviders = (selectedProviderId) => {
+    const providers = Array.isArray(providerInventory?.providers) ? providerInventory.providers : [];
+    const preferred = providers
+      .map((provider) => provider.id)
+      .filter(Boolean);
+    const ordered = [
+      selectedProviderId,
+      ...PREFERRED_EXECUTION_PROVIDER_ORDER,
+      ...preferred,
+    ]
+      .map((id) => canonicalProviderId(id))
+      .filter((id, index, array) => id && array.indexOf(id) === index);
+    return ordered.filter((id) => id !== selectedProviderId);
+  };
+
   const buildPanePrompt = (description, index, assets) => {
     const lines = [
       `Execute this Oracle workstream: ${description}.`,
@@ -1857,11 +1880,13 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
       '',
       'Instructions:',
       '0. Submit this payload immediately with pane_write submit=true.',
+      `0a. Your first visible line must be exactly: ${OUTPUT_PROBE_SENTINEL}.`,
       '1. Follow the user task exactly.',
       '2. Use the selected model for the pane.',
       '3. Produce only the result needed for this workstream.',
       '4. If you need to touch files, make the minimal safe change.',
       '5. Do not leave the pane sitting at a shell prompt.',
+      '6. If the pane reaches idle but no readable output is captured, retry once with the same prompt and then fall back to the next verified provider.',
     ];
     if (Array.isArray(assets) && assets.length) {
       lines.push('');
@@ -1917,6 +1942,11 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
       mechanism: asset.invocation?.mechanism || null,
       command: asset.invocation?.command || null,
       pane_prompt: executionPromptForAsset(asset, task, selectedModel),
+      pane_spawn: {
+        provider_id: selectedProviderId,
+        model: selectedModel,
+        override_host_session: true,
+      },
       pane_write: (() => {
         const prompt = executionPromptForAsset(asset, task, selectedModel);
         return prompt
@@ -1926,6 +1956,14 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
             }
           : null;
       })(),
+      output_capture_policy: {
+        required: true,
+        probe_sentinel: OUTPUT_PROBE_SENTINEL,
+        empty_read_is_failure: true,
+        retry_strategy: 'same-pane-once-then-fallback-provider',
+        max_attempts: 2,
+        fallback_providers: buildFallbackProviders(selectedProviderId).slice(0, 3),
+      },
       provider_id: selectedProviderId,
       model: selectedModel,
     })),
@@ -1946,9 +1984,22 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
               mechanism: asset.invocation?.mechanism || null,
             })),
             pane_prompt: panePrompt,
+            pane_spawn: {
+              provider_id: selectedProviderId,
+              model: selectedModel,
+              override_host_session: true,
+            },
             pane_write: {
               submit: true,
               content: panePrompt,
+            },
+            output_capture_policy: {
+              required: true,
+              probe_sentinel: OUTPUT_PROBE_SENTINEL,
+              empty_read_is_failure: true,
+              retry_strategy: 'same-pane-once-then-fallback-provider',
+              max_attempts: 2,
+              fallback_providers: buildFallbackProviders(selectedProviderId).slice(0, 3),
             },
           };
         })
@@ -1956,12 +2007,13 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
     notes: [
       visiblePanes
         ? 'Spawn one visible pane per independent workstream, pass the selected provider and selected model explicitly, and submit the prompt immediately.'
-        : 'Host does not expose visible panes; execute in the current runtime or route to a supported executor.',
+      : 'Host does not expose visible panes; execute in the current runtime or route to a supported executor.',
       !FIRST_CLASS_HOSTS.has(runtimeName)
         ? 'If the host cannot adapt cleanly, recommend the first-class standards: Overclock, Claude Code, Codex, or Antigravity CLI.'
         : null,
       'Do not downgrade execution-ready picks into discovery-only recommendations.',
       'If a pane is spawned, complete pane_write -> pane_wait_idle -> pane_read before treating the workstream as active.',
+      `If pane_read returns no readable output, retry with the same prompt once and use ${OUTPUT_PROBE_SENTINEL} as the visible probe before falling back to the next verified provider.`,
     ].filter(Boolean),
   };
 }
@@ -1984,14 +2036,28 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
     state: visiblePanes ? 'pending' : 'host-managed',
     assets: item.assets || [],
     pane_prompt: item.pane_prompt,
+    pane_spawn: item.pane_spawn || {
+      provider_id: item.provider_id || dispatchPlan?.selected_provider || null,
+      model: item.model || dispatchPlan?.selected_model || null,
+      override_host_session: true,
+    },
     pane_write: item.pane_write || {
       submit: true,
       content: item.pane_prompt,
+    },
+    output_capture_policy: item.output_capture_policy || {
+      required: true,
+      probe_sentinel: OUTPUT_PROBE_SENTINEL,
+      empty_read_is_failure: true,
+      retry_strategy: 'same-pane-once-then-fallback-provider',
+      max_attempts: 2,
+      fallback_providers: [],
     },
     completion_criteria: [
       'prompt submitted',
       'pane reached idle',
       'pane output read',
+      `probe sentinel captured: ${OUTPUT_PROBE_SENTINEL}`,
     ],
     ownership: {
       close_only_owned_panes: true,
@@ -2015,6 +2081,8 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
       dispatch_style: visiblePanes ? 'visible-pane-swarm' : 'local-plan',
       state_machine: ['spawn', 'write', 'wait_idle', 'read'],
       pane_write_submission_required: true,
+      empty_read_is_failure: true,
+      output_capture_required: true,
     },
     stages,
     bundle: (bundle || []).map((asset) => ({
