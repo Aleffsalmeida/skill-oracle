@@ -542,6 +542,7 @@ if (require.main === module) {
 
 module.exports = {
   compareVersions,
+  detectExecutor,
   ensureSessionHook,
   isIndexFresh,
   isInventoryChanged,
