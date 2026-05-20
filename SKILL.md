@@ -49,6 +49,7 @@ Oracle must also keep the user-facing summary minimal and operational:
 | `--stats` | Show counts: total assets, by type, by domain, last build time |
 | `--list-domains` | List all 20 domains with asset counts and master agent names |
 | `--no-debate` | Skip Step 3 debate; return ranked candidates as-is (cheapest path) |
+| `--manifest` | Print a machine-readable execution manifest for host orchestration |
 
 ---
 
@@ -67,6 +68,14 @@ node ~/.claude/skills/skill-oracle/scripts/oracle-query.js "<task description>"
 ```
 
 The local runner reads `~/.claude/oracle-index.json`, detects domains, ranks assets directly, prints the top picks, and exits with code `2` when no strong local match exists or only `misc` matches. Treat exit code `2` as the signal to use the `find-skills` fallback.
+
+For execution-oriented flows, prefer the manifest runner:
+
+```bash
+node ~/.claude/skills/skill-oracle/scripts/oracle-executor.js "<task description>"
+```
+
+It emits a structured manifest with the workstream state machine (`spawn -> write -> wait_idle -> read`) so the host can execute a real swarm instead of parsing prose.
 
 ### Model policy
 
@@ -97,6 +106,15 @@ The bootstrap preflight should report the detected executor explicitly:
 If the preflight is not ready, Oracle must stop before routing and print the exact actions needed to repair the host or local installation.
 
 Important: Oracle can produce a dispatch plan, but it cannot create visible panes or subagents by itself unless the current host exposes those tools to the model runtime.
+
+When Oracle is used in a host that supports visible panes, the host should consume the manifest and perform the following loop for each workstream:
+
+1. spawn
+2. write
+3. wait_idle
+4. read
+
+Do not consider the workstream active until the loop completes for a pane owned by the current task.
 
 ### Step 0 — Bootstrap detection
 

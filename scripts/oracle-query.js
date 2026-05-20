@@ -753,11 +753,13 @@ function usage() {
     '  node scripts/oracle-query.js --list-domains',
     '  node scripts/oracle-query.js --rebuild',
     '  node scripts/oracle-query.js --preflight',
+    '  node scripts/oracle-query.js --manifest "<task>"',
     '',
     'Options:',
     '  --limit <n>       Number of final picks to print (default: 5)',
     '  --domain <id>     Force one or more domains; repeatable',
     '  --json            Print machine-readable JSON',
+    '  --manifest        Print execution manifest JSON only',
     '  --index <path>    Use a custom oracle-index.json',
     '  --no-embed        Disable embedding enhancement for this query',
   ].join('\n');
@@ -770,6 +772,7 @@ function parseArgs(argv) {
     limit: DEFAULT_LIMIT,
     indexPath: DEFAULT_INDEX,
     json: false,
+    manifest: false,
     preflight: false,
     stats: false,
     listDomains: false,
@@ -782,6 +785,7 @@ function parseArgs(argv) {
     const arg = argv[i];
     if (arg === '--help' || arg === '-h') out.help = true;
     else if (arg === '--json') out.json = true;
+    else if (arg === '--manifest') out.manifest = true;
     else if (arg === '--preflight') out.preflight = true;
     else if (arg === '--stats') out.stats = true;
     else if (arg === '--list-domains') out.listDomains = true;
@@ -1664,6 +1668,66 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
   };
 }
 
+function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPlan, preflight }) {
+  const visiblePanes = dispatchPlan?.host === 'overclock';
+  const stages = [
+    { id: 'spawn', label: 'spawn visible pane', required: visiblePanes },
+    { id: 'write', label: 'submit prompt', required: visiblePanes },
+    { id: 'wait_idle', label: 'wait for idle', required: visiblePanes },
+    { id: 'read', label: 'read result', required: visiblePanes },
+  ];
+
+  const workstreams = (dispatchPlan?.parallel_workstreams || []).map((item, index) => ({
+    id: `workstream-${index + 1}`,
+    description: item.description,
+    executor: item.executor,
+    model: item.model,
+    state: visiblePanes ? 'pending' : 'host-managed',
+    assets: item.assets || [],
+    pane_prompt: item.pane_prompt,
+    completion_criteria: [
+      'prompt submitted',
+      'pane reached idle',
+      'pane output read',
+    ],
+    ownership: {
+      close_only_owned_panes: true,
+      never_close_caller_pane: true,
+      track_spawned_pane_ids: true,
+    },
+  }));
+
+  return {
+    version: 1,
+    task,
+    runtime: preflight?.preflight?.runtime || 'unknown',
+    executor: dispatchPlan?.host || 'local',
+    selected_model: dispatchPlan?.selected_model || null,
+    host_contract: {
+      visible_panes: visiblePanes,
+      dispatch_style: visiblePanes ? 'visible-pane-swarm' : 'local-plan',
+      state_machine: ['spawn', 'write', 'wait_idle', 'read'],
+    },
+    stages,
+    bundle: (bundle || []).map((asset) => ({
+      name: asset.name,
+      type: asset.type,
+      domain: asset.domain,
+      invoke: asset.invoke,
+      mechanism: asset.invocation?.mechanism || null,
+    })),
+    picks: (picks || []).map((asset) => ({
+      name: asset.name,
+      type: asset.type,
+      domain: asset.domain,
+      invoke: asset.invoke,
+      mechanism: asset.invocation?.mechanism || null,
+      command: asset.invocation?.command || null,
+    })),
+    workstreams,
+  };
+}
+
 async function selectAssets(idx, task, options = {}) {
   // Keyword-based domain detection (baseline)
   const domainIds = detectDomains(task, idx, options.domains || []);
@@ -1837,6 +1901,14 @@ async function selectAssets(idx, task, options = {}) {
     executor,
     preflight: options.preflight,
   });
+  const executionManifest = buildExecutionManifest({
+    task,
+    picks,
+    bundle,
+    dispatchPlan,
+    parallelPlan,
+    preflight: options.preflight,
+  });
 
   return {
     task,
@@ -1857,6 +1929,7 @@ async function selectAssets(idx, task, options = {}) {
     processWorkflow,
     parallelPlan,
     dispatchPlan,
+    executionManifest,
     fallbackRecommended,
     fallback: fallbackRecommended ? fallbackGuidance(task) : null,
     modelHints,
@@ -1924,6 +1997,11 @@ function formatResult(result) {
     if (result.dispatchPlan.models) {
       lines.push(`Model matrix: Claude=${result.dispatchPlan.models.claude || 'n/a'} | Codex=${result.dispatchPlan.models.codex || 'n/a'}`);
     }
+  }
+  if (result.executionManifest) {
+    lines.push(`Execution manifest: ${result.executionManifest.version} (${result.executionManifest.host_contract.dispatch_style})`);
+    lines.push(`State machine: ${result.executionManifest.host_contract.state_machine.join(' -> ')}`);
+    lines.push(`Workstreams: ${result.executionManifest.workstreams.length}`);
   }
   if (result.synthesis && result.synthesis.reasoning) {
     lines.push('LLM synthesis: active');
@@ -2107,6 +2185,10 @@ async function main(argv = process.argv.slice(2)) {
   }
 
   const result = await selectAssets(idx, args.task, { ...args, executor: preflight.preflight.executor, preflight });
+  if (args.manifest) {
+    console.log(JSON.stringify(result.executionManifest || null, null, 2));
+    return 0;
+  }
   if (args.json) console.log(JSON.stringify(result, null, 2));
   else console.log(formatResult(result));
   return result.fallbackRecommended ? 2 : 0;
@@ -2130,6 +2212,7 @@ module.exports = {
   recommendedModels,
   parallelExecutionPlan,
   resolveSkillInvocation,
+  buildExecutionManifest,
   parseSkillCommands,
   loadIndex,
   main,
