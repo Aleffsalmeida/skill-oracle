@@ -5,952 +5,415 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>skill-oracle demo</title>
   <style>
-    :root {
+    :root{
       color-scheme: dark;
-      --bg: #070b10;
-      --bg2: #0d1117;
-      --panel: rgba(16, 20, 26, 0.92);
-      --panel-2: rgba(21, 26, 33, 0.95);
-      --line: rgba(93, 104, 118, 0.28);
-      --line-strong: rgba(93, 104, 118, 0.45);
-      --fg: #e6edf3;
-      --muted: #8b949e;
-      --muted-2: #5f6b78;
-      --green: #2fd67d;
-      --blue: #5bb6ff;
-      --amber: #ffb24a;
-      --red: #ff5f57;
-      --violet: #a57cff;
-      --cyan: #58e7ff;
+      --bg:#05080d;
+      --bg2:#0a0e13;
+      --panel:rgba(10,14,19,.92);
+      --panel2:rgba(14,19,25,.94);
+      --line:rgba(90,99,110,.26);
+      --line2:rgba(90,99,110,.16);
+      --fg:#edf3f7;
+      --muted:#7c8995;
+      --muted2:#56616c;
+      --green:#28d17c;
+      --blue:#56b0ff;
+      --red:#ff5b52;
+      --amber:#f2b84b;
+      --violet:#ae7dff;
     }
-
-    html, body {
-      margin: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: var(--bg);
-      font-family: "IBM Plex Mono", "JetBrains Mono", "Source Code Pro", monospace;
-    }
-
-    #stage {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:"JetBrains Mono","IBM Plex Mono",monospace}
+    #stage{
+      position:relative;width:100%;height:100%;overflow:hidden;color:var(--fg);
       background:
-        radial-gradient(circle at 16% 16%, rgba(91, 182, 255, 0.13), transparent 28%),
-        radial-gradient(circle at 84% 18%, rgba(165, 124, 255, 0.10), transparent 24%),
-        radial-gradient(circle at 54% 84%, rgba(47, 214, 125, 0.10), transparent 30%),
-        linear-gradient(180deg, #0b1016 0%, #070b10 100%);
-      color: var(--fg);
-    }
-
-    .vignette,
-    .grain,
-    .grid,
-    .halo {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-    }
-
-    .vignette {
-      background: radial-gradient(circle at center, transparent 44%, rgba(0, 0, 0, 0.38) 100%);
-    }
-
-    .grain {
-      opacity: 0.08;
-      background-image:
-        linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-      background-size: 72px 72px;
-      mix-blend-mode: screen;
-    }
-
-    .grid {
-      opacity: 0.18;
-      background-image:
-        linear-gradient(rgba(125, 133, 144, 0.10) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(125, 133, 144, 0.10) 1px, transparent 1px);
-      background-size: 120px 120px;
-      mix-blend-mode: screen;
-    }
-
-    .halo::before,
-    .halo::after {
-      content: "";
-      position: absolute;
-      border-radius: 999px;
-      filter: blur(10px);
-      mix-blend-mode: screen;
-    }
-
-    .halo::before {
-      width: 720px;
-      height: 720px;
-      left: -160px;
-      top: -160px;
-      background: radial-gradient(circle, rgba(91, 182, 255, 0.24) 0%, rgba(91, 182, 255, 0.02) 56%, transparent 73%);
-    }
-
-    .halo::after {
-      width: 820px;
-      height: 820px;
-      right: -200px;
-      top: 40px;
-      background: radial-gradient(circle, rgba(165, 124, 255, 0.22) 0%, rgba(165, 124, 255, 0.04) 52%, transparent 74%);
-    }
-
-    .shell {
-      position: absolute;
-      inset: 38px;
-      border-radius: 18px;
-      border: 1px solid rgba(93, 104, 118, 0.28);
-      background: rgba(9, 13, 18, 0.58);
-      box-shadow:
-        0 36px 100px rgba(0, 0, 0, 0.48),
-        inset 0 1px 0 rgba(255, 255, 255, 0.03);
-      backdrop-filter: blur(18px);
-    }
-
-    .windowbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 24px;
-      height: 32px;
-      padding: 0 16px;
-      border-bottom: 1px solid rgba(93, 104, 118, 0.18);
-      color: var(--muted);
-      font-size: 11px;
-      letter-spacing: 0.14em;
-      text-transform: lowercase;
-    }
-
-    .traffic {
-      display: flex;
-      gap: 8px;
-    }
-
-    .traffic span {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3) inset;
-    }
-
-    .traffic .red { background: var(--red); }
-    .traffic .amber { background: #ffcb5f; }
-    .traffic .green { background: var(--green); }
-
-    .masthead {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 18px;
-      padding: 16px 20px 12px;
-      border-bottom: 1px solid rgba(93, 104, 118, 0.18);
-    }
-
-    .brandline {
-      display: flex;
-      align-items: baseline;
-      gap: 14px;
-      min-width: 0;
-    }
-
-    .brand {
-      font-size: 18px;
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
-      color: #f2f5f8;
-    }
-
-    .subtitle {
-      font-size: 12px;
-      letter-spacing: 0.18em;
-      color: var(--muted);
-      text-transform: uppercase;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .status {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 12px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--green);
-      white-space: nowrap;
-    }
-
-    .live-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 0 6px rgba(47, 214, 125, 0.14);
-    }
-
-    .hero {
-      display: grid;
-      grid-template-columns: 0.28fr 0.44fr 0.28fr;
-      gap: 14px;
-      padding: 16px;
-      height: calc(100% - 86px);
-      box-sizing: border-box;
-    }
-
-    .panel {
-      position: relative;
-      border: 1px solid rgba(93, 104, 118, 0.28);
-      border-radius: 14px;
-      background: var(--panel);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.03),
-        0 22px 40px rgba(0, 0, 0, 0.28);
-      overflow: hidden;
-    }
-
-    .panel-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14px;
-      padding: 14px 16px 12px;
-      border-bottom: 1px solid rgba(93, 104, 118, 0.16);
-      background: rgba(0, 0, 0, 0.18);
-    }
-
-    .panel-title {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      min-width: 0;
-    }
-
-    .panel-title strong {
-      font-size: 18px;
-      letter-spacing: 0.02em;
-      color: #f5f7fb;
-    }
-
-    .panel-title span {
-      font-size: 11px;
-      letter-spacing: 0.18em;
-      color: var(--muted);
-      text-transform: uppercase;
-    }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 7px 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(93, 104, 118, 0.28);
-      background: rgba(8, 11, 15, 0.55);
-      color: var(--muted);
-      font-size: 11px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      white-space: nowrap;
-    }
-
-    .badge .tiny {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 0 4px rgba(47, 214, 125, 0.12);
-    }
-
-    .mission {
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }
-
-    .mission-body {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      padding: 14px;
-    }
-
-    .mission-callout {
-      padding: 14px;
-      border-radius: 12px;
-      border: 1px solid rgba(91, 182, 255, 0.22);
-      background:
-        linear-gradient(180deg, rgba(14, 19, 26, 0.90), rgba(8, 12, 16, 0.84));
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-    }
-
-    .mission-eyebrow {
-      margin-bottom: 10px;
-      font-size: 10px;
-      letter-spacing: 0.24em;
-      text-transform: uppercase;
-      color: var(--blue);
-    }
-
-    .mission-copy {
-      margin: 0;
-      font-size: 18px;
-      line-height: 1.36;
-      color: #f2f5f8;
-    }
-
-    .mission-note {
-      margin-top: 12px;
-      font-size: 12px;
-      line-height: 1.4;
-      color: var(--muted);
-    }
-
-    .feed {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .msg {
-      display: grid;
-      grid-template-columns: 36px 1fr;
-      gap: 10px;
-      align-items: start;
-    }
-
-    .avatar {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      display: grid;
-      place-items: center;
-      font-size: 12px;
-      font-weight: 700;
-      color: #0c0f13;
-      background: linear-gradient(180deg, #6ae3ff, #4fa6ff);
-      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
-    }
-
-    .avatar.purple { background: linear-gradient(180deg, #c69cff, #8f6dff); }
-    .avatar.green { background: linear-gradient(180deg, #61f4b3, #2fd67d); }
-    .avatar.orange { background: linear-gradient(180deg, #ffb870, #ff8e45); }
-
-    .bubble {
-      padding: 10px 12px;
-      border-radius: 10px;
-      border: 1px solid rgba(93, 104, 118, 0.20);
-      background: rgba(0, 0, 0, 0.24);
-      color: #edf2f7;
-      font-size: 12px;
-      line-height: 1.45;
-    }
-
-    .bubble .meta {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 6px;
-      color: var(--muted);
-      font-size: 10px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-    }
-
-    .bubble .meta strong {
-      color: #f4f7fb;
-    }
-
-    .bubble .status {
-      color: var(--green);
-      letter-spacing: 0.14em;
-    }
-
-    .center {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      min-width: 0;
-      min-height: 0;
-    }
-
-    .stack {
-      display: grid;
-      grid-template-rows: 1fr 1fr;
-      gap: 14px;
-      flex: 1;
-      min-height: 0;
-    }
-
-    .codepane {
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-      border-radius: 14px;
-      border: 1px solid rgba(93, 104, 118, 0.28);
-      background: linear-gradient(180deg, rgba(19, 24, 31, 0.96), rgba(12, 16, 22, 0.96));
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.03),
-        0 20px 36px rgba(0, 0, 0, 0.28);
-      overflow: hidden;
-    }
-
-    .codebar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 10px 14px;
-      border-bottom: 1px solid rgba(93, 104, 118, 0.16);
-      background: rgba(0, 0, 0, 0.24);
-      color: var(--muted);
-      font-size: 11px;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-    }
-
-    .codebar .path {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      min-width: 0;
-    }
-
-    .codebar .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--blue);
-      box-shadow: 0 0 0 6px rgba(91, 182, 255, 0.12);
-      flex: none;
-    }
-
-    .codebar .score {
-      color: var(--green);
-      white-space: nowrap;
-    }
-
-    .code {
-      display: grid;
-      grid-template-columns: 44px 1fr;
-      gap: 0;
-      flex: 1;
-      min-height: 0;
-      padding: 12px 0 0;
-      font-size: 12px;
-      line-height: 1.65;
-      color: #dfe8f0;
-    }
-
-    .lines {
-      padding: 0 8px 12px 0;
-      text-align: right;
-      color: rgba(139, 148, 158, 0.72);
-      user-select: none;
-    }
-
-    .lines div {
-      height: 20px;
-      padding-right: 10px;
-    }
-
-    .source {
-      padding: 0 16px 12px 10px;
-      white-space: pre;
-      overflow: hidden;
-    }
-
-    .source .faded { color: var(--muted-2); }
-    .source .kw { color: var(--blue); }
-    .source .fn { color: #e6edf3; }
-    .source .str { color: #95e6a5; }
-    .source .op { color: var(--amber); }
-    .source .num { color: #d8a7ff; }
-    .source .comment { color: rgba(139, 148, 158, 0.8); }
-    .source .accent { color: var(--green); }
-
-    .progress {
-      position: relative;
-      margin: 0 14px 14px;
-      height: 12px;
-      border-radius: 999px;
-      overflow: hidden;
-      border: 1px solid rgba(93, 104, 118, 0.22);
-      background: rgba(7, 10, 14, 0.8);
-    }
-
-    .progress-fill {
-      position: absolute;
-      inset: 0;
-      transform-origin: left center;
-      background: linear-gradient(90deg, var(--blue), var(--green), var(--violet));
-      box-shadow: 0 0 18px rgba(91, 182, 255, 0.24);
-    }
-
-    .progress-hint {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 120px;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
-      filter: blur(1px);
-      opacity: 0.65;
-    }
-
-    .right {
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }
-
-    .preview {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      padding: 14px;
-      min-height: 0;
-      flex: 1;
-    }
-
-    .monitor {
-      position: relative;
-      min-height: 310px;
-      border-radius: 14px;
-      border: 1px solid rgba(93, 104, 118, 0.26);
-      overflow: hidden;
-      background:
-        linear-gradient(180deg, rgba(10, 14, 20, 0.92), rgba(6, 8, 12, 0.95));
-    }
-
-    .monitor-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 12px 14px 10px;
-      border-bottom: 1px solid rgba(93, 104, 118, 0.16);
-      font-size: 11px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-
-    .monitor-head .live {
-      color: var(--green);
-    }
-
-    .viewport {
-      position: absolute;
-      inset: 48px 14px 58px;
-      border-radius: 12px;
-      border: 1px solid rgba(93, 104, 118, 0.20);
-      background:
-        radial-gradient(circle at 50% 18%, rgba(91, 182, 255, 0.12), transparent 38%),
-        linear-gradient(180deg, rgba(21, 27, 35, 0.95), rgba(9, 12, 16, 0.97));
-      overflow: hidden;
-    }
-
-    .viewport::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 18%),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.025), transparent 20%, rgba(255, 255, 255, 0.025) 80%, transparent);
-      opacity: 0.8;
-    }
-
-    .preview-top {
-      position: absolute;
-      inset: 14px 14px auto;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      color: #cfd6de;
-      font-size: 13px;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-    }
-
-    .preview-top .pill {
-      padding: 7px 10px;
-      border: 1px solid rgba(91, 182, 255, 0.22);
-      border-radius: 999px;
-      background: rgba(9, 13, 18, 0.64);
-      color: var(--blue);
-      font-size: 10px;
-      letter-spacing: 0.18em;
-    }
-
-    .preview-grid {
-      position: absolute;
-      inset: 54px 14px 14px;
-      display: grid;
-      grid-template-columns: 1.2fr 0.8fr;
-      gap: 10px;
-    }
-
-    .preview-card {
-      border: 1px solid rgba(93, 104, 118, 0.18);
-      border-radius: 12px;
-      background: rgba(8, 12, 17, 0.72);
-      overflow: hidden;
-    }
-
-    .preview-card.big {
-      display: grid;
-      grid-template-rows: auto 1fr auto;
-    }
-
-    .preview-card.small {
-      display: grid;
-      grid-template-rows: auto 1fr auto;
-    }
-
-    .preview-card .hd {
-      padding: 10px 12px;
-      border-bottom: 1px solid rgba(93, 104, 118, 0.16);
-      color: var(--muted);
-      font-size: 10px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-    }
-
-    .dashboard {
-      padding: 12px;
-      display: grid;
-      gap: 10px;
-    }
-
-    .hero-title {
-      font-size: 18px;
-      line-height: 1.15;
-      color: #eef3f8;
-    }
-
-    .hero-sub {
-      font-size: 11px;
-      color: var(--muted);
-      line-height: 1.45;
-    }
-
-    .metric {
-      display: flex;
-      justify-content: space-between;
-      gap: 14px;
-      padding: 0 12px 10px;
-      font-size: 11px;
-      color: var(--muted);
-    }
-
-    .metric strong {
-      color: #f2f5f8;
-    }
-
-    .chart {
-      display: flex;
-      align-items: end;
-      gap: 8px;
-      height: 98px;
-      padding: 10px 12px 12px;
-    }
-
-    .bar {
-      flex: 1;
-      border-radius: 8px 8px 4px 4px;
-      background: linear-gradient(180deg, rgba(91, 182, 255, 0.95), rgba(47, 214, 125, 0.82));
-      box-shadow: 0 0 16px rgba(91, 182, 255, 0.18);
-      opacity: 0.92;
-    }
-
-    .bar:nth-child(1) { height: 28%; }
-    .bar:nth-child(2) { height: 52%; }
-    .bar:nth-child(3) { height: 38%; }
-    .bar:nth-child(4) { height: 64%; }
-    .bar:nth-child(5) { height: 44%; }
-    .bar:nth-child(6) { height: 76%; }
-    .bar:nth-child(7) { height: 58%; }
-
-    .preview-list {
-      padding: 12px;
-      display: grid;
-      gap: 8px;
-    }
-
-    .preview-list .row {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      font-size: 11px;
-      color: var(--muted);
-    }
-
-    .preview-list .row strong {
-      color: #f2f5f8;
-    }
-
-    .footerbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 0 20px 16px;
-      font-size: 11px;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-
-    .footerbar .chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      justify-content: flex-end;
-    }
-
-    .chip {
-      padding: 6px 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(93, 104, 118, 0.20);
-      background: rgba(8, 12, 17, 0.54);
-      color: #dfe8f0;
-      white-space: nowrap;
-    }
-
-    .chip.green { color: var(--green); border-color: rgba(47, 214, 125, 0.22); }
-    .chip.blue { color: var(--blue); border-color: rgba(91, 182, 255, 0.22); }
-    .chip.violet { color: var(--violet); border-color: rgba(165, 124, 255, 0.22); }
-
-    .corner {
-      position: absolute;
-      width: 26px;
-      height: 26px;
-      border-color: rgba(91, 182, 255, 0.28);
-      border-style: solid;
-      opacity: 0.72;
-    }
-
-    .corner.tl { left: 10px; top: 10px; border-width: 1px 0 0 1px; border-top-left-radius: 9px; }
-    .corner.tr { right: 10px; top: 10px; border-width: 1px 1px 0 0; border-top-right-radius: 9px; }
-    .corner.bl { left: 10px; bottom: 10px; border-width: 0 0 1px 1px; border-bottom-left-radius: 9px; }
-    .corner.br { right: 10px; bottom: 10px; border-width: 0 1px 1px 0; border-bottom-right-radius: 9px; }
+        radial-gradient(circle at 14% 14%, rgba(86,176,255,.14), transparent 24%),
+        radial-gradient(circle at 84% 18%, rgba(174,125,255,.10), transparent 22%),
+        radial-gradient(circle at 60% 84%, rgba(40,209,124,.11), transparent 28%),
+        linear-gradient(180deg,#0b1016 0%, #05080d 100%);
+    }
+    .grid,.halo,.vignette,.grain{position:absolute;inset:0;pointer-events:none}
+    .grid{
+      opacity:.16;
+      background-image:linear-gradient(rgba(125,133,144,.10) 1px,transparent 1px),linear-gradient(90deg,rgba(125,133,144,.10) 1px,transparent 1px);
+      background-size:120px 120px;
+    }
+    .grain{
+      opacity:.06;
+      background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);
+      background-size:72px 72px;
+      mix-blend-mode:screen;
+    }
+    .vignette{background:radial-gradient(circle at center, transparent 42%, rgba(0,0,0,.36) 100%)}
+    .halo::before,.halo::after{
+      content:"";position:absolute;border-radius:999px;filter:blur(16px);mix-blend-mode:screen
+    }
+    .halo::before{
+      width:620px;height:620px;left:-120px;top:-120px;
+      background:radial-gradient(circle, rgba(86,176,255,.20) 0%, rgba(86,176,255,.03) 56%, transparent 74%);
+    }
+    .halo::after{
+      width:760px;height:760px;right:-160px;top:60px;
+      background:radial-gradient(circle, rgba(174,125,255,.18) 0%, rgba(174,125,255,.04) 54%, transparent 75%);
+    }
+    .shell{
+      position:absolute;inset:38px;border:1px solid rgba(90,99,110,.25);border-radius:18px;background:rgba(7,10,14,.60);
+      box-shadow:0 34px 100px rgba(0,0,0,.50), inset 0 1px 0 rgba(255,255,255,.03);
+      backdrop-filter:blur(18px);
+    }
+    .topstrip{
+      display:flex;align-items:center;justify-content:space-between;gap:16px;
+      height:32px;padding:0 16px;border-bottom:1px solid var(--line2);color:var(--muted);font-size:11px;letter-spacing:.16em;text-transform:lowercase
+    }
+    .lights{display:flex;gap:8px}
+    .lights span{width:10px;height:10px;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.35) inset}
+    .lights .r{background:var(--red)} .lights .y{background:var(--amber)} .lights .g{background:var(--green)}
+    .header{
+      display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px 18px 12px;border-bottom:1px solid var(--line2)
+    }
+    .brand{display:flex;align-items:baseline;gap:14px;min-width:0}
+    .brand .name{font-size:18px;letter-spacing:.24em;text-transform:uppercase;color:#f4f7fb}
+    .brand .desc{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .live{display:flex;align-items:center;gap:10px;color:var(--green);font-size:12px;letter-spacing:.18em;text-transform:uppercase;white-space:nowrap}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 7px rgba(40,209,124,.12)}
+    .hero{
+      display:grid;grid-template-columns:0.29fr 0.46fr 0.25fr;gap:14px;height:calc(100% - 82px);padding:16px;box-sizing:border-box
+    }
+    .panel{
+      border:1px solid var(--line);border-radius:14px;background:var(--panel);overflow:hidden;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.03), 0 20px 36px rgba(0,0,0,.30)
+    }
+    .ph{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px 12px;border-bottom:1px solid var(--line2);background:rgba(0,0,0,.18)
+    }
+    .pt{display:flex;flex-direction:column;gap:4px;min-width:0}
+    .pt strong{font-size:17px;letter-spacing:.02em;color:#f6f8fb}
+    .pt span{font-size:10px;letter-spacing:.20em;color:var(--muted);text-transform:uppercase}
+    .badge{
+      display:inline-flex;align-items:center;gap:8px;padding:7px 10px;border-radius:999px;background:rgba(7,10,14,.62);border:1px solid var(--line2);
+      color:var(--muted);font-size:10px;letter-spacing:.18em;text-transform:uppercase;white-space:nowrap
+    }
+    .badge .mini{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 5px rgba(40,209,124,.12)}
+    .mission{display:flex;flex-direction:column;min-height:0}
+    .mission .body{display:flex;flex-direction:column;gap:12px;padding:14px;min-height:0}
+    .mission-note{
+      padding:12px 13px;border-radius:12px;border:1px solid rgba(86,176,255,.22);
+      background:linear-gradient(180deg, rgba(12,16,22,.92), rgba(8,11,15,.84))
+    }
+    .mission-note .eyebrow{font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--blue);margin-bottom:9px}
+    .mission-note p{margin:0;font-size:13px;line-height:1.45;color:#eef3f7}
+    .mission-note .small{margin-top:10px;font-size:11px;line-height:1.45;color:var(--muted)}
+    .feed{display:grid;gap:10px}
+    .msg{display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:start}
+    .av{
+      width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:#081015;font-weight:700;font-size:12px;
+      background:linear-gradient(180deg,#6fe6ff,#4f9fff);box-shadow:0 0 0 1px rgba(255,255,255,.05) inset
+    }
+    .av.p{background:linear-gradient(180deg,#cb9cff,#8e6bff)}
+    .av.g{background:linear-gradient(180deg,#61f0b0,#28d17c)}
+    .av.o{background:linear-gradient(180deg,#ffbf79,#ff8e49)}
+    .bubble{
+      padding:10px 11px;border-radius:10px;border:1px solid rgba(90,99,110,.20);background:rgba(0,0,0,.22);color:#eef3f7;font-size:12px;line-height:1.42
+    }
+    .meta{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:5px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+    .meta strong{color:#f5f8fb}
+    .meta .ok{color:var(--green)}
+    .composer{
+      margin-top:auto;padding:10px 12px;border-radius:10px;border:1px solid var(--line2);background:rgba(0,0,0,.20);color:var(--muted);font-size:11px
+    }
+
+    .center{min-width:0;min-height:0}
+    .workbench{
+      display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:14px;height:100%;min-height:0
+    }
+    .pane{
+      display:flex;flex-direction:column;min-height:0;border:1px solid rgba(90,99,110,.22);border-radius:13px;background:linear-gradient(180deg, rgba(16,21,27,.96), rgba(10,13,18,.96));
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.03), 0 18px 28px rgba(0,0,0,.22);overflow:hidden
+    }
+    .pane .bar{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px;border-bottom:1px solid var(--line2);background:rgba(0,0,0,.22);
+      color:var(--muted);font-size:10px;letter-spacing:.18em;text-transform:uppercase
+    }
+    .pane .left{display:flex;align-items:center;gap:8px;min-width:0}
+    .pane .status-dot{width:8px;height:8px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 6px rgba(86,176,255,.11)}
+    .pane .score{color:var(--green)}
+    .pane pre{
+      margin:0;padding:10px 12px 0 12px;flex:1;font-size:11px;line-height:1.55;color:#dfe8f0;white-space:pre-wrap
+    }
+    .pane .footer{
+      margin:0 12px 12px;height:10px;border-radius:999px;border:1px solid var(--line2);background:#071016;overflow:hidden;position:relative
+    }
+    .pane .fill{position:absolute;inset:0;transform-origin:left center;background:linear-gradient(90deg,var(--blue),var(--green),var(--violet))}
+    .pane .shimmer{position:absolute;top:0;bottom:0;width:130px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.16),transparent);opacity:.75}
+    .mono-green{color:#95e6a5}
+    .mono-blue{color:#8bc7ff}
+    .mono-red{color:#ff8c87}
+    .mono-violet{color:#d3b3ff}
+    .mono-amber{color:#ffd37f}
+
+    .right{display:flex;flex-direction:column;min-height:0}
+    .preview-wrap{display:flex;flex-direction:column;gap:12px;padding:14px;min-height:0;flex:1}
+    .monitor{
+      position:relative;min-height:306px;border-radius:14px;border:1px solid rgba(90,99,110,.22);overflow:hidden;
+      background:linear-gradient(180deg, rgba(10,14,20,.96), rgba(7,9,13,.98))
+    }
+    .monitor .head{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;border-bottom:1px solid var(--line2);
+      font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)
+    }
+    .monitor .head .liveb{color:var(--green)}
+    .browser{
+      position:absolute;inset:48px 13px 58px;border-radius:12px;border:1px solid rgba(90,99,110,.18);
+      background:linear-gradient(180deg, rgba(23,29,37,.94), rgba(9,11,15,.97));overflow:hidden
+    }
+    .browser::before{
+      content:"";position:absolute;inset:0;
+      background:linear-gradient(180deg, rgba(255,255,255,.03), transparent 20%), linear-gradient(90deg, rgba(255,255,255,.02), transparent 18%, rgba(255,255,255,.02) 82%, transparent)
+    }
+    .sitehead{
+      position:absolute;left:12px;right:12px;top:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;color:#d9e2ea;
+      font-size:12px;letter-spacing:.06em;text-transform:uppercase
+    }
+    .sitehead .pill{
+      padding:6px 10px;border-radius:999px;border:1px solid rgba(86,176,255,.22);background:rgba(7,10,14,.62);color:var(--blue);font-size:10px;letter-spacing:.18em
+    }
+    .dash{
+      position:absolute;inset:50px 12px 12px;display:grid;grid-template-columns:1.2fr .8fr;gap:10px
+    }
+    .card{
+      border:1px solid rgba(90,99,110,.16);border-radius:12px;background:rgba(7,10,14,.70);overflow:hidden
+    }
+    .card .h{padding:10px 12px;border-bottom:1px solid var(--line2);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+    .card .b{padding:12px}
+    .headline{font-size:18px;line-height:1.15;color:#f4f8fb;margin-bottom:8px}
+    .sub{font-size:11px;line-height:1.45;color:var(--muted)}
+    .bars{display:flex;align-items:end;gap:8px;height:94px;padding:0 12px 12px}
+    .bars span{flex:1;border-radius:8px 8px 4px 4px;background:linear-gradient(180deg, rgba(86,176,255,.95), rgba(40,209,124,.82));box-shadow:0 0 14px rgba(86,176,255,.18)}
+    .bars span:nth-child(1){height:28%}.bars span:nth-child(2){height:54%}.bars span:nth-child(3){height:40%}.bars span:nth-child(4){height:66%}.bars span:nth-child(5){height:44%}.bars span:nth-child(6){height:78%}.bars span:nth-child(7){height:58%}
+    .list{display:grid;gap:8px;padding:12px}
+    .row{display:flex;justify-content:space-between;gap:12px;font-size:11px;color:var(--muted)}
+    .row strong{color:#f4f8fb}
+    .metrics{display:flex;justify-content:space-between;gap:12px;padding:0 12px 12px;font-size:11px;color:var(--muted)}
+    .metrics strong{color:#f4f8fb}
+    .corners{position:absolute;inset:0;pointer-events:none}
+    .corner{position:absolute;width:24px;height:24px;border-style:solid;border-color:rgba(86,176,255,.22);opacity:.8}
+    .tl{left:10px;top:10px;border-width:1px 0 0 1px;border-top-left-radius:8px}
+    .tr{right:10px;top:10px;border-width:1px 1px 0 0;border-top-right-radius:8px}
+    .bl{left:10px;bottom:10px;border-width:0 0 1px 1px;border-bottom-left-radius:8px}
+    .br{right:10px;bottom:10px;border-width:0 1px 1px 0;border-bottom-right-radius:8px}
+    .telemetry{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 14px 16px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+    .telemetry .peak{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid var(--line2);border-radius:999px;background:rgba(7,10,14,.6)}
+    .telemetry .peak strong{color:var(--red)}
+    .footer{
+      display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 20px 16px;color:var(--muted);font-size:11px;letter-spacing:.16em;text-transform:uppercase
+    }
+    .chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+    .chip{padding:6px 10px;border-radius:999px;border:1px solid rgba(90,99,110,.18);background:rgba(7,10,14,.52);color:#dfe7ef}
+    .chip.green{color:var(--green);border-color:rgba(40,209,124,.22)}
+    .chip.blue{color:var(--blue);border-color:rgba(86,176,255,.22)}
+    .chip.violet{color:var(--violet);border-color:rgba(174,125,255,.22)}
   </style>
 </head>
 <body>
-  <div
-    id="stage"
-    data-composition-id="skill-oracle-demo"
-    data-start="0"
-    data-duration="13.5"
-    data-width="1920"
-    data-height="1080"
-    data-fps="30"
-  >
-    <div class="vignette"></div>
-    <div class="grain"></div>
+  <div id="stage" data-composition-id="skill-oracle-demo" data-start="0" data-duration="13.5" data-width="1920" data-height="1080" data-fps="30">
     <div class="grid"></div>
+    <div class="grain"></div>
+    <div class="vignette"></div>
     <div class="halo"></div>
-
     <div class="shell">
-      <div class="windowbar">
-        <div class="traffic" aria-hidden="true">
-          <span class="red"></span>
-          <span class="amber"></span>
-          <span class="green"></span>
-        </div>
-        <div>skill-oracle live demo</div>
-        <div>multi-agent cockpit</div>
+      <div class="topstrip">
+        <div class="lights" aria-hidden="true"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+        <div>overclock • live demo • multi-agent cockpit</div>
+        <div>live • 6 agents</div>
       </div>
 
-      <header class="masthead">
-        <div class="brandline">
-          <div class="brand">skill-oracle</div>
-          <div class="subtitle">find the right skill before the work starts</div>
+      <div class="header">
+        <div class="brand">
+          <div class="name">skill-oracle</div>
+          <div class="desc">find the right skill before the work starts</div>
         </div>
-        <div class="status"><span class="live-dot"></span> live - 6 agents</div>
-      </header>
+        <div class="live"><span class="dot"></span> todos online</div>
+      </div>
 
       <div class="hero">
         <section class="panel mission">
-          <div class="panel-head">
-            <div class="panel-title">
-              <strong>mission room</strong>
-              <span>human prompt -> routed work</span>
+          <div class="ph">
+            <div class="pt">
+              <strong>Piloto</strong>
+              <span>mission room • 6 agents</span>
             </div>
-            <div class="badge"><span class="tiny"></span> todos online</div>
+            <div class="badge"><span class="mini"></span> live</div>
           </div>
-          <div class="mission-body">
-            <div class="mission-callout">
-              <div class="mission-eyebrow">task brief</div>
-              <p class="mission-copy">I keep losing time because the right Skill, Agent, Plugin, or MCP server is buried in a huge workspace.</p>
-              <div class="mission-note">skill-oracle solves that by scanning the stack, ranking the best fit, and keeping the fallback ready when nothing is obvious.</div>
+          <div class="body">
+            <div class="mission-note">
+              <div class="eyebrow">task brief</div>
+              <p>I keep losing time because the right Skill, Agent, Plugin, or MCP server is buried in a huge workspace.</p>
+              <div class="small">skill-oracle scans the stack, ranks the best fit, and keeps the fallback ready when nothing is obvious.</div>
             </div>
 
             <div class="feed">
               <div class="msg">
-                <div class="avatar">P</div>
+                <div class="av">P</div>
                 <div class="bubble">
-                  <div class="meta"><strong>pilot</strong><span class="status">live</span></div>
-                  ship the landing page. keep the layout clean and the motion readable.
+                  <div class="meta"><strong>pilot</strong><span class="ok">live</span></div>
+                  ship the landing page. keep the cockpit readable and the motion subtle.
                 </div>
               </div>
               <div class="msg">
-                <div class="avatar purple">B1</div>
+                <div class="av p">B1</div>
                 <div class="bubble">
                   <div class="meta"><strong>builder-1</strong><span>code</span></div>
                   routing the request to the right domain instead of guessing by title only.
                 </div>
               </div>
               <div class="msg">
-                <div class="avatar green">RV</div>
+                <div class="av g">RV</div>
                 <div class="bubble">
                   <div class="meta"><strong>reviewer</strong><span>check</span></div>
                   the result should feel like a cockpit: structured, clear, and fast to parse.
                 </div>
               </div>
               <div class="msg">
-                <div class="avatar orange">EX</div>
+                <div class="av o">EX</div>
                 <div class="bubble">
                   <div class="meta"><strong>executor</strong><span>done</span></div>
                   no noise, no dead ends, just the best fit and a clean handoff.
                 </div>
               </div>
             </div>
+
+            <div class="composer">@executor esta digitando</div>
           </div>
         </section>
 
         <section class="center">
-          <div class="stack">
-            <div class="codepane">
-              <div class="codebar">
-                <div class="path"><span class="dot"></span> <span>routes/auth.ts</span></div>
-                <div class="score">motion intent boosted</div>
+          <div class="workbench">
+            <div class="pane">
+              <div class="bar">
+                <div class="left"><span class="status-dot"></span><span>scout</span></div>
+                <div class="score">$0.004</div>
               </div>
-              <div class="code">
-                <div class="lines">
-                  <div>01</div><div>02</div><div>03</div><div>04</div><div>05</div><div>06</div><div>07</div><div>08</div>
-                </div>
-                <div class="source">
-<span class="comment">// keep UI shell and motion in the same lane</span>
-<span class="kw">import</span> { Router } <span class="kw">from</span> <span class="str">'express'</span>;
-<span class="kw">import</span> { z } <span class="kw">from</span> <span class="str">'zod'</span>;
-
-<span class="kw">const</span> router = <span class="fn">Router</span>();
-<span class="kw">const</span> Login = <span class="fn">z.object</span>({
-  uiShell: <span class="str">true</span>,
-  motion: <span class="str">true</span>,
-  <span class="accent">fallback</span>: <span class="str">find-skills</span>
-});
-
-<span class="kw">export</span> <span class="kw">default</span> router;
-                </div>
-              </div>
-              <div class="progress">
-                <div class="progress-fill" data-fill="0.72"></div>
-                <div class="progress-hint"></div>
-              </div>
+              <pre>
+grep "deprecated" -> 3 hits
+<span class="mono-amber">scanning</span> db/schema
+<span class="mono-amber">parsing</span> db/schema
+<span class="mono-green">routing to design + web</span>
+blocking analytics unless explicit
+              </pre>
+              <div class="footer"><div class="fill" style="width:78%"></div><div class="shimmer" style="left:-120px"></div></div>
             </div>
 
-            <div class="codepane">
-              <div class="codebar">
-                <div class="path"><span class="dot" style="background: var(--green); box-shadow: 0 0 0 6px rgba(47, 214, 125, 0.12);"></span> <span>scanner.js</span></div>
-                <div class="score">9,599 assets / 20 domains</div>
+            <div class="pane">
+              <div class="bar">
+                <div class="left"><span class="status-dot" style="background:var(--red);box-shadow:0 0 0 6px rgba(255,91,82,.11)"></span><span>builder-1</span></div>
+                <div class="score">$0.013</div>
               </div>
-              <div class="code">
-                <div class="lines">
-                  <div>01</div><div>02</div><div>03</div><div>04</div><div>05</div><div>06</div><div>07</div><div>08</div>
-                </div>
-                <div class="source">
-<span class="comment">// rank the best fit, do not drown the operator in options</span>
-<span class="kw">for</span> (<span class="kw">const</span> asset <span class="kw">of</span> assets) {
-  <span class="kw">if</span> (<span class="fn">matchesIntent</span>(asset, task)) route.push(asset);
-}
-<span class="kw">if</span> (!route.length) <span class="fn">fallback</span>(<span class="str">'find-skills'</span>);
-<span class="kw">return</span> <span class="fn">sortByConfidence</span>(route);
+              <pre>
+<span class="mono-red">return res.status(401).end();</span>
+req.user = p; next();
+import { Router } from 'express';
+import { z } from 'zod';
+import { limiter } from '../lib/redis';
+const router = Router();
+const Login = z.object({
+  session: true
+});
+              </pre>
+              <div class="footer"><div class="fill" style="width:46%"></div><div class="shimmer" style="left:-90px"></div></div>
+            </div>
 
-<span class="comment">// keep the answer clean for the visitor</span>
-                </div>
+            <div class="pane">
+              <div class="bar">
+                <div class="left"><span class="status-dot" style="background:var(--green);box-shadow:0 0 0 6px rgba(40,209,124,.11)"></span><span>builder-2</span></div>
+                <div class="score">$0.014</div>
               </div>
-              <div class="progress">
-                <div class="progress-fill" data-fill="0.86"></div>
-                <div class="progress-hint"></div>
+              <pre>
+<span class="mono-violet">CREATE INDEX</span> idx_users_email <span class="mono-violet">ON</span> users(email);
+<span class="mono-violet">ALTER TABLE</span> users ENABLE <span class="mono-violet">ROW LEVEL SECURITY</span>;
+<span class="mono-green">✓ migration applied</span>
+import { stripe } from '@lib/stripe';
+export async function POST(req) {
+  const session = await stripe.checkout.sessions.create({ ... })
+}
+              </pre>
+              <div class="footer"><div class="fill" style="width:57%"></div><div class="shimmer" style="left:-100px"></div></div>
+            </div>
+
+            <div class="pane">
+              <div class="bar">
+                <div class="left"><span class="status-dot" style="background:#d88cff;box-shadow:0 0 0 6px rgba(216,140,255,.11)"></span><span>reviewer</span></div>
+                <div class="score">$0.005</div>
               </div>
+              <pre>
+res.json({ refresh })     <span class="mono-red">flagged</span>
+res.cookie("rt", refresh, { httpOnly: true })
+<span class="mono-green">approve -> merge ok</span>
+tsc --noEmit
+line 47: string not assignable
+npm test
+              </pre>
+              <div class="footer"><div class="fill" style="width:77%"></div><div class="shimmer" style="left:-140px"></div></div>
             </div>
           </div>
         </section>
 
         <section class="panel right">
-          <div class="panel-head">
-            <div class="panel-title">
-              <strong>live preview</strong>
-              <span>status surface / telemetry</span>
+          <div class="ph">
+            <div class="pt">
+              <strong>sentinela dashboard</strong>
+              <span>live build / preview</span>
             </div>
-            <div class="badge"><span class="tiny"></span> build live</div>
+            <div class="badge"><span class="mini"></span> live build</div>
           </div>
-          <div class="preview">
+          <div class="preview-wrap">
             <div class="monitor">
-              <div class="monitor-head">
+              <div class="head">
                 <div>sentinela.io/dashboard</div>
-                <div class="live">live build</div>
+                <div class="liveb">build live</div>
               </div>
-              <div class="viewport">
-                <div class="preview-top">
+              <div class="browser">
+                <div class="sitehead">
                   <div>production telemetry that explains itself</div>
-                  <div class="pill">start free</div>
+                  <div class="pill">star free</div>
                 </div>
-                <div class="preview-grid">
-                  <div class="preview-card big">
-                    <div class="hd">overview</div>
-                    <div class="dashboard">
-                      <div class="hero-title">clean routing, clear handoff, no guessing.</div>
-                      <div class="hero-sub">the demo keeps the signal structured so a visitor can understand the product at a glance.</div>
+                <div class="dash">
+                  <div class="card">
+                    <div class="h">overview</div>
+                    <div class="b">
+                      <div class="headline">clean routing, clear handoff, no guessing.</div>
+                      <div class="sub">the demo keeps the signal structured so a visitor can understand the product at a glance.</div>
                     </div>
-                    <div class="chart" aria-hidden="true">
-                      <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                    <div class="bars" aria-hidden="true">
+                      <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
                     </div>
                   </div>
-                  <div class="preview-card small">
-                    <div class="hd">signal map</div>
-                    <div class="preview-list">
+                  <div class="card">
+                    <div class="h">signal map</div>
+                    <div class="list">
                       <div class="row"><strong>motion</strong><span>ui shell</span></div>
                       <div class="row"><strong>security</strong><span>proactive</span></div>
                       <div class="row"><strong>fallback</strong><span>ready</span></div>
                       <div class="row"><strong>confidence</strong><span>high</span></div>
                     </div>
-                    <div class="metric">
+                    <div class="metrics">
                       <span>lighthouse <strong>96</strong></span>
                       <span>load <strong>0.8s</strong></span>
                     </div>
                   </div>
                 </div>
               </div>
-              <div class="corner tl"></div>
-              <div class="corner tr"></div>
-              <div class="corner bl"></div>
-              <div class="corner br"></div>
-            </div>
-
-            <div class="panel-head" style="border-radius: 12px; margin-top: 0; background: rgba(0,0,0,0.14);">
-              <div class="panel-title">
-                <strong>telemetry</strong>
-                <span>runtime summary</span>
+              <div class="corners">
+                <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
               </div>
-              <div class="badge">peak <span style="color: var(--red);">1.00</span></div>
+            </div>
+            <div class="telemetry">
+              <div>monitor • live</div>
+              <div class="peak">peak <strong>1.00</strong></div>
             </div>
           </div>
         </section>
       </div>
 
-      <div class="footerbar">
+      <div class="footer">
         <div>skill-oracle / updated demo</div>
         <div class="chips">
           <div class="chip green">orchestrator</div>
@@ -966,53 +429,23 @@
   <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
   <script>
     const tl = gsap.timeline({ paused: true });
-
-    tl.set([
-      ".halo", ".shell", ".masthead", ".mission", ".center", ".right",
-      ".mission-callout", ".feed", ".codepane", ".monitor", ".footerbar",
-      ".progress-fill", ".progress-hint"
-    ], { opacity: 0 }, 0);
-
     tl.to(".grid", { backgroundPosition: "0 84px", duration: 13.5, ease: "none" }, 0);
-    tl.to(".halo", { opacity: 1, x: 18, y: -12, duration: 13.5, ease: "sine.inOut" }, 0);
-    tl.to(".shell", { opacity: 1, boxShadow: "0 40px 120px rgba(0, 0, 0, 0.56), inset 0 1px 0 rgba(255,255,255,0.03)", duration: 0.1, ease: "none" }, 0);
-
-    tl.fromTo(".masthead", { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 0.08);
-    tl.fromTo(".mission", { opacity: 0, x: -36 }, { opacity: 1, x: 0, duration: 0.62, ease: "power3.out" }, 0.18);
-    tl.fromTo(".mission-callout", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.48, ease: "power3.out" }, 0.30);
-    tl.fromTo(".feed", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.52, ease: "power3.out" }, 0.44);
-    tl.fromTo(".msg", { opacity: 0, x: -16 }, { opacity: 1, x: 0, duration: 0.36, stagger: 0.12, ease: "power2.out" }, 0.54);
-
-    tl.fromTo(".center", { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.64, ease: "power3.out" }, 0.34);
-    tl.fromTo(".codepane", { opacity: 0, scale: 0.985 }, { opacity: 1, scale: 1, duration: 0.54, stagger: 0.12, ease: "power2.out" }, 0.48);
-    tl.fromTo(".source", { opacity: 0 }, { opacity: 1, duration: 0.12 }, 0.72);
-    tl.fromTo(".progress-fill", { scaleX: 0 }, { scaleX: function(i, target) { return parseFloat(target.dataset.fill || "0.8"); }, duration: 1.25, ease: "power2.out" }, 0.90);
-    tl.fromTo(".progress-hint", { x: -160 }, { x: 760, duration: 1.15, ease: "none" }, 0.98);
-
-    tl.fromTo(".right", { opacity: 0, x: 36 }, { opacity: 1, x: 0, duration: 0.68, ease: "power3.out" }, 0.42);
-    tl.fromTo(".monitor", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.58, ease: "power3.out" }, 0.58);
-    tl.fromTo(".preview-grid", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.52, ease: "power2.out" }, 0.82);
-    tl.fromTo(".bar", { scaleY: 0.16, transformOrigin: "bottom center" }, { scaleY: 1, duration: 0.95, stagger: 0.05, ease: "power2.out" }, 1.04);
-
-    tl.fromTo(".footerbar", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.36, ease: "power2.out" }, 1.42);
-
-    tl.to(".live-dot", { boxShadow: "0 0 0 10px rgba(47, 214, 125, 0.08)", duration: 1.5, repeat: 1, yoyo: true, ease: "sine.inOut" }, 1.0);
-    tl.to(".badge .tiny", { boxShadow: "0 0 0 9px rgba(47, 214, 125, 0.08)", duration: 1.8, repeat: 1, yoyo: true, ease: "sine.inOut" }, 1.08);
-    tl.to(".mission-copy", { color: "#ffffff", duration: 0.8, ease: "sine.inOut" }, 1.6);
-    tl.to(".preview-top .pill", { boxShadow: "0 0 0 10px rgba(91, 182, 255, 0.06)", duration: 1.6, repeat: 1, yoyo: true, ease: "sine.inOut" }, 1.72);
-    tl.to(".monitor", { boxShadow: "0 0 0 1px rgba(91, 182, 255, 0.08), 0 24px 44px rgba(0,0,0,0.30)", duration: 1.4, repeat: 1, yoyo: true, ease: "sine.inOut" }, 2.1);
-    tl.to(".mission-callout", { borderColor: "rgba(91, 182, 255, 0.34)", duration: 1.2, yoyo: true, repeat: 1, ease: "sine.inOut" }, 4.8);
-    tl.to(".codepane:first-child .codebar .score", { color: "#8be6a0", duration: 0.4 }, 5.0);
-    tl.to(".codepane:last-child .codebar .score", { color: "#8be6a0", duration: 0.4 }, 5.2);
-    tl.to(".hero-title", { x: 8, duration: 1.2, yoyo: true, repeat: 1, ease: "sine.inOut" }, 6.0);
-    tl.to(".preview-list .row:nth-child(1) strong", { color: "#8be6a0", duration: 0.5 }, 6.2);
-    tl.to(".preview-list .row:nth-child(4) strong", { color: "#8be6a0", duration: 0.5 }, 6.4);
-
-    tl.fromTo(".footerbar", { opacity: 0.8 }, { opacity: 1, duration: 0.2 }, 9.8);
-    tl.to(".footerbar .chips .chip.green", { boxShadow: "0 0 0 8px rgba(47, 214, 125, 0.05)", duration: 1.2, repeat: 1, yoyo: true, ease: "sine.inOut" }, 10.0);
-    tl.to(".footerbar .chips .chip.blue", { boxShadow: "0 0 0 8px rgba(91, 182, 255, 0.05)", duration: 1.2, repeat: 1, yoyo: true, ease: "sine.inOut" }, 10.15);
-    tl.to(".footerbar .chips .chip.violet", { boxShadow: "0 0 0 8px rgba(165, 124, 255, 0.05)", duration: 1.2, repeat: 1, yoyo: true, ease: "sine.inOut" }, 10.3);
-
+    tl.to(".halo", { x: 18, y: -12, duration: 13.5, ease: "sine.inOut" }, 0);
+    tl.fromTo(".header", { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.35, ease: "power2.out" }, 0.05);
+    tl.fromTo(".mission", { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.55, ease: "power3.out" }, 0.15);
+    tl.fromTo(".center", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.22);
+    tl.fromTo(".right", { opacity: 0, x: 30 }, { opacity: 1, x: 0, duration: 0.6, ease: "power3.out" }, 0.28);
+    tl.fromTo(".msg", { opacity: 0, x: -12 }, { opacity: 1, x: 0, duration: 0.32, stagger: 0.09, ease: "power2.out" }, 0.46);
+    tl.fromTo(".pane", { opacity: 0, scale: 0.98 }, { opacity: 1, scale: 1, duration: 0.36, stagger: 0.08, ease: "power2.out" }, 0.42);
+    tl.fromTo(".fill", { scaleX: 0 }, { scaleX: 1, duration: 1.05, stagger: 0.08, ease: "power2.out" }, 0.9);
+    tl.fromTo(".shimmer", { x: -160 }, { x: 700, duration: 1.0, stagger: 0.08, ease: "none" }, 1.0);
+    tl.fromTo(".monitor", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 0.36);
+    tl.fromTo(".telemetry", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.28, ease: "power2.out" }, 1.35);
+    tl.fromTo(".footer", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" }, 1.35);
+    tl.to(".dot", { boxShadow: "0 0 0 10px rgba(40,209,124,.08)", duration: 1.4, repeat: 1, yoyo: true, ease: "sine.inOut" }, 1.0);
+    tl.to(".badge .mini", { boxShadow: "0 0 0 10px rgba(40,209,124,.08)", duration: 1.4, repeat: 1, yoyo: true, ease: "sine.inOut" }, 1.05);
+    tl.to(".liveb", { color: "#8bf0ac", duration: 0.6, repeat: 1, yoyo: true, ease: "sine.inOut" }, 1.2);
+    tl.to(".peak strong", { color: "#ff7b70", duration: 0.4, repeat: 1, yoyo: true, ease: "sine.inOut" }, 1.5);
     window.__timelines = window.__timelines || {};
     window.__timelines["skill-oracle-demo"] = tl;
   </script>
