@@ -1,10 +1,11 @@
 {
-  "version": "2.4.14",
-  "updated_at": "2026-05-20T02:02:33.3388598Z",
+  "version": "2.4.15",
+  "updated_at": "2026-05-20T02:20:17.9897638Z",
   "paths": [
     "SKILL.md",
     "README.md",
     "LICENSE",
+    "assets/demo.gif",
     "assets/demo.svg",
     "assets/demo.webm",
     "demo-video/index.html",

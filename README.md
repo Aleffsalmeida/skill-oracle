@@ -1,9 +1,9 @@
 # skill-oracle — Universal Dynamic Orchestrator
 
 <p align="center">
-  <video width="760" autoplay loop muted playsinline controls poster="assets/demo.svg" aria-label="skill-oracle demo">
-    <source src="assets/demo.webm" type="video/webm" />
-  </video>
+  <a href="assets/demo.webm" aria-label="Open the full skill-oracle demo video">
+    <img src="assets/demo.gif" alt="skill-oracle demo" width="760"/>
+  </a>
 </p>
 
 <p align="center">
@@ -14,9 +14,19 @@
   <img src="https://img.shields.io/badge/schema-v2-purple?style=flat-square" alt="schema"/>
 </p>
 
-**Single entry point for 5,000+ Claude Code, Overclock, and Codex-local assets.** Indexes Skills, Agents, Plugins, and MCP servers — then routes any task to the right Master Agent in Claude Code or to the local semantic selector in Overclock/Codex-compatible runtimes.
+**skill-oracle is the router for overloaded local AI setups.** It scans thousands of Skills, Agents, Plugins, and MCP servers, picks the best match for the task, and falls back cleanly when nothing is obvious.
 
-Loads minutes-of-overhead environments in seconds. Built for Claude Code users who have hundreds of plugins and don't want to pay token cost on every prompt.
+It was built for a practical problem: when the right tool exists, but finding it across a huge workspace costs time, context, and attention.
+
+## Why it exists
+
+- Find the right asset before you start guessing
+- Route tasks to the right domain master agent or local selector
+- Keep motion, UI, security, analytics, docs, and backend work separated
+- Suggest adjacent domains that people often forget
+- Fall back to `find-skills` when nothing local is a strong fit
+
+The full demo video is stored in [assets/demo.webm](assets/demo.webm). The inline preview above uses [assets/demo.gif](assets/demo.gif) because GitHub renders GIFs reliably in repository READMEs.
 
 ---
 
@@ -33,37 +43,15 @@ Loads minutes-of-overhead environments in seconds. Built for Claude Code users w
 
 The old `build-index.js` is preserved for backward compat. New pipeline is `scanner.js` -> `classifier.js` -> Master Agents.
 
----
-
 ## How it works
 
-```
-                user prompt
-                     |
-                     v
-            +----------------+
-            |  skill-oracle  |  (this skill — single entry point)
-            +----------------+
-                     |
-        parse task -> pick 1-3 domains
-                     |
-        +--------+--+--+--------+--------+
-        v        v     v        v        v
-  oracle-master-web   ...   oracle-master-security   <- subagents (Task tool)
-        |        |              |
-        |        |              v
-        |        |          filter cluster
-        |        v             rank top-8
-        |    debate if         (debate if ambiguous)
-        |    ambiguous          return top-5
-        v
-   top-5 picks back to Oracle
-                     |
-        Oracle synthesizes + adds proactive suggestions
-                     |
-                     v
-              final answer
-```
+1. Read the task and detect the likely domains.
+2. Rank the best matching skills, agents, plugins, and MCP servers.
+3. Dispatch to Claude Code master agents or the local semantic selector.
+4. Add proactive suggestions when the prompt implies security, observability, or another adjacent domain.
+5. Return a ranked bundle plus a fallback path when nothing is strong enough.
+
+---
 
 Every asset carries a `domain` and `master_agent` tag in the index. In Claude Code, the Oracle dispatches in parallel and each master sees only its own cluster. In Overclock/Codex/local runtimes, `scripts/oracle-query.js` reads the same index, evaluates enriched semantic fields extracted from each `SKILL.md`, and ranks assets deterministically without requiring Claude Code's `Task` dispatcher. In Overclock, follow-up agent work should be delegated through visible `pane_spawn` panes only when the work genuinely splits into independent streams.
 
