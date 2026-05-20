@@ -1,7 +1,9 @@
 # skill-oracle — Universal Dynamic Orchestrator
 
 <p align="center">
-  <img src="assets/demo.svg" alt="skill-oracle demo" width="760"/>
+  <video width="760" autoplay loop muted playsinline controls poster="assets/demo.svg" aria-label="skill-oracle demo">
+    <source src="assets/demo.webm" type="video/webm" />
+  </video>
 </p>
 
 <p align="center">
