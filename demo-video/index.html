@@ -8,13 +8,12 @@
     :root{
       color-scheme: dark;
       --bg:#05080d;
-      --panel:rgba(9,13,18,.92);
-      --panel2:rgba(12,17,23,.96);
-      --line:rgba(90,99,110,.24);
-      --line2:rgba(90,99,110,.15);
+      --panel:rgba(9,13,18,.94);
+      --panel2:rgba(11,16,22,.96);
+      --line:rgba(90,99,110,.22);
+      --line2:rgba(90,99,110,.14);
       --fg:#edf3f7;
       --muted:#7d8994;
-      --muted2:#56616c;
       --green:#27d07b;
       --blue:#56b0ff;
       --red:#ff5b52;
@@ -25,37 +24,37 @@
     #stage{
       position:relative;width:100%;height:100%;overflow:hidden;color:var(--fg);
       background:
-        radial-gradient(circle at 15% 14%, rgba(86,176,255,.14), transparent 24%),
-        radial-gradient(circle at 84% 20%, rgba(172,124,255,.11), transparent 22%),
-        radial-gradient(circle at 50% 84%, rgba(39,208,123,.10), transparent 26%),
+        radial-gradient(circle at 14% 16%, rgba(86,176,255,.11), transparent 26%),
+        radial-gradient(circle at 84% 18%, rgba(172,124,255,.09), transparent 24%),
+        radial-gradient(circle at 52% 84%, rgba(39,208,123,.10), transparent 28%),
         linear-gradient(180deg,#0b1016 0%, #05080d 100%);
     }
-    .grid,.halo,.grain,.vignette{position:absolute;inset:0;pointer-events:none}
+    .grid,.halo,.vignette,.grain{position:absolute;inset:0;pointer-events:none}
     .grid{
-      opacity:.14;
-      background-image:linear-gradient(rgba(125,133,144,.10) 1px,transparent 1px),linear-gradient(90deg,rgba(125,133,144,.10) 1px,transparent 1px);
-      background-size:120px 120px;
+      opacity:.12;
+      background-image:linear-gradient(rgba(125,133,144,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(125,133,144,.08) 1px,transparent 1px);
+      background-size:140px 140px;
     }
     .grain{
-      opacity:.06;
+      opacity:.04;
       background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);
-      background-size:72px 72px;
+      background-size:82px 82px;
       mix-blend-mode:screen;
     }
-    .vignette{background:radial-gradient(circle at center, transparent 42%, rgba(0,0,0,.36) 100%)}
+    .vignette{background:radial-gradient(circle at center, transparent 44%, rgba(0,0,0,.42) 100%)}
     .halo::before,.halo::after{
-      content:"";position:absolute;border-radius:999px;filter:blur(16px);mix-blend-mode:screen
+      content:"";position:absolute;border-radius:999px;filter:blur(20px);mix-blend-mode:screen
     }
     .halo::before{
-      width:620px;height:620px;left:-140px;top:-130px;
-      background:radial-gradient(circle, rgba(86,176,255,.20) 0%, rgba(86,176,255,.03) 56%, transparent 74%);
+      width:580px;height:580px;left:-120px;top:-120px;
+      background:radial-gradient(circle, rgba(86,176,255,.18) 0%, rgba(86,176,255,.03) 56%, transparent 74%);
     }
     .halo::after{
-      width:760px;height:760px;right:-190px;top:70px;
-      background:radial-gradient(circle, rgba(172,124,255,.18) 0%, rgba(172,124,255,.04) 54%, transparent 75%);
+      width:700px;height:700px;right:-160px;top:60px;
+      background:radial-gradient(circle, rgba(172,124,255,.16) 0%, rgba(172,124,255,.03) 56%, transparent 76%);
     }
     .shell{
-      position:absolute;inset:38px;border:1px solid rgba(90,99,110,.25);border-radius:18px;background:rgba(7,10,14,.60);
+      position:absolute;inset:34px;border:1px solid rgba(90,99,110,.24);border-radius:18px;background:rgba(7,10,14,.60);
       box-shadow:0 34px 100px rgba(0,0,0,.50), inset 0 1px 0 rgba(255,255,255,.03);
       backdrop-filter:blur(18px);
     }
@@ -69,144 +68,161 @@
     .header{
       display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px 18px 12px;border-bottom:1px solid var(--line2)
     }
-    .brand{display:flex;align-items:baseline;gap:14px;min-width:0}
-    .brand .name{font-size:18px;letter-spacing:.24em;text-transform:uppercase;color:#f4f7fb}
-    .brand .desc{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .live{display:flex;align-items:center;gap:10px;color:var(--green);font-size:12px;letter-spacing:.18em;text-transform:uppercase;white-space:nowrap}
+    .brand{display:flex;align-items:baseline;gap:12px;min-width:0}
+    .brand .name{font-size:17px;letter-spacing:.22em;text-transform:uppercase;color:#f4f7fb}
+    .brand .desc{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .live{display:flex;align-items:center;gap:10px;color:var(--green);font-size:11px;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap}
     .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 7px rgba(39,208,123,.12)}
-    .hero{
-      display:grid;grid-template-columns:0.31fr 0.39fr 0.30fr;gap:14px;height:calc(100% - 82px);padding:16px;box-sizing:border-box
+    .content{
+      display:grid;
+      grid-template-columns:0.30fr 0.38fr 0.32fr;
+      gap:14px;
+      height:calc(100% - 82px);
+      padding:16px;
+      box-sizing:border-box;
     }
     .panel{
-      border:1px solid var(--line);border-radius:14px;background:var(--panel);overflow:hidden;
+      border:1px solid var(--line);
+      border-radius:14px;
+      background:var(--panel);
+      overflow:hidden;
       box-shadow:inset 0 1px 0 rgba(255,255,255,.03), 0 20px 36px rgba(0,0,0,.30)
     }
     .ph{
       display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px 12px;border-bottom:1px solid var(--line2);background:rgba(0,0,0,.18)
     }
     .pt{display:flex;flex-direction:column;gap:4px;min-width:0}
-    .pt strong{font-size:17px;letter-spacing:.02em;color:#f6f8fb}
+    .pt strong{font-size:18px;letter-spacing:.02em;color:#f6f8fb}
     .pt span{font-size:10px;letter-spacing:.20em;color:var(--muted);text-transform:uppercase}
     .badge{
       display:inline-flex;align-items:center;gap:8px;padding:7px 10px;border-radius:999px;background:rgba(7,10,14,.62);border:1px solid var(--line2);
-      color:var(--muted);font-size:10px;letter-spacing:.18em;text-transform:uppercase;white-space:nowrap
+      color:var(--muted);font-size:10px;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap
     }
     .badge .mini{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 5px rgba(39,208,123,.12)}
+    .body{display:flex;flex-direction:column;gap:12px;padding:14px;min-height:0;height:calc(100% - 57px);box-sizing:border-box}
 
-    .mission{display:flex;flex-direction:column;min-height:0}
-    .body{display:flex;flex-direction:column;gap:12px;padding:14px;min-height:0}
-    .task{
-      padding:12px 13px;border-radius:12px;border:1px solid rgba(86,176,255,.22);
+    .mission-note{
+      padding:13px 14px;border-radius:12px;border:1px solid rgba(86,176,255,.22);
       background:linear-gradient(180deg, rgba(12,16,22,.92), rgba(8,11,15,.84))
     }
-    .task .eyebrow{font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--blue);margin-bottom:9px}
-    .task p{margin:0;font-size:13px;line-height:1.45;color:#eef3f7}
-    .task .small{margin-top:10px;font-size:11px;line-height:1.45;color:var(--muted)}
+    .mission-note .eyebrow{font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--blue);margin-bottom:10px}
+    .mission-note p{margin:0;font-size:15px;line-height:1.45;color:#f2f6fa}
+    .mission-note .small{margin-top:10px;font-size:11px;line-height:1.45;color:var(--muted)}
+
     .prompt{
-      padding:11px 12px;border-radius:10px;border:1px solid var(--line2);background:rgba(0,0,0,.20);font-size:12px;line-height:1.5;color:#e9f1f7
+      padding:12px 13px;border-radius:12px;border:1px solid var(--line2);background:rgba(0,0,0,.20)
     }
-    .prompt .q{color:var(--muted);font-size:10px;letter-spacing:.18em;text-transform:uppercase;margin-bottom:6px}
-    .statusbox{
+    .prompt .q{color:var(--muted);font-size:10px;letter-spacing:.18em;text-transform:uppercase;margin-bottom:8px}
+    .prompt .txt{font-size:13px;line-height:1.5;color:#eef3f7}
+    .prompt .tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    .tag{padding:5px 9px;border-radius:999px;border:1px solid rgba(90,99,110,.18);background:rgba(7,10,14,.52);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#dfe7ef}
+    .tag.blue{color:var(--blue);border-color:rgba(86,176,255,.22)}
+    .tag.green{color:var(--green);border-color:rgba(39,208,123,.22)}
+    .tag.violet{color:var(--violet);border-color:rgba(172,124,255,.22)}
+
+    .meta{
       display:grid;gap:8px;padding:12px;border:1px solid rgba(90,99,110,.18);border-radius:12px;background:rgba(7,10,14,.34);
       font-size:11px;color:var(--muted)
     }
-    .statusrow{display:flex;justify-content:space-between;gap:12px}
-    .statusrow strong{color:#f4f8fb}
-    .statusrow .ok{color:var(--green)}
+    .meta-row{display:flex;justify-content:space-between;gap:12px}
+    .meta-row strong{color:#f4f8fb}
+    .meta-row .ok{color:var(--green)}
 
-    .center{min-width:0;min-height:0;display:grid;grid-template-rows:1.1fr .9fr;gap:14px}
-    .pane{
+    .center{min-width:0;min-height:0;display:grid;grid-template-rows:0.56fr 0.44fr;gap:14px}
+    .scan{
       display:flex;flex-direction:column;min-height:0;border:1px solid rgba(90,99,110,.22);border-radius:13px;background:linear-gradient(180deg, rgba(16,21,27,.96), rgba(10,13,18,.96));
       box-shadow:inset 0 1px 0 rgba(255,255,255,.03), 0 18px 28px rgba(0,0,0,.22);overflow:hidden
     }
-    .pane .bar{
+    .scan .bar{
       display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px;border-bottom:1px solid var(--line2);background:rgba(0,0,0,.22);
       color:var(--muted);font-size:10px;letter-spacing:.18em;text-transform:uppercase
     }
-    .pane .left{display:flex;align-items:center;gap:8px;min-width:0}
-    .pane .status-dot{width:8px;height:8px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 6px rgba(86,176,255,.11)}
-    .pane .score{color:var(--green)}
-    .pane .scan{
-      margin:0;padding:12px 12px 0 12px;flex:1;font-size:11px;line-height:1.65;color:#dfe8f0;white-space:pre-wrap
+    .scan .left{display:flex;align-items:center;gap:8px;min-width:0}
+    .scan .status-dot{width:8px;height:8px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 6px rgba(86,176,255,.11)}
+    .scan .score{color:var(--green)}
+    .scan .log{
+      margin:0;padding:12px;flex:1;font-size:13px;line-height:1.75;color:#e6edf3;white-space:pre-wrap
     }
-    .scan .line{display:flex;justify-content:space-between;gap:12px}
-    .scan .dim{color:var(--muted)}
-    .scan .accent{color:var(--green)}
-    .scan .warn{color:var(--amber)}
-    .pane .footer{
+    .log .row{display:flex;justify-content:space-between;gap:12px}
+    .log .dim{color:var(--muted)}
+    .log .accent{color:var(--green)}
+    .log .warn{color:var(--amber)}
+    .scan .footer{
       margin:0 12px 12px;height:10px;border-radius:999px;border:1px solid var(--line2);background:#071016;overflow:hidden;position:relative
     }
-    .pane .fill{position:absolute;inset:0;transform-origin:left center;background:linear-gradient(90deg,var(--blue),var(--green),var(--violet))}
-    .pane .shimmer{position:absolute;top:0;bottom:0;width:130px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.16),transparent);opacity:.75}
-    .rank{
-      display:grid;grid-template-columns:1fr;gap:10px;padding:12px;flex:1;min-height:0
+    .fill{position:absolute;inset:0;transform-origin:left center;background:linear-gradient(90deg,var(--blue),var(--green),var(--violet))}
+    .shimmer{position:absolute;top:0;bottom:0;width:130px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.16),transparent);opacity:.75}
+
+    .agents{
+      display:flex;flex-direction:column;min-height:0;border:1px solid rgba(90,99,110,.22);border-radius:13px;background:linear-gradient(180deg, rgba(16,21,27,.96), rgba(10,13,18,.96));
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.03), 0 18px 28px rgba(0,0,0,.22);overflow:hidden
     }
-    .candidate{
-      padding:10px 12px;border-radius:12px;border:1px solid rgba(90,99,110,.18);background:rgba(7,10,14,.54)
+    .agents .bar{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px;border-bottom:1px solid var(--line2);background:rgba(0,0,0,.22);
+      color:var(--muted);font-size:10px;letter-spacing:.18em;text-transform:uppercase
     }
-    .candidate .top{display:flex;justify-content:space-between;gap:12px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
-    .candidate .top strong{color:#f4f8fb}
-    .candidate .title{font-size:12px;line-height:1.45;color:#edf3f7}
-    .candidate .bar2{margin-top:8px;height:8px;border-radius:999px;background:rgba(8,12,17,.85);border:1px solid var(--line2);overflow:hidden}
-    .candidate .bar2 span{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--green),var(--violet))}
-    .chips{display:flex;gap:8px;flex-wrap:wrap;padding:0 12px 12px}
-    .chip{padding:6px 10px;border-radius:999px;border:1px solid rgba(90,99,110,.18);background:rgba(7,10,14,.52);color:#dfe7ef;font-size:10px;letter-spacing:.18em;text-transform:uppercase}
-    .chip.green{color:var(--green);border-color:rgba(39,208,123,.22)}
-    .chip.blue{color:var(--blue);border-color:rgba(86,176,255,.22)}
-    .chip.violet{color:var(--violet);border-color:rgba(172,124,255,.22)}
+    .agent-list{display:grid;gap:10px;padding:12px;flex:1;min-height:0}
+    .agent{
+      padding:11px 12px;border-radius:12px;border:1px solid rgba(90,99,110,.18);background:rgba(7,10,14,.54)
+    }
+    .agent .top{display:flex;justify-content:space-between;gap:12px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+    .agent .top strong{color:#f4f8fb}
+    .agent .title{font-size:13px;line-height:1.45;color:#edf3f7}
+    .agent .sub{margin-top:8px;font-size:11px;line-height:1.45;color:var(--muted)}
+    .agent .bar2{margin-top:8px;height:8px;border-radius:999px;background:rgba(8,12,17,.85);border:1px solid var(--line2);overflow:hidden}
+    .agent .bar2 span{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--green),var(--violet))}
 
     .right{display:flex;flex-direction:column;min-height:0}
-    .result{
+    .out{
       display:flex;flex-direction:column;gap:12px;padding:14px;min-height:0;flex:1
     }
-    .bundle{
+    .dispatch{
       position:relative;min-height:320px;border-radius:14px;border:1px solid rgba(90,99,110,.22);overflow:hidden;
       background:linear-gradient(180deg, rgba(10,14,20,.96), rgba(7,9,13,.98))
     }
-    .bundle .head{
+    .dispatch .head{
       display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;border-bottom:1px solid var(--line2);
       font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)
     }
-    .bundle .head .liveb{color:var(--green)}
-    .bundle .body{
+    .dispatch .head .liveb{color:var(--green)}
+    .dispatch .body{
       position:absolute;inset:46px 13px 58px;border-radius:12px;border:1px solid rgba(90,99,110,.18);
       background:linear-gradient(180deg, rgba(23,29,37,.94), rgba(9,11,15,.97));overflow:hidden;padding:0
     }
-    .bundle .body::before{
+    .dispatch .body::before{
       content:"";position:absolute;inset:0;
       background:linear-gradient(180deg, rgba(255,255,255,.03), transparent 20%), linear-gradient(90deg, rgba(255,255,255,.02), transparent 18%, rgba(255,255,255,.02) 82%, transparent)
     }
-    .bundle .titlebar{
+    .dispatch .titlebar{
       position:absolute;left:12px;right:12px;top:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;color:#d9e2ea;
       font-size:12px;letter-spacing:.06em;text-transform:uppercase
     }
-    .bundle .pill{
+    .dispatch .pill{
       padding:6px 10px;border-radius:999px;border:1px solid rgba(86,176,255,.22);background:rgba(7,10,14,.62);color:var(--blue);font-size:10px;letter-spacing:.18em
     }
     .bundlegrid{
-      position:absolute;inset:50px 12px 12px;display:grid;grid-template-columns:1.2fr .8fr;gap:10px
+      position:absolute;inset:50px 12px 12px;display:grid;grid-template-columns:1fr;gap:10px
     }
     .card{
-      border:1px solid rgba(90,99,110,.16);border-radius:12px;background:rgba(7,10,14,.70);overflow:hidden
+      border:1px solid rgba(90,99,110,.16);border-radius:12px;background:rgba(7,10,14,.70);overflow:hidden;padding:12px
     }
-    .card .h{padding:10px 12px;border-bottom:1px solid var(--line2);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
-    .card .b{padding:12px}
-    .headline{font-size:18px;line-height:1.15;color:#f4f8fb;margin-bottom:8px}
-    .sub{font-size:11px;line-height:1.45;color:var(--muted)}
-    .rows{display:grid;gap:8px;padding:12px}
-    .row{display:flex;justify-content:space-between;gap:12px;font-size:11px;color:var(--muted)}
-    .row strong{color:#f4f8fb}
-    .metrics{display:flex;justify-content:space-between;gap:12px;padding:0 12px 12px;font-size:11px;color:var(--muted)}
-    .metrics strong{color:#f4f8fb}
-    .corners{position:absolute;inset:0;pointer-events:none}
-    .corner{position:absolute;width:24px;height:24px;border-style:solid;border-color:rgba(86,176,255,.22);opacity:.8}
-    .tl{left:10px;top:10px;border-width:1px 0 0 1px;border-top-left-radius:8px}
-    .tr{right:10px;top:10px;border-width:1px 1px 0 0;border-top-right-radius:8px}
-    .bl{left:10px;bottom:10px;border-width:0 0 1px 1px;border-bottom-left-radius:8px}
-    .br{right:10px;bottom:10px;border-width:0 1px 1px 0;border-bottom-right-radius:8px}
+    .card .h{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+    .card .headline{font-size:20px;line-height:1.14;color:#f4f8fb;margin-bottom:8px}
+    .card .sub{font-size:12px;line-height:1.35;color:var(--muted)}
+    .execution{
+      display:grid;grid-template-columns:repeat(3, 1fr);gap:10px;padding:0 14px 14px
+    }
+    .exec{
+      border:1px solid rgba(90,99,110,.18);border-radius:12px;background:rgba(7,10,14,.54);padding:10px 12px
+    }
+    .exec .top{display:flex;justify-content:space-between;gap:10px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+    .exec .top strong{color:#f4f8fb}
+    .exec .line{font-size:12px;line-height:1.45;color:#edf3f7}
+    .exec .state{margin-top:8px;font-size:11px;line-height:1.4;color:var(--muted)}
     .telemetry{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 14px 16px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
     .telemetry .peak{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid var(--line2);border-radius:999px;background:rgba(7,10,14,.6)}
     .telemetry .peak strong{color:var(--red)}
+
     .footer{
       display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 20px 16px;color:var(--muted);font-size:11px;letter-spacing:.16em;text-transform:uppercase
     }
@@ -222,83 +238,90 @@
       <div class="topbar">
         <div class="lights" aria-hidden="true"><span class="r"></span><span class="y"></span><span class="g"></span></div>
         <div>skill-oracle live demo</div>
-        <div>unified index • routing • fallback</div>
+        <div>scan • rank • execute</div>
       </div>
 
       <div class="header">
         <div class="brand">
           <div class="name">skill-oracle</div>
-          <div class="desc">find the right skill before the work starts</div>
+          <div class="desc">routes tasks to the right agents and skills</div>
         </div>
-        <div class="live"><span class="dot"></span> live • 5,000+ assets indexed</div>
+        <div class="live"><span class="dot"></span> live • indexed assets ready</div>
       </div>
 
-      <div class="hero">
-        <section class="panel mission">
+      <div class="content">
+        <section class="panel">
           <div class="ph">
             <div class="pt">
-              <strong>user task</strong>
-              <span>what the operator typed</span>
+              <strong>user request</strong>
+              <span>operator input</span>
             </div>
             <div class="badge"><span class="mini"></span> bootstrap</div>
           </div>
           <div class="body">
-            <div class="task">
-              <div class="eyebrow">input</div>
-              <p>Preciso de uma skill para login, dashboard e motion. Quero achar a melhor de forma rapida, sem vasculhar o workspace inteiro.</p>
-              <div class="small">skill-oracle reads the task, scans Skills / Agents / Plugins / MCP servers, and returns the best match plus a fallback path.</div>
+            <div class="mission-note">
+              <div class="eyebrow">the problem</div>
+              <p>There is a task, but the right skill is buried inside the workspace.</p>
+              <div class="small">skill-oracle reads the prompt and finds the best Skills, Agents, Plugins, or MCP servers for the context.</div>
             </div>
-
             <div class="prompt">
-              <div class="q">oracle-bootstrap</div>
-              bootstrap -> fresh index -> preflight ok
+              <div class="q">prompt</div>
+              <div class="txt">Quero implementar login, dashboard e motion. Se existir uma skill melhor, me mostra os agentes certos e o que cada um executa.</div>
+              <div class="tags">
+                <span class="tag blue">login</span>
+                <span class="tag green">dashboard</span>
+                <span class="tag violet">motion</span>
+                <span class="tag">context aware</span>
+              </div>
             </div>
-
-            <div class="statusbox">
-              <div class="statusrow"><strong>runtime</strong><span class="ok">Codex / Overclock ready</span></div>
-              <div class="statusrow"><strong>index</strong><span class="ok">fresh unified inventory</span></div>
-              <div class="statusrow"><strong>mode</strong><span>local selector + master routing</span></div>
+            <div class="meta">
+              <div class="meta-row"><strong>runtime</strong><span class="ok">Codex / Overclock</span></div>
+              <div class="meta-row"><strong>index</strong><span class="ok">fresh unified inventory</span></div>
+              <div class="meta-row"><strong>fallback</strong><span>find-skills ready</span></div>
             </div>
           </div>
         </section>
 
         <section class="center">
-          <div class="pane">
+          <div class="scan">
             <div class="bar">
-              <div class="left"><span class="status-dot"></span><span>scan</span></div>
+              <div class="left"><span class="status-dot"></span><span>index scan</span></div>
               <div class="score">9,599 assets / 20 domains</div>
             </div>
-            <div class="scan">
-              <div class="line"><span>scanning skills, agents, plugins, mcp</span><span class="accent">live</span></div>
-              <div class="line dim"><span>detect intent: login / dashboard / motion</span><span>ui-shell</span></div>
-              <div class="line dim"><span>score semantic signals from SKILL.md</span><span>content</span></div>
-              <div class="line"><span>boost domains: design, web, security</span><span class="warn">adjacent</span></div>
-              <div class="line dim"><span>ignore analytics unless explicit</span><span>guardrail</span></div>
-              <div class="line"><span>fallback ready: find-skills</span><span class="accent">armed</span></div>
+            <div class="log">
+              <div class="row"><span>scan skills, agents, plugins, mcp</span><span class="accent">live</span></div>
+              <div class="row dim"><span>detect intent: login / dashboard / motion</span><span>ui-shell</span></div>
+              <div class="row dim"><span>score semantic signals from SKILL.md</span><span>content</span></div>
+              <div class="row"><span>boost design, web, security</span><span class="warn">adjacent</span></div>
+              <div class="row dim"><span>ignore analytics unless explicit</span><span>guardrail</span></div>
+              <div class="row"><span>fallback path stays armed</span><span class="accent">find-skills</span></div>
             </div>
             <div class="footer"><div class="fill" style="width:82%"></div><div class="shimmer" style="left:-120px"></div></div>
           </div>
 
-          <div class="pane">
+          <div class="agents">
             <div class="bar">
-              <div class="left"><span class="status-dot" style="background:var(--green);box-shadow:0 0 0 6px rgba(39,208,123,.11)"></span><span>ranked bundle</span></div>
-              <div class="score">confidence high</div>
+              <div class="left"><span class="status-dot" style="background:var(--green);box-shadow:0 0 0 6px rgba(39,208,123,.11)"></span><span>selected agents</span></div>
+              <div class="score">dispatching</div>
             </div>
-            <div class="rank">
-              <div class="candidate">
+            <div class="agent-list">
+              <div class="agent">
                 <div class="top"><strong>oracle-master-design</strong><span>top fit</span></div>
-                <div class="title">Best for motion-heavy UI structure, layout direction, and visual polish.</div>
+                <div class="title">Builds the visual structure and motion direction for the UI.</div>
+                <div class="sub">skill: design system, layout, motion polish</div>
                 <div class="bar2"><span style="width:92%"></span></div>
               </div>
-              <div class="candidate">
+              <div class="agent">
                 <div class="top"><strong>oracle-master-web</strong><span>support</span></div>
-                <div class="title">Covers login, dashboard, and front-end surface area for the request.</div>
-                <div class="bar2"><span style="width:84%"></span></div>
+                <div class="title">Implements login and dashboard surface area.</div>
+                <div class="sub">skill: frontend, shell, routing</div>
+                <div class="bar2"><span style="width:85%"></span></div>
               </div>
-              <div class="candidate">
+              <div class="agent">
                 <div class="top"><strong>oracle-master-security</strong><span>suggested</span></div>
-                <div class="title">Proactive guardrail when a login flow might need auth review.</div>
-                <div class="bar2"><span style="width:63%"></span></div>
+                <div class="title">Reviews auth and guards the login flow.</div>
+                <div class="sub">skill: security, session checks, review</div>
+                <div class="bar2"><span style="width:62%"></span></div>
               </div>
             </div>
           </div>
@@ -308,50 +331,60 @@
           <div class="panel">
             <div class="ph">
               <div class="pt">
-                <strong>output</strong>
-                <span>what oracle returns</span>
+                <strong>execution</strong>
+                <span>agents running context-aware skills</span>
               </div>
-              <div class="badge"><span class="mini"></span> dispatch</div>
+              <div class="badge"><span class="mini"></span> live</div>
             </div>
-            <div class="result">
-              <div class="bundle">
+            <div class="out">
+              <div class="dispatch">
                 <div class="head">
                   <div>final bundle</div>
-                  <div class="liveb">live answer</div>
+                  <div class="liveb">answer ready</div>
                 </div>
                 <div class="body">
                   <div class="titlebar">
-                    <div>recommended path for this task</div>
-                    <div class="pill">start free</div>
+                    <div>what oracle returns</div>
+                    <div class="pill">dispatch plan</div>
                   </div>
                   <div class="bundlegrid">
-                    <div class="card">
-                      <div class="h">primary</div>
-                      <div class="b">
-                        <div class="headline">route to design + web.</div>
-                        <div class="sub">The task is about login, dashboard, and motion, so the Oracle returns the right domains instead of making you search manually.</div>
-                      </div>
-                    </div>
-                    <div class="card">
-                      <div class="h">fallback</div>
-                      <div class="rows">
-                        <div class="row"><strong>find-skills</strong><span>ready</span></div>
-                        <div class="row"><strong>master agents</strong><span>parallel</span></div>
-                        <div class="row"><strong>proactive</strong><span>security</span></div>
-                      </div>
-                      <div class="metrics">
-                        <span>rank <strong>1</strong></span>
-                        <span>latency <strong>fast</strong></span>
-                      </div>
-                    </div>
+                  <div class="card">
+                    <div class="h">best match</div>
+                    <div class="headline">route to design + web.</div>
+                    <div class="sub">Login, dashboard, and motion map to the right agents.</div>
                   </div>
+                  <div class="card">
+                    <div class="h">fallback</div>
+                    <div class="headline">find-skills stays ready.</div>
+                    <div class="sub">If the match is weak, Oracle falls back cleanly.</div>
+                  </div>
+                </div>
                 </div>
                 <div class="corners">
                   <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
                 </div>
               </div>
+
+              <div class="execution">
+                <div class="exec">
+                  <div class="top"><strong>design</strong><span>run</span></div>
+                <div class="line">creates the UI shell and motion system</div>
+                <div class="state">skill: layout, motion, polish</div>
+                </div>
+                <div class="exec">
+                  <div class="top"><strong>web</strong><span>run</span></div>
+                <div class="line">implements login and dashboard surfaces</div>
+                <div class="state">skill: routing, shell, frontend</div>
+                </div>
+                <div class="exec">
+                  <div class="top"><strong>security</strong><span>check</span></div>
+                <div class="line">reviews auth and session guardrails</div>
+                <div class="state">skill: login review, guardrails</div>
+                </div>
+              </div>
+
               <div class="telemetry">
-                <div>local selector -> master dispatch</div>
+                <div>local selector -> agent dispatch -> skill execution</div>
                 <div class="peak">fallback <strong>ready</strong></div>
               </div>
             </div>
@@ -361,7 +394,7 @@
 
       <div class="footer">
         <div>skill-oracle / demo of the real workflow</div>
-        <div>scan -> rank -> dispatch -> fallback</div>
+        <div>scan -> rank -> execute -> fallback</div>
       </div>
     </div>
   </div>
@@ -372,24 +405,23 @@
     tl.to(".grid", { backgroundPosition: "0 84px", duration: 13.5, ease: "none" }, 0);
     tl.to(".halo", { x: 18, y: -12, duration: 13.5, ease: "sine.inOut" }, 0);
     tl.fromTo(".header", { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.35, ease: "power2.out" }, 0.05);
-    tl.fromTo(".mission", { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.55, ease: "power3.out" }, 0.12);
-    tl.fromTo(".center", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.2);
-    tl.fromTo(".right", { opacity: 0, x: 28 }, { opacity: 1, x: 0, duration: 0.6, ease: "power3.out" }, 0.28);
-    tl.fromTo(".task", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.38, ease: "power2.out" }, 0.18);
-    tl.fromTo(".prompt", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.28, ease: "power2.out" }, 0.40);
-    tl.fromTo(".statusbox", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.30, ease: "power2.out" }, 0.52);
-    tl.fromTo(".scan .line", { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.30, stagger: 0.10, ease: "power2.out" }, 0.65);
-    tl.fromTo(".candidate", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.34, stagger: 0.10, ease: "power2.out" }, 1.30);
-    tl.fromTo(".fill", { scaleX: 0 }, { scaleX: 1, duration: 1.1, stagger: 0.08, ease: "power2.out" }, 0.95);
-    tl.fromTo(".shimmer", { x: -160 }, { x: 720, duration: 1.0, stagger: 0.08, ease: "none" }, 1.0);
-    tl.fromTo(".bundle", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 1.6);
-    tl.fromTo(".telemetry", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.28, ease: "power2.out" }, 1.95);
-    tl.fromTo(".footer", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.28, ease: "power2.out" }, 2.0);
-    tl.to(".dot", { boxShadow: "0 0 0 10px rgba(39,208,123,.08)", duration: 1.4, repeat: 1, yoyo: true, ease: "sine.inOut" }, 1.0);
-    tl.to(".badge .mini", { boxShadow: "0 0 0 10px rgba(39,208,123,.08)", duration: 1.4, repeat: 1, yoyo: true, ease: "sine.inOut" }, 1.08);
-    tl.to(".score", { color: "#8ef0aa", duration: 0.5, repeat: 1, yoyo: true, ease: "sine.inOut" }, 2.2);
+    tl.fromTo(".panel", { opacity: 0 }, { opacity: 1, duration: 0.3, stagger: 0.06, ease: "power2.out" }, 0.10);
+    tl.fromTo(".mission-note", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.30, ease: "power2.out" }, 0.18);
+    tl.fromTo(".prompt", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.30, ease: "power2.out" }, 0.36);
+    tl.fromTo(".meta", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.26, ease: "power2.out" }, 0.52);
+    tl.fromTo(".scan .log .row", { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.26, stagger: 0.09, ease: "power2.out" }, 0.60);
+    tl.fromTo(".agent", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.30, stagger: 0.10, ease: "power2.out" }, 1.10);
+    tl.fromTo(".fill", { scaleX: 0 }, { scaleX: 1, duration: 1.0, ease: "power2.out" }, 0.95);
+    tl.fromTo(".shimmer", { x: -160 }, { x: 720, duration: 1.0, ease: "none" }, 1.0);
+    tl.fromTo(".dispatch", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.40, ease: "power3.out" }, 0.82);
+    tl.fromTo(".card", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.30, stagger: 0.10, ease: "power2.out" }, 1.02);
+    tl.fromTo(".exec", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.26, stagger: 0.10, ease: "power2.out" }, 1.28);
+    tl.fromTo(".telemetry", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.26, ease: "power2.out" }, 1.45);
+    tl.fromTo(".footer", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.26, ease: "power2.out" }, 1.50);
+    tl.to(".dot", { boxShadow: "0 0 0 10px rgba(39,208,123,.08)", duration: 1.2, repeat: 1, yoyo: true, ease: "sine.inOut" }, 1.0);
+    tl.to(".badge .mini", { boxShadow: "0 0 0 10px rgba(39,208,123,.08)", duration: 1.2, repeat: 1, yoyo: true, ease: "sine.inOut" }, 1.08);
+    tl.to(".score", { color: "#8ef0aa", duration: 0.5, repeat: 1, yoyo: true, ease: "sine.inOut" }, 2.0);
     tl.to(".peak strong", { color: "#ff7b70", duration: 0.4, repeat: 1, yoyo: true, ease: "sine.inOut" }, 2.0);
-    tl.to(".pill", { boxShadow: "0 0 0 10px rgba(86,176,255,.05)", duration: 1.4, repeat: 1, yoyo: true, ease: "sine.inOut" }, 2.25);
     window.__timelines = window.__timelines || {};
     window.__timelines["skill-oracle-demo"] = tl;
   </script>
