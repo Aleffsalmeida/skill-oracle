@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>skill-oracle demo</title>
+  <style>
+    :root{
+      color-scheme: dark;
+      --bg:#05070a;
+      --panel:rgba(10,14,19,.96);
+      --panel-2:rgba(13,18,24,.96);
+      --line:rgba(105,119,132,.20);
+      --line-soft:rgba(105,119,132,.12);
+      --text:#edf4f8;
+      --muted:#7f8b95;
+      --green:#2dd67f;
+      --cyan:#67dfff;
+      --violet:#b07cff;
+      --amber:#efbe57;
+      --red:#ff6059;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:"IBM Plex Mono","JetBrains Mono","SFMono-Regular",monospace}
+    #stage{
+      position:relative;width:100%;height:100%;color:var(--text);
+      background:
+        radial-gradient(circle at 15% 16%, rgba(103,223,255,.13), transparent 24%),
+        radial-gradient(circle at 82% 18%, rgba(176,124,255,.11), transparent 24%),
+        radial-gradient(circle at 48% 86%, rgba(45,214,127,.09), transparent 28%),
+        linear-gradient(180deg,#0a0d12 0%, #05070a 100%);
+    }
+    .grid,.grain,.vignette,.glow{position:absolute;inset:0;pointer-events:none}
+    .grid{
+      opacity:.12;
+      background-image:
+        linear-gradient(rgba(121,134,148,.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(121,134,148,.08) 1px, transparent 1px);
+      background-size:112px 112px;
+    }
+    .grain{
+      opacity:.04;
+      background-image:
+        linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px);
+      background-size:68px 68px;
+      mix-blend-mode:screen;
+    }
+    .vignette{background:radial-gradient(circle at center, transparent 40%, rgba(0,0,0,.45) 100%)}
+    .glow::before,.glow::after{
+      content:"";position:absolute;border-radius:999px;filter:blur(26px);mix-blend-mode:screen;opacity:.9
+    }
+    .glow::before{
+      width:520px;height:520px;left:-140px;top:-120px;
+      background:radial-gradient(circle, rgba(103,223,255,.19) 0%, rgba(103,223,255,.05) 48%, transparent 74%);
+    }
+    .glow::after{
+      width:680px;height:680px;right:-150px;top:60px;
+      background:radial-gradient(circle, rgba(176,124,255,.18) 0%, rgba(176,124,255,.05) 52%, transparent 76%);
+    }
+    .shell{
+      position:absolute;inset:34px;border-radius:20px;border:1px solid rgba(105,119,132,.22);
+      background:rgba(7,10,14,.64);box-shadow:0 30px 90px rgba(0,0,0,.52), inset 0 1px 0 rgba(255,255,255,.03);
+      backdrop-filter:blur(18px);
+      overflow:hidden;
+    }
+    .topbar{
+      display:flex;align-items:center;justify-content:space-between;gap:14px;
+      height:34px;padding:0 16px;border-bottom:1px solid var(--line-soft);
+      color:var(--muted);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+      background:rgba(0,0,0,.22)
+    }
+    .lights{display:flex;gap:8px}
+    .lights span{width:10px;height:10px;border-radius:50%}
+    .lights .r{background:var(--red)}
+    .lights .y{background:var(--amber)}
+    .lights .g{background:var(--green)}
+    .hero{
+      display:flex;align-items:center;justify-content:space-between;gap:20px;
+      padding:14px 18px 12px;border-bottom:1px solid var(--line-soft);
+      min-height:72px
+    }
+    .brand{display:flex;align-items:center;gap:14px;min-width:0}
+    .brand .mark{
+      display:inline-flex;align-items:center;justify-content:center;
+      width:44px;height:44px;border-radius:14px;border:1px solid rgba(103,223,255,.20);
+      background:linear-gradient(180deg, rgba(8,12,16,.96), rgba(6,9,12,.92));
+      box-shadow:0 0 0 1px rgba(0,0,0,.32) inset, 0 0 30px rgba(103,223,255,.08);
+      color:var(--cyan);font-size:18px
+    }
+    .brand .copy{min-width:0}
+    .brand .name{
+      font-size:22px;line-height:1.05;letter-spacing:.22em;text-transform:uppercase;color:#f7fbfe;
+      white-space:nowrap
+    }
+    .brand .desc{
+      margin-top:4px;font-size:11px;line-height:1.35;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)
+    }
+    .status{
+      display:flex;align-items:center;gap:10px;white-space:nowrap;
+      color:var(--green);font-size:11px;letter-spacing:.18em;text-transform:uppercase
+    }
+    .pulse{
+      width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(45,214,127,.32)
+    }
+    .main{
+      display:grid;grid-template-columns:1.02fr 0.92fr 1.06fr;gap:14px;
+      padding:16px;height:calc(100% - 122px - 54px);
+    }
+    .panel{
+      display:flex;flex-direction:column;min-width:0;min-height:0;
+      border-radius:16px;border:1px solid var(--line);
+      background:linear-gradient(180deg, rgba(13,18,24,.96), rgba(8,11,15,.98));
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.03), 0 18px 32px rgba(0,0,0,.26);
+      overflow:hidden;
+    }
+    .panel-head{
+      display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+      padding:14px 14px 12px;border-bottom:1px solid var(--line-soft);
+      background:rgba(0,0,0,.18)
+    }
+    .panel-title{min-width:0}
+    .panel-title strong{
+      display:block;font-size:16px;line-height:1.2;letter-spacing:.08em;text-transform:uppercase;color:#f6fafc
+    }
+    .panel-title span{
+      display:block;margin-top:5px;font-size:10px;line-height:1.4;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)
+    }
+    .badge{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:7px 11px;border-radius:999px;border:1px solid rgba(103,223,255,.18);
+      background:rgba(6,9,12,.62);color:var(--cyan);
+      font-size:10px;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap
+    }
+    .badge .dot{
+      width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 5px rgba(45,214,127,.12)
+    }
+    .panel-body{display:flex;flex-direction:column;gap:12px;min-height:0;padding:14px}
+
+    .terminal{
+      border-radius:14px;border:1px solid rgba(105,119,132,.20);
+      background:linear-gradient(180deg, rgba(11,16,21,.98), rgba(7,10,14,.98));
+      overflow:hidden;position:relative
+    }
+    .terminal .bar{
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+      padding:10px 12px;border-bottom:1px solid var(--line-soft);background:rgba(0,0,0,.24)
+    }
+    .terminal .dots{display:flex;gap:8px}
+    .terminal .dots span{width:10px;height:10px;border-radius:50%}
+    .terminal .dots .r{background:var(--red)}
+    .terminal .dots .y{background:var(--amber)}
+    .terminal .dots .g{background:var(--green)}
+    .terminal .label{
+      font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);white-space:nowrap
+    }
+    .terminal .tag{
+      font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--green);white-space:nowrap
+    }
+    .terminal .body{
+      padding:14px 14px 16px;min-height:0;
+    }
+    .stream{
+      font-size:24px;line-height:1.45;color:#f0f5f8;white-space:pre-wrap;
+      text-shadow:0 0 18px rgba(255,255,255,.03)
+    }
+    .stream.small{font-size:18px;line-height:1.52}
+    .stream.tiny{font-size:15px;line-height:1.55;color:#dfe8ef}
+    .cursor{
+      display:inline-block;width:11px;height:1.15em;vertical-align:-.15em;margin-left:3px;background:var(--green);
+      box-shadow:0 0 14px rgba(45,214,127,.45)
+    }
+    .typing .cursor{animation:blink .9s steps(2,end) infinite}
+    @keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes typeReveal{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+    @keyframes caretBlink{0%,49%{border-right-color:var(--green)}50%,100%{border-right-color:transparent}}
+    .reveal{
+      opacity:1;
+    }
+    .typewriter{
+      display:block;
+      overflow:hidden;
+      white-space:pre-wrap;
+      border-right:0;
+    }
+
+    .left .terminal{flex:1;min-height:0}
+    .left .terminal .body{display:flex;flex-direction:column;gap:14px;height:100%}
+    .problem{
+      padding:14px 14px 12px;border-radius:12px;border:1px solid rgba(103,223,255,.20);
+      background:linear-gradient(180deg, rgba(10,14,19,.88), rgba(6,8,12,.86))
+    }
+    .problem .eyebrow{
+      font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--cyan);margin-bottom:10px
+    }
+    .problem .text{
+      font-size:18px;line-height:1.45;color:#f1f6f9
+    }
+    .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+    .chip{
+      padding:7px 10px;border-radius:999px;border:1px solid rgba(105,119,132,.20);
+      background:rgba(7,10,14,.60);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#dfe7ef
+    }
+    .chip.cyan{color:var(--cyan);border-color:rgba(103,223,255,.22)}
+    .chip.green{color:var(--green);border-color:rgba(45,214,127,.22)}
+    .chip.violet{color:var(--violet);border-color:rgba(176,124,255,.22)}
+    .chip.amber{color:var(--amber);border-color:rgba(239,190,87,.22)}
+    .left .prompt{
+      flex:1;display:flex;flex-direction:column;justify-content:flex-start;min-height:0
+    }
+    .hint{
+      margin-top:6px;font-size:11px;line-height:1.5;color:var(--muted)
+    }
+
+    .oracle{
+      display:flex;flex-direction:column;gap:12px;min-height:0;flex:1
+    }
+    .oracle-core{
+      position:relative;display:flex;align-items:center;justify-content:center;
+      height:180px;border-radius:16px;border:1px solid rgba(103,223,255,.18);
+      background:
+        radial-gradient(circle at 50% 50%, rgba(103,223,255,.17) 0, rgba(103,223,255,.04) 22%, transparent 56%),
+        radial-gradient(circle at 50% 50%, rgba(176,124,255,.16) 0, rgba(176,124,255,.04) 18%, transparent 58%),
+        linear-gradient(180deg, rgba(11,16,22,.96), rgba(6,8,11,.98));
+      overflow:hidden
+    }
+    .oracle-core::before,.oracle-core::after{
+      content:"";position:absolute;border-radius:50%;border:1px solid rgba(103,223,255,.18)
+    }
+    .oracle-core::before{inset:20px}
+    .oracle-core::after{inset:44px;border-color:rgba(176,124,255,.16)}
+    .oracle-core .ring{
+      position:absolute;width:120px;height:120px;border-radius:50%;
+      border:4px solid rgba(103,223,255,.36);
+      box-shadow:0 0 0 12px rgba(103,223,255,.04), 0 0 50px rgba(103,223,255,.14);
+    }
+    .oracle-core .ring::after{
+      content:"";position:absolute;inset:22px;border-radius:50%;
+      background:radial-gradient(circle, rgba(103,223,255,.98) 0%, rgba(176,124,255,.92) 46%, rgba(255,255,255,.0) 72%);
+      box-shadow:0 0 26px rgba(103,223,255,.45)
+    }
+    .oracle-core .label{
+      position:absolute;bottom:18px;left:18px;right:18px;text-align:center;
+      font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)
+    }
+    .oracle-log{
+      display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:14px;border:1px solid rgba(105,119,132,.18);
+      background:rgba(7,10,14,.56);min-height:0
+    }
+    .oracle-line{
+      display:flex;justify-content:space-between;gap:14px;align-items:flex-start;
+      font-size:16px;line-height:1.45;color:#edf3f7
+    }
+    .oracle-line .dim{color:var(--muted)}
+    .oracle-line .good{color:var(--green)}
+    .oracle-line .warn{color:var(--amber)}
+    .oracle-line .text,.match .title,.match .sub,.agent .task,.agent .detail,.summary .title,.summary .sub{
+      opacity:1;
+      animation:none;
+    }
+    .match-grid{
+      display:grid;grid-template-columns:repeat(2, minmax(0,1fr));gap:10px
+    }
+    .match{
+      padding:12px;border-radius:12px;border:1px solid rgba(105,119,132,.18);
+      background:rgba(7,10,14,.56)
+    }
+    .match .head{
+      display:flex;justify-content:space-between;gap:10px;
+      font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:8px
+    }
+    .match strong{color:#f6fafc}
+    .match .title{font-size:17px;line-height:1.35;color:#edf4f8}
+    .match .sub{margin-top:7px;font-size:12px;line-height:1.45;color:var(--muted)}
+    .oracle-footer{
+      display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:auto;
+      padding-top:2px;color:var(--muted);font-size:10px;letter-spacing:.18em;text-transform:uppercase
+    }
+    .oracle-footer .flag{
+      color:var(--green)
+    }
+
+    .swarm{
+      display:grid;grid-template-rows:auto 1fr auto;min-height:0;gap:12px
+    }
+    .swarm-top{
+      display:flex;justify-content:space-between;align-items:center;gap:12px
+    }
+    .swarm-top .title{
+      font-size:15px;letter-spacing:.18em;text-transform:uppercase;color:#f4f8fb
+    }
+    .swarm-top .small{
+      font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)
+    }
+    .agent-grid{
+      display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;min-height:0
+    }
+    .agent{
+      display:flex;flex-direction:column;min-width:0;border-radius:14px;border:1px solid rgba(105,119,132,.18);
+      background:linear-gradient(180deg, rgba(9,13,18,.96), rgba(6,8,11,.98));overflow:hidden
+    }
+    .agent .bar{
+      display:flex;justify-content:space-between;align-items:center;gap:10px;
+      padding:10px 11px;border-bottom:1px solid var(--line-soft);background:rgba(0,0,0,.20)
+    }
+    .agent .bar .name{
+      font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#f6fafc
+    }
+    .agent .bar .state{
+      font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--green)
+    }
+    .agent .body{
+      display:flex;flex-direction:column;gap:10px;padding:12px;min-height:0;flex:1
+    }
+    .agent .task{
+      font-size:16px;line-height:1.4;color:#edf4f8
+    }
+    .agent .detail{
+      font-size:12px;line-height:1.45;color:var(--muted)
+    }
+    .progress{
+      height:8px;border-radius:999px;border:1px solid rgba(105,119,132,.16);background:rgba(7,10,14,.86);overflow:hidden;margin-top:auto
+    }
+    .progress span{
+      display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--green),var(--violet));
+      box-shadow:0 0 16px rgba(103,223,255,.22)
+    }
+    .runline{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
+      padding:12px 0 0;color:var(--muted);font-size:10px;letter-spacing:.18em;text-transform:uppercase
+    }
+    .summary{
+      border-radius:14px;border:1px solid rgba(103,223,255,.18);
+      background:linear-gradient(180deg, rgba(10,14,19,.94), rgba(6,8,11,.96));
+      padding:12px 14px
+    }
+    .summary .kicker{
+      font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--cyan);margin-bottom:8px
+    }
+    .summary .title{
+      font-size:18px;line-height:1.35;color:#f5f9fc
+    }
+    .summary .sub{
+      margin-top:6px;font-size:12px;line-height:1.5;color:var(--muted)
+    }
+    .footer{
+      display:flex;align-items:center;justify-content:space-between;gap:16px;
+      height:54px;padding:0 20px;border-top:1px solid var(--line-soft);
+      color:var(--muted);font-size:11px;letter-spacing:.18em;text-transform:uppercase
+    }
+    .footer .strong{color:#edf4f8}
+  </style>
+</head>
+<body>
+  <div id="stage" data-composition-id="skill-oracle-demo-pt" data-start="0" data-duration="30" data-width="1920" data-height="1080" data-fps="30">
+    <div class="grid"></div>
+    <div class="grain"></div>
+    <div class="vignette"></div>
+    <div class="glow"></div>
+
+    <div class="shell">
+      <div class="topbar">
+        <div class="lights" aria-hidden="true"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+        <div>skill-oracle • demonstração</div>
+        <div>ler • ranquear • orquestrar</div>
+      </div>
+
+      <div class="hero">
+        <div class="brand">
+          <div class="mark">◉</div>
+          <div class="copy">
+            <div class="name">skill-oracle</div>
+            <div class="desc">um pedido simples vira um swarm de agentes certos, por contexto</div>
+          </div>
+        </div>
+        <div class="status"><span class="pulse"></span>ao vivo • analisando workspace</div>
+      </div>
+
+      <div class="main">
+        <section class="panel left">
+          <div class="panel-head">
+            <div class="panel-title">
+              <strong>entrada do usuário</strong>
+              <span>o problema começa com uma frase simples</span>
+            </div>
+            <div class="badge"><span class="dot"></span>terminal aberto</div>
+          </div>
+
+          <div class="panel-body">
+            <div class="problem">
+              <div class="eyebrow">situação real</div>
+              <div class="text reveal" id="problemText" style="--delay:0.8s">o usuário quer uma landing page animada, mas não sabe qual skill chamar nem como dividir o trabalho.</div>
+              <div class="hint">o usuário quer uma landing page animada, mas não sabe qual skill chamar nem como dividir o trabalho.</div>
+            </div>
+
+            <div class="terminal prompt">
+              <div class="bar">
+                <div class="dots"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+                <div class="label">prompt em português</div>
+                <div class="tag">digitando</div>
+              </div>
+              <div class="body">
+                <div class="stream typewriter" id="promptStream">oracle, quero uma landing page animada
+não sei qual skill usar. monta os agentes certos pra mim</div><span class="cursor" id="promptCursor"></span>
+              </div>
+            </div>
+
+            <div class="chips">
+              <span class="chip cyan">landing page</span>
+              <span class="chip violet">motion</span>
+              <span class="chip green">web</span>
+              <span class="chip amber">revisão</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">
+              <strong>oracle analisando</strong>
+              <span>lendo skills, agentes, plugins e mcp no contexto certo</span>
+            </div>
+            <div class="badge"><span class="dot"></span>scan ativo</div>
+          </div>
+
+          <div class="panel-body oracle">
+            <div class="oracle-core">
+              <div class="ring"></div>
+              <div class="label">oracle cruza intenção com capacidade instalada</div>
+            </div>
+
+            <div class="oracle-log">
+              <div class="oracle-line"><span class="text reveal" id="scanLine1" style="--delay:7.0s">lendo skills, agents, plugins e mcp...</span><span class="good">live</span></div>
+              <div class="oracle-line"><span class="text reveal dim" id="scanLine2" style="--delay:8.6s">contexto detectado: landing page / motion / web / copy</span><span>ui / motion / copy</span></div>
+              <div class="oracle-line"><span class="text reveal dim" id="scanLine3" style="--delay:10.1s">ranqueando melhor combinação para o projeto...</span><span>ranking</span></div>
+            </div>
+
+            <div class="match-grid">
+              <div class="match">
+                <div class="head"><strong>melhor rota</strong><span id="match1Score">0%</span></div>
+                <div class="title reveal" id="match1Title" style="--delay:11.9s">design + web + motion</div>
+                <div class="sub reveal" id="match1Sub" style="--delay:12.05s">melhor rota para hero animado, layout responsivo e CTA claro.</div>
+              </div>
+              <div class="match">
+                <div class="head"><strong>rota de apoio</strong><span id="match2Score">0%</span></div>
+                <div class="title reveal" id="match2Title" style="--delay:12.2s">revisão + fallback</div>
+                <div class="sub reveal" id="match2Sub" style="--delay:12.35s">se o sinal ficar fraco, Oracle chama find-skills e mantém o caminho limpo.</div>
+              </div>
+            </div>
+
+            <div class="oracle-footer">
+              <div>fallback <span class="flag">find-skills pronto</span></div>
+              <div>contexto identificado</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">
+              <strong>swarm de agentes</strong>
+              <span>cada terminal recebe uma parte do trabalho</span>
+            </div>
+            <div class="badge"><span class="dot"></span>4 agentes</div>
+          </div>
+
+          <div class="panel-body swarm">
+            <div class="swarm-top">
+              <div class="title">execução distribuída</div>
+              <div class="small">orquestração por contexto</div>
+            </div>
+
+            <div class="agent-grid">
+              <div class="agent">
+                <div class="bar"><div class="name">agente design</div><div class="state">ativo</div></div>
+                <div class="body">
+                  <div class="task reveal" id="agent1Task" style="--delay:13.2s">cria a hierarquia visual da landing page</div>
+                  <div class="detail reveal" id="agent1Detail" style="--delay:13.35s">skill aplicada: layout, tipografia, contraste e hero</div>
+                  <div class="progress"><span id="agent1Bar"></span></div>
+                </div>
+              </div>
+              <div class="agent">
+                <div class="bar"><div class="name">agente web</div><div class="state">ativo</div></div>
+                <div class="body">
+                  <div class="task reveal" id="agent2Task" style="--delay:14.5s">monta a estrutura responsiva e o CTA</div>
+                  <div class="detail reveal" id="agent2Detail" style="--delay:14.65s">skill aplicada: web, seções, estados e navegação</div>
+                  <div class="progress"><span id="agent2Bar"></span></div>
+                </div>
+              </div>
+              <div class="agent">
+                <div class="bar"><div class="name">agente motion</div><div class="state">ativo</div></div>
+                <div class="body">
+                  <div class="task reveal" id="agent3Task" style="--delay:15.8s">anima a entrada e os detalhes de movimento</div>
+                  <div class="detail reveal" id="agent3Detail" style="--delay:15.95s">skill aplicada: motion, timing e transições suaves</div>
+                  <div class="progress"><span id="agent3Bar"></span></div>
+                </div>
+              </div>
+              <div class="agent">
+                <div class="bar"><div class="name">agente revisão</div><div class="state">ativo</div></div>
+                <div class="body">
+                  <div class="task reveal" id="agent4Task" style="--delay:17.1s">valida leitura, clareza e consistência</div>
+                  <div class="detail reveal" id="agent4Detail" style="--delay:17.25s">skill aplicada: revisão, legibilidade e ajuste fino</div>
+                  <div class="progress"><span id="agent4Bar"></span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="summary">
+              <div class="kicker">resultado esperado</div>
+              <div class="title reveal" id="summaryTitle" style="--delay:22.0s">Oracle escolheu o swarm certo e distribuiu o trabalho por contexto.</div>
+              <div class="sub reveal" id="summarySub" style="--delay:22.3s">o usuário não precisou saber o nome da skill. ele só descreveu o objetivo, e a Oracle fez o resto.</div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="footer">
+        <div><span class="strong">skill-oracle</span> • resolve o problema de escolher a skill certa</div>
+        <div>analisar → selecionar → executar → devolver o bundle certo</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+    const promptCursor = document.getElementById("promptCursor");
+    const agent1Bar = document.getElementById("agent1Bar");
+    const agent2Bar = document.getElementById("agent2Bar");
+    const agent3Bar = document.getElementById("agent3Bar");
+    const agent4Bar = document.getElementById("agent4Bar");
+
+    const tl = gsap.timeline({ paused: true });
+
+    tl.fromTo(".shell", { opacity: 0, y: 12, scale: 0.99 }, { opacity: 1, y: 0, scale: 1, duration: 0.8, ease: "power3.out" }, 0.0);
+    tl.fromTo(".hero", { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 0.15);
+    tl.fromTo(".panel", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.45, stagger: 0.08, ease: "power2.out" }, 0.30);
+    tl.to(".grid", { backgroundPosition: "0 112px", duration: 30, ease: "none" }, 0);
+    tl.to(".glow", { x: 14, y: -12, duration: 30, ease: "sine.inOut" }, 0);
+    tl.to(promptCursor, { opacity: 0.2, duration: 0.8, repeat: 14, yoyo: true, ease: "sine.inOut" }, 1.9);
+    tl.fromTo(".match", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.35, stagger: 0.08, ease: "power2.out" }, 11.9);
+    tl.fromTo("#match1Score, #match2Score", { opacity: 0 }, { opacity: 1, duration: 0.2, stagger: 0.2 }, 11.5);
+
+    tl.fromTo(".agent", { opacity: 0, y: 18, scale: 0.98 }, { opacity: 1, y: 0, scale: 1, duration: 0.45, stagger: 0.12, ease: "power3.out" }, 13.0);
+
+    tl.to(agent1Bar, { width: "96%", duration: 4.0, ease: "power1.out" }, 13.4);
+    tl.to(agent2Bar, { width: "91%", duration: 4.0, ease: "power1.out" }, 14.7);
+    tl.to(agent3Bar, { width: "88%", duration: 4.0, ease: "power1.out" }, 16.0);
+    tl.to(agent4Bar, { width: "84%", duration: 4.0, ease: "power1.out" }, 17.3);
+
+    tl.to(".oracle-core .ring", { scale: 1.08, duration: 1.6, repeat: 5, yoyo: true, ease: "sine.inOut" }, 9.0);
+    tl.fromTo(".summary", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 21.5);
+
+    tl.to(".status", { color: "#88f1a4", duration: 1.2, repeat: 2, yoyo: true, ease: "sine.inOut" }, 24.0);
+    tl.to(".pulse", { boxShadow: "0 0 0 10px rgba(45,214,127,.10)", duration: 1.2, repeat: 2, yoyo: true, ease: "sine.inOut" }, 24.0);
+    tl.to(".footer", { color: "#b8c4ce", duration: 0.5 }, 26.5);
+
+    window.__timelines = window.__timelines || {};
+    window.__timelines["skill-oracle-demo-pt"] = tl;
+  </script>
+</body>
+</html>

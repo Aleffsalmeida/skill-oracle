@@ -1,0 +1,133 @@
+'use strict';
+
+/**
+ * oracle-smoke-test.js - validates the local/Codex Oracle path.
+ *
+ * This smoke test does not require Claude Code's Task dispatcher. It checks
+ * the index, master-agent installation, query ranking, and helper scripts.
+ */
+
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const { spawnSync } = require('child_process');
+const { loadIndex, selectAssets, DEFAULT_INDEX } = require('./oracle-query');
+const { main: runRegression } = require('./oracle-regression-test');
+
+const HOME = os.homedir();
+const CLAUDE_ROOT = path.join(HOME, '.claude');
+const AGENTS_ROOT = path.join(CLAUDE_ROOT, 'agents');
+const REQUIRED_SCRIPTS = [
+  'oracle-bootstrap.js',
+  'scanner.js',
+  'classifier.js',
+  'gen-masters.js',
+  'install-agents.js',
+  'auto-rebuild.js',
+  'optimizer.js',
+  'oracle-query.js',
+  'oracle-regression-test.js',
+];
+
+const REQUIRED_ROOT_FILES = [
+  path.join(__dirname, '..', 'oracle-manifest.json'),
+];
+
+function assertCheck(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+function checkScripts() {
+  for (const script of REQUIRED_SCRIPTS) {
+    const full = path.join(__dirname, script);
+    assertCheck(fs.existsSync(full), `missing script: ${full}`);
+  }
+  for (const file of REQUIRED_ROOT_FILES) {
+    assertCheck(fs.existsSync(file), `missing root file: ${file}`);
+  }
+}
+
+function checkIndex(idx) {
+  assertCheck(idx.version === 2, 'oracle-index.json must use schema version 2');
+  assertCheck(idx.stats && idx.stats.total > 0, 'index stats.total must be > 0');
+  assertCheck(Array.isArray(idx.assets) && idx.assets.length === idx.stats.total, 'assets length must match stats.total');
+  assertCheck(Array.isArray(idx.domains) && idx.domains.length === 20, 'index must contain 20 domains');
+  assertCheck(idx.domains.every((d) => d.id && d.master_agent), 'all domains must include id and master_agent');
+}
+
+function checkAgents(idx) {
+  assertCheck(fs.existsSync(AGENTS_ROOT), `agents directory not found: ${AGENTS_ROOT}`);
+  const expected = idx.domains.map((d) => `${d.master_agent}.md`);
+  const missing = expected.filter((file) => !fs.existsSync(path.join(AGENTS_ROOT, file)));
+  assertCheck(missing.length === 0, `missing master agents: ${missing.join(', ')}`);
+}
+
+async function checkQuery(idx) {
+  const task = 'build a React dashboard with Stripe billing and Playwright tests';
+  const result = await selectAssets(idx, task, { limit: 5 });
+  for (const domain of ['web-dev', 'testing-qa', 'finance-billing']) {
+    assertCheck(result.domains.includes(domain), `query should include domain ${domain}`);
+  }
+  assertCheck(result.picks.length > 0, 'query should return at least one strong pick');
+}
+
+function checkPreflight() {
+  const full = path.join(__dirname, 'oracle-query.js');
+  const attempt = () => spawnSync(process.execPath, [full, '--preflight'], { encoding: 'utf8', timeout: 120000 });
+  let result = attempt();
+  if (result.status !== 0) {
+    const bootstrap = path.join(__dirname, 'oracle-bootstrap.js');
+    const repair = spawnSync(process.execPath, [bootstrap, '--install'], { encoding: 'utf8', timeout: 180000 });
+    assertCheck(repair.status === 0, `oracle-bootstrap repair failed: ${repair.stderr || repair.stdout}`);
+    result = attempt();
+  }
+  assertCheck(result.status === 0, `oracle-query preflight failed: ${result.stderr || result.stdout}`);
+  assertCheck(/Oracle preflight: ready/i.test(result.stdout), 'preflight should report ready');
+}
+
+function checkAutoRebuild() {
+  const full = path.join(__dirname, 'auto-rebuild.js');
+  const result = spawnSync(process.execPath, [full], { encoding: 'utf8', timeout: 120000 });
+  assertCheck(result.status === 0, `auto-rebuild failed: ${result.stderr || result.stdout}`);
+}
+
+async function checkRegression() {
+  await runRegression();
+}
+
+async function main() {
+  const checks = [
+    ['scripts present', () => checkScripts()],
+    ['index valid', () => checkIndex(loadIndex(DEFAULT_INDEX))],
+    ['master agents installed', () => checkAgents(loadIndex(DEFAULT_INDEX))],
+    ['local query works', () => checkQuery(loadIndex(DEFAULT_INDEX))],
+    ['preflight works', () => checkPreflight()],
+    ['regression cases pass', () => checkRegression()],
+    ['auto-rebuild works', () => checkAutoRebuild()],
+  ];
+
+  const passed = [];
+  for (const [label, fn] of checks) {
+    await fn();
+    passed.push(label);
+    console.log(`ok - ${label}`);
+  }
+
+  const idx = loadIndex(DEFAULT_INDEX);
+  console.log(`\nOracle smoke test passed: ${idx.stats.total} assets, ${idx.domains.length} domains.`);
+  return passed.length;
+}
+
+if (require.main === module) {
+  try {
+    main().catch((e) => {
+      console.error(`[oracle-smoke-test] failed: ${e.message}`);
+      process.exitCode = 1;
+    });
+  } catch (e) {
+    console.error(`[oracle-smoke-test] failed: ${e.message}`);
+    process.exitCode = 1;
+  }
+}
+
+module.exports = { main };

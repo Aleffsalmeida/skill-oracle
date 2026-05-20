@@ -1,0 +1,12 @@
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+.sonar/
+oracle-index.json
+oracle-embeddings.json
+settings.json
+settings.json.oracle-*.bak
+*.bak
+*.tmp
+*.swp
