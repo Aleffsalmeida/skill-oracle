@@ -1298,11 +1298,61 @@ function parallelExecutionPlan(task, domains, preflight) {
   return {
     recommended: workstreams.length >= 2,
     executor: visiblePaneExecutor ? 'pane_spawn' : 'visible-pane-required',
+    model: visiblePaneExecutor ? null : null,
     reason: visiblePaneExecutor
       ? 'Independent workstreams can run in visible Overclock panes.'
       : 'Use visible panes/agents only; do not use invisible Task subagents in Overclock.',
     orchestrationPolicy: overclockOrchestrationPolicy(workstreams.length >= 2),
     workstreams: workstreams.slice(0, 4),
+  };
+}
+
+function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, executor, preflight }) {
+  const executorName = normalize(executor?.name || '');
+  const runtimeName = normalize(preflight?.preflight?.runtime || preflight?.runtime || '');
+  const visiblePanes = executorName === 'pane_spawn' || parallelPlan?.executor === 'pane_spawn';
+  const selectedModel = runtimeName === 'claude-code'
+    ? modelHints?.claude || null
+    : modelHints?.codex || modelHints?.claude || null;
+  const mode = parallelPlan?.recommended ? 'parallel' : 'single';
+
+  return {
+    mode,
+    host: visiblePanes ? 'overclock' : 'local',
+    complexity: modelHints?.complexity || 'simple',
+    models: {
+      claude: modelHints?.claude || null,
+      codex: modelHints?.codex || null,
+    },
+    selected_model: selectedModel,
+    selected_model_reason:
+      modelHints?.complexity === 'simple'
+        ? 'Simple task; use the cheapest safe model.'
+        : modelHints?.complexity === 'medium'
+          ? 'Moderate task; use a mid-tier model.'
+          : 'Heavy task; use the strongest model available.',
+    execution_target_count: Math.max(picks.length, bundle.length),
+    execution_required: picks.map((asset) => ({
+      name: asset.name,
+      type: asset.type,
+      domain: asset.domain,
+      invoke: asset.invoke,
+      model: selectedModel,
+    })),
+    parallel_workstreams: parallelPlan?.recommended
+      ? parallelPlan.workstreams.map((item) => ({
+          description: item,
+          executor: parallelPlan.executor,
+          model: selectedModel,
+        }))
+      : [],
+    notes: [
+      visiblePanes
+        ? 'Spawn one visible pane per independent workstream and pass the selected model explicitly.'
+        : 'Host does not expose visible panes; execute in the current runtime or route to a supported executor.',
+      'Do not downgrade execution-ready picks into discovery-only recommendations.',
+      'If a pane is spawned, complete pane_write -> pane_wait_idle -> pane_read before treating the workstream as active.',
+    ],
   };
 }
 
@@ -1469,6 +1519,15 @@ async function selectAssets(idx, task, options = {}) {
   const fallbackRecommended = picks.length === 0;
   const processWorkflow = workflowRecommendations(idx, task, finalDomainIds);
   const parallelPlan = parallelExecutionPlan(task, finalDomainIds, options.preflight || { executor });
+  const dispatchPlan = buildDispatchPlan({
+    task,
+    picks,
+    bundle,
+    parallelPlan,
+    modelHints,
+    executor,
+    preflight: options.preflight,
+  });
 
   return {
     task,
@@ -1488,6 +1547,7 @@ async function selectAssets(idx, task, options = {}) {
     suggestions: proactiveSuggestions(task, finalDomainIds, idx),
     processWorkflow,
     parallelPlan,
+    dispatchPlan,
     fallbackRecommended,
     fallback: fallbackRecommended ? fallbackGuidance(task) : null,
     modelHints,
@@ -1548,6 +1608,13 @@ function formatResult(result) {
   if (result.embeddingUsed) lines.push('Mode: semantic (keyword + embedding hybrid)');
   if (result.modelHints) {
     lines.push(`Model hint: ${result.modelHints.complexity} | Claude=${result.modelHints.claude} | Codex=${result.modelHints.codex}`);
+  }
+  if (result.dispatchPlan) {
+    lines.push(`Execution plan: ${result.dispatchPlan.mode} on ${result.dispatchPlan.host}`);
+    lines.push(`Selected model: ${result.dispatchPlan.selected_model || 'n/a'} (${result.dispatchPlan.selected_model_reason})`);
+    if (result.dispatchPlan.models) {
+      lines.push(`Model matrix: Claude=${result.dispatchPlan.models.claude || 'n/a'} | Codex=${result.dispatchPlan.models.codex || 'n/a'}`);
+    }
   }
   if (result.synthesis && result.synthesis.reasoning) {
     lines.push('LLM synthesis: active');
@@ -1622,6 +1689,14 @@ function formatResult(result) {
     for (const s of result.suggestions) {
       lines.push(`- ${s.domain} (${s.master_agent}) - ${s.asset_count} assets`);
     }
+  }
+
+  if (result.dispatchPlan?.parallel_workstreams?.length) {
+    lines.push('');
+    lines.push('Dispatch workstreams:');
+    result.dispatchPlan.parallel_workstreams.forEach((item, index) => {
+      lines.push(`  ${index + 1}. ${item.description} -> ${item.executor} using ${item.model || 'runtime-default model'}`);
+    });
   }
 
   return lines.join('\n');
