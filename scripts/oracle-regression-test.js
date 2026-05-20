@@ -9,6 +9,7 @@ const {
   parallelExecutionPlan,
   resolveSkillInvocation,
 } = require('./oracle-query');
+const { detectExecutor } = require('./oracle-bootstrap');
 
 function assertCheck(condition, message) {
   if (!condition) throw new Error(message);
@@ -315,6 +316,27 @@ async function main() {
     Array.isArray(overclockResult.executionManifest?.workstreams) &&
       overclockResult.executionManifest.workstreams.every((workstream) => workstream.pane_write?.submit === true),
     'Overclock workstreams must require pane_write submit=true'
+  );
+  assertCheck(
+    detectExecutor('antigravity').name === 'agy',
+    `expected antigravity runtime to resolve to agy, got ${detectExecutor('antigravity').name}`
+  );
+  const antigravityResult = await selectAssets(
+    idx,
+    'refazer o projeto Estrelagithub com leaderboard premium, Supabase e GitHub OAuth',
+    { preflight: { preflight: { executor: { name: 'agy' }, runtime: 'Antigravity' } } }
+  );
+  assertCheck(
+    antigravityResult.dispatchPlan?.host_adapter?.adapter === 'antigravity-cli-adapter',
+    `expected antigravity-cli-adapter, got ${antigravityResult.dispatchPlan?.host_adapter?.adapter}`
+  );
+  assertCheck(
+    antigravityResult.dispatchPlan?.host_adapter?.supported === true,
+    'antigravity must be treated as a first-class host'
+  );
+  assertCheck(
+    antigravityResult.parallelPlan?.executor === 'agy',
+    `expected antigravity parallel executor to be agy, got ${antigravityResult.parallelPlan?.executor}`
   );
   for (const report of reports) {
     console.log(`ok - ${report.name}: ${report.domains.join(', ')} -> picks ${report.picks.join(', ')} | bundle ${report.bundle.join(', ')}`);

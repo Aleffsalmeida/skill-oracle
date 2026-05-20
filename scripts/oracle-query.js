@@ -54,6 +54,7 @@ const PREFERRED_EXECUTION_PROVIDER_ORDER = [
   'mimo-DMlOoB',
   'claude-oauth',
 ];
+const FIRST_CLASS_HOSTS = new Set(['overclock', 'claude-code', 'codex', 'antigravity']);
 const PREFERRED_SKILLS = new Set([
   'skill-oracle',
   'awesome-design-md',
@@ -353,6 +354,34 @@ function fallbackGuidance(task) {
       'Rerun Oracle or start a new session; the inventory signature will trigger an automatic rebuild.',
       'Oracle will classify it into the right domain/master agent and use it on the next query.',
     ],
+  };
+}
+
+function buildHostAdapterPolicy(runtimeName, executorName, visiblePanes) {
+  const supported = FIRST_CLASS_HOSTS.has(runtimeName);
+  const adapter =
+    runtimeName === 'overclock' ? 'overclock-pane-adapter'
+      : runtimeName === 'claude-code' ? 'claude-task-adapter'
+        : runtimeName === 'codex' ? 'codex-local-adapter'
+          : runtimeName === 'antigravity' ? 'antigravity-cli-adapter'
+            : 'fallback-standard-adapter';
+  return {
+    runtime: runtimeName || 'unknown',
+    supported,
+    adapter,
+    execution_mode: visiblePanes
+      ? 'visible-pane-swarm'
+      : runtimeName === 'claude-code'
+        ? 'task-subagents'
+        : runtimeName === 'antigravity'
+          ? 'cli-adapter'
+          : 'local-manifest',
+    fallback_recommendations: supported
+      ? []
+      : ['overclock', 'claude-code', 'codex', 'antigravity'],
+    note: supported
+      ? 'First-class host: Oracle can adapt natively.'
+      : 'Unsupported host: Oracle should recommend one of the first-class standards.',
   };
 }
 
@@ -1733,6 +1762,7 @@ function workflowRecommendations(idx, task, domains) {
 function parallelExecutionPlan(task, domains, preflight) {
   const text = normalize(task);
   const executorName = normalize(preflight?.preflight?.executor?.name || preflight?.executor?.name || '');
+  const runtimeName = normalize(preflight?.preflight?.runtime || preflight?.runtime || '');
   const visiblePaneExecutor = executorName === 'pane_spawn';
   const multiStepRisk = /\b(parallel|architecture|arquitetura|api|schema|migration|migracao|migração|soft delete|lixeira|rls|security|seguranca|segurança|test|tests|teste|testes|playwright|multi-step|end-to-end|cross-domain|banco de dados|database|auth|checkout|payment|pagamento|stripe|pix)\b/.test(text);
   const heavy = domains.length >= 3 || (domains.length >= 2 && multiStepRisk);
@@ -1763,11 +1793,25 @@ function parallelExecutionPlan(task, domains, preflight) {
 
   return {
     recommended: workstreams.length >= 2,
-    executor: visiblePaneExecutor ? 'pane_spawn' : 'visible-pane-required',
+    executor: visiblePaneExecutor
+      ? 'pane_spawn'
+      : runtimeName === 'claude-code'
+        ? 'Task'
+        : runtimeName === 'codex'
+          ? 'oracle-query.js'
+          : runtimeName === 'antigravity'
+            ? 'agy'
+            : 'visible-pane-required',
     model: visiblePaneExecutor ? null : null,
     reason: visiblePaneExecutor
       ? 'Independent workstreams can run in visible Overclock panes.'
-      : 'Use visible panes/agents only; do not use invisible Task subagents in Overclock.',
+      : runtimeName === 'claude-code'
+        ? 'Use Claude Code Task subagents for independent workstreams.'
+        : runtimeName === 'codex'
+          ? 'Use the Codex local runner and manifest execution.'
+          : runtimeName === 'antigravity'
+            ? 'Use the Antigravity CLI adapter and local manifest execution.'
+            : 'Use visible panes/agents only; do not use invisible Task subagents in Overclock.',
     orchestrationPolicy: overclockOrchestrationPolicy(workstreams.length >= 2),
     workstreams: workstreams.slice(0, 4),
   };
@@ -1834,10 +1878,11 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
 
   return {
     mode,
-    host: visiblePanes ? 'overclock' : 'local',
+    host: visiblePanes ? 'overclock' : (FIRST_CLASS_HOSTS.has(runtimeName) ? runtimeName : 'local'),
     complexity: modelHints?.complexity || 'simple',
     selected_provider: selectedProviderId,
     selected_provider_reason: executionTarget.reason,
+    host_adapter: buildHostAdapterPolicy(runtimeName, executorName, visiblePanes),
     models: {
       claude: modelHints?.claude || null,
       codex: modelHints?.codex || null,
@@ -1912,9 +1957,12 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
       visiblePanes
         ? 'Spawn one visible pane per independent workstream, pass the selected provider and selected model explicitly, and submit the prompt immediately.'
         : 'Host does not expose visible panes; execute in the current runtime or route to a supported executor.',
+      !FIRST_CLASS_HOSTS.has(runtimeName)
+        ? 'If the host cannot adapt cleanly, recommend the first-class standards: Overclock, Claude Code, Codex, or Antigravity CLI.'
+        : null,
       'Do not downgrade execution-ready picks into discovery-only recommendations.',
       'If a pane is spawned, complete pane_write -> pane_wait_idle -> pane_read before treating the workstream as active.',
-    ],
+    ].filter(Boolean),
   };
 }
 
@@ -1957,9 +2005,11 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
     task,
     runtime: preflight?.preflight?.runtime || 'unknown',
     executor: dispatchPlan?.host || 'local',
+    host_adapter: dispatchPlan?.host_adapter || null,
     selected_provider: dispatchPlan?.selected_provider || null,
     selected_model: dispatchPlan?.selected_model || null,
     provider_inventory: dispatchPlan?.provider_inventory || null,
+    supported_hosts: ['overclock', 'claude-code', 'codex', 'antigravity'],
     host_contract: {
       visible_panes: visiblePanes,
       dispatch_style: visiblePanes ? 'visible-pane-swarm' : 'local-plan',
@@ -2253,6 +2303,14 @@ function formatResult(result) {
   }
   if (result.dispatchPlan) {
     lines.push(`Execution plan: ${result.dispatchPlan.mode} on ${result.dispatchPlan.host}`);
+    if (result.dispatchPlan.host_adapter) {
+      lines.push(`Host adapter: ${result.dispatchPlan.host_adapter.adapter} (${result.dispatchPlan.host_adapter.execution_mode})`);
+      if (result.dispatchPlan.host_adapter.supported) {
+        lines.push('Host class: first-class');
+      } else if (Array.isArray(result.dispatchPlan.host_adapter.fallback_recommendations) && result.dispatchPlan.host_adapter.fallback_recommendations.length) {
+        lines.push(`Host class: unsupported; recommend ${result.dispatchPlan.host_adapter.fallback_recommendations.join(', ')}`);
+      }
+    }
     lines.push(`Selected model: ${result.dispatchPlan.selected_model || 'n/a'} (${result.dispatchPlan.selected_model_reason})`);
     if (result.dispatchPlan.models) {
       lines.push(`Model matrix: Claude=${result.dispatchPlan.models.claude || 'n/a'} | Codex=${result.dispatchPlan.models.codex || 'n/a'}`);
@@ -2260,6 +2318,9 @@ function formatResult(result) {
   }
   if (result.executionManifest) {
     lines.push(`Execution manifest: ${result.executionManifest.version} (${result.executionManifest.host_contract.dispatch_style})`);
+    if (Array.isArray(result.executionManifest.supported_hosts)) {
+      lines.push(`Supported hosts: ${result.executionManifest.supported_hosts.join(', ')}`);
+    }
     lines.push(`State machine: ${result.executionManifest.host_contract.state_machine.join(' -> ')}`);
     lines.push(`Workstreams: ${result.executionManifest.workstreams.length}`);
   }

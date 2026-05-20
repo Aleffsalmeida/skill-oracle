@@ -61,6 +61,15 @@ Every asset carries a `domain` and `master_agent` tag in the index. In Claude Co
 
 Overclock pane execution must use the verified local provider inventory. Oracle must not choose a provider that is not present in the current install, and it must always submit pane prompts with `pane_write submit=true` rather than leaving them visible at a shell prompt.
 
+First-class host standards are:
+
+- `Overclock`
+- `Claude Code`
+- `Codex`
+- `Antigravity CLI`
+
+Any other IDE/CLI/terminal should be treated as an adapter target. If Oracle cannot adapt cleanly, it should recommend one of the four standards above instead of pretending to support the host natively.
+
 The local path is not a per-domain LLM orchestration layer. It is a semantic selector that approximates the master-agent bundle by combining:
 
 - `name`, `description`, and classification keywords

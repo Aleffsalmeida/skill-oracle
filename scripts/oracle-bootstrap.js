@@ -21,6 +21,7 @@ const SESSION_HOOK_COMMAND = 'node ~/.claude/skills/skill-oracle/scripts/auto-re
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 10000;
 const REQUIRED_MASTER_COUNT = 20;
+const FIRST_CLASS_HOSTS = ['overclock', 'claude-code', 'codex', 'antigravity'];
 const GH_AUTH_CACHE = { checked: false, available: false };
 
 function readJson(filePath, fallback = null) {
@@ -85,7 +86,7 @@ function isInventoryChanged(index = null) {
 function detectRuntime() {
   const env = process.env;
   const forced = String(env.ORACLE_RUNTIME || '').trim().toLowerCase();
-  if (['overclock', 'codex', 'claude-code', 'local'].includes(forced)) {
+  if (['overclock', 'codex', 'claude-code', 'antigravity', 'local'].includes(forced)) {
     return forced === 'local' ? 'codex' : forced;
   }
 
@@ -108,10 +109,22 @@ function detectRuntime() {
     env.CLAUDE_HOME,
     env.CLAUDECODE,
   ];
+  const antigravityHints = [
+    env.ANTIGRAVITY,
+    env.ANTIGRAVITY_APP,
+    env.ANTIGRAVITY_HOME,
+    env.AGY,
+    env.AGY_HOME,
+    fs.existsSync(path.join(HOME, '.antigravity')),
+    fs.existsSync(path.join(HOME, 'AppData', 'Roaming', 'Antigravity')),
+    fs.existsSync(path.join(HOME, 'AppData', 'Local', 'agy')),
+    fs.existsSync(path.join(HOME, 'AppData', 'Local', 'antigravity')),
+  ];
   const hints = [
     ['overclock', overclockHints.some(Boolean)],
     ['codex', codexHints.some(Boolean)],
     ['claude-code', claudeHints.some(Boolean)],
+    ['antigravity', antigravityHints.some(Boolean)],
   ];
 
   for (const [runtime, hit] of hints) {
@@ -142,6 +155,13 @@ function detectExecutor(runtime) {
       kind: 'local-runner',
       dispatch: 'local ranked selection only',
       availability: 'available',
+      source: 'runtime-hints',
+    },
+    antigravity: {
+      name: 'agy',
+      kind: 'cli-runner',
+      dispatch: 'Antigravity CLI adapter with local manifest execution',
+      availability: 'inferred',
       source: 'runtime-hints',
     },
   };
@@ -178,7 +198,8 @@ function buildPreflightReport() {
   const runtimeKnown = runtime !== 'unknown';
   const executorReady = executor.name !== 'none' && executor.kind !== 'unknown';
   const requiredActions = [
-    !runtimeKnown ? 'Set up the host runtime so Oracle can identify Claude Code, Overclock, or Codex/local.' : null,
+    !runtimeKnown ? 'Set up the host runtime so Oracle can identify Claude Code, Overclock, Codex/local, or Antigravity CLI.' : null,
+    runtimeKnown && !FIRST_CLASS_HOSTS.includes(runtime) ? `Host "${runtime}" is not a first-class Oracle target. Use a supported adapter or fall back to our standards.` : null,
     !executorReady ? `Expose a supported executor (${executor.dispatch}).` : null,
     !indexExists ? 'Run Oracle bootstrap to build the unified index.' : null,
     indexExists && inventoryChanged ? 'Run Oracle bootstrap to analyze newly installed or changed skills, agents, plugins, or MCP servers.' : null,
@@ -210,6 +231,7 @@ function buildPreflightReport() {
       mastersInstalled < REQUIRED_MASTER_COUNT ? `Only ${mastersInstalled}/${REQUIRED_MASTER_COUNT} Oracle master agents are installed.` : null,
       runtime === 'unknown' ? 'Runtime could not be identified from local environment hints.' : null,
       executorReady ? null : `No supported executor is available for ${runtime}.`,
+      !FIRST_CLASS_HOSTS.includes(runtime) ? 'First-class hosts: Overclock, Claude Code, Codex, and Antigravity CLI.' : null,
     ].filter(Boolean),
   };
 }
