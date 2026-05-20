@@ -229,18 +229,19 @@ function shortcutExists(command, projectRoot = findProjectRoot()) {
   return null;
 }
 
-function resolveSkillInvocation(asset, task, executor = null, projectRoot = findProjectRoot()) {
+function resolveSkillInvocation(asset, task, options = {}, projectRoot = findProjectRoot()) {
   const skillName = asset?.name || '';
   if (!skillName) {
     return { invoke: 'Skill("unknown")', mechanism: 'skill', command: null, pinned: false };
   }
 
+  const executor = options?.executor || null;
+  const allowPaneSpawn = Boolean(options?.allowPaneSpawn);
   const skillPath = asset?.path || findLocalSkill(skillName);
   const skillText = skillPath ? readTextFile(skillPath) : '';
   const commands = parseSkillCommands(skillText);
   const target = normalizeTaskTarget(task);
   const command = selectSkillCommand(commands, task, skillName);
-  const executorName = normalize(executor?.name || process.env.ORACLE_EXECUTOR || '');
 
   if (commands.length > 0 && command) {
     const pinnedPath = shortcutExists(command.name, projectRoot);
@@ -267,7 +268,7 @@ function resolveSkillInvocation(asset, task, executor = null, projectRoot = find
     };
   }
 
-  if (executorName === 'pane_spawn') {
+  if (allowPaneSpawn && normalize(executor?.name || process.env.ORACLE_EXECUTOR || '') === 'pane_spawn') {
     return {
       invoke: `pane_spawn visible pane, then prompt it to use ${skillName}`,
       mechanism: 'pane_spawn',
@@ -288,6 +289,21 @@ function resolveSkillInvocation(asset, task, executor = null, projectRoot = find
     target,
     pinned_path: null,
   };
+}
+
+function executionPromptForAsset(asset, task, selectedModel) {
+  const target = asset?.invocation?.target || normalizeTaskTarget(task);
+  if (asset?.invocation?.mechanism === 'pane_spawn') {
+    const parts = [
+      `Spawn a visible pane and use ${asset.name} to complete the task.`,
+      `Task: ${task}`,
+    ];
+    if (target) parts.push(`Target: ${target}`);
+    if (selectedModel) parts.push(`Model: ${selectedModel}`);
+    parts.push('Execute the skill, wait for idle, and report back with the result.');
+    return parts.join('\n');
+  }
+  return null;
 }
 
 function fallbackGuidance(task) {
@@ -1162,7 +1178,7 @@ function scoreAsset(asset, taskTokens, activeCapabilityIntents = []) {
 
 function enrichRankedAsset(asset, domain, result, executor = null, task = '', projectRoot = findProjectRoot()) {
   const invocation = asset.type === 'skill'
-    ? resolveSkillInvocation(asset, task, executor, projectRoot)
+    ? resolveSkillInvocation(asset, task, { executor, allowPaneSpawn: false }, projectRoot)
     : {
         invoke: invocationHint(asset, task, executor, projectRoot),
         mechanism: null,
@@ -1222,7 +1238,7 @@ function assetTypeFit(asset, task) {
 
 function invocationHint(asset, task, executor = null, projectRoot = findProjectRoot()) {
   if (asset.type === 'skill') {
-    return resolveSkillInvocation(asset, task, executor, projectRoot).invoke;
+    return resolveSkillInvocation(asset, task, { executor, allowPaneSpawn: false }, projectRoot).invoke;
   }
   if (asset.type === 'agent') {
     const executorName = normalize(executor?.name || process.env.ORACLE_EXECUTOR || '');
@@ -1474,7 +1490,7 @@ function workflowRecommendations(idx, task, domains) {
     })
     .map((name) => {
       const asset = findAssetByName(idx, name);
-      const resolved = asset ? resolveSkillInvocation(asset, task, null, projectRoot) : null;
+      const resolved = asset ? resolveSkillInvocation(asset, task, { allowPaneSpawn: false }, projectRoot) : null;
       return {
         name,
         type: asset?.type || 'skill',
@@ -1609,6 +1625,7 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
       invoke: asset.invoke,
       mechanism: asset.invocation?.mechanism || null,
       command: asset.invocation?.command || null,
+      pane_prompt: executionPromptForAsset(asset, task, selectedModel),
       model: selectedModel,
     })),
     parallel_workstreams: parallelPlan?.recommended
