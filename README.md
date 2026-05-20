@@ -1,4 +1,8 @@
-# skill-oracle — Universal Dynamic Orchestrator
+# skill-oracle — Universal Orchestrator for Skills, Agents, Plugins, and MCP
+
+<p align="center">
+  <img src="assets/oracle-logo.svg" alt="Oracle logo" width="540"/>
+</p>
 
 <p align="center">
   <a href="assets/demo.webm" aria-label="Open the full skill-oracle demo video">
@@ -14,19 +18,29 @@
   <img src="https://img.shields.io/badge/schema-v2-purple?style=flat-square" alt="schema"/>
 </p>
 
-**skill-oracle is the router for overloaded local AI setups.** It scans thousands of Skills, Agents, Plugins, and MCP servers, picks the best match for the task, and falls back cleanly when nothing is obvious.
+**skill-oracle is the orchestration layer for overloaded local AI setups.** It reads the task, scans the installed Skills, Agents, Plugins, and MCP servers, ranks the best fits, and hands work off to the right runtime path.
 
-It was built for a practical problem: when the right tool exists, but finding it across a huge workspace costs time, context, and attention.
+It was built to solve a specific problem: when the right tool already exists in the workspace, but finding it fast is harder than doing the work itself.
 
 ## Why it exists
 
-- Find the right asset before you start guessing
-- Route tasks to the right domain master agent or local selector
-- Keep motion, UI, security, analytics, docs, and backend work separated
-- Suggest adjacent domains that people often forget
-- Fall back to `find-skills` when nothing local is a strong fit
+- Stop the user from hunting through a huge workspace by hand
+- Turn a simple prompt into a ranked set of skills and agents
+- Keep adjacent domains visible without overwhelming the user
+- Route to the best runtime path for Claude Code, Overclock, or Codex/local
+- Fall back to `find-skills` when the local match is weak
 
 The full demo video is stored in [assets/demo.webm](assets/demo.webm). The inline preview above uses [assets/demo.gif](assets/demo.gif) because GitHub renders GIFs reliably in repository READMEs.
+
+---
+
+## What it does
+
+1. Read the task and detect the likely domains.
+2. Scan the unified index of Skills, Agents, Plugins, and MCP servers.
+3. Rank the best matches by context, capability, and intent.
+4. Dispatch to the right agents or local selector.
+5. Keep a clean fallback path when the match is weak or ambiguous.
 
 ---
 
@@ -43,17 +57,7 @@ The full demo video is stored in [assets/demo.webm](assets/demo.webm). The inlin
 
 The old `build-index.js` is preserved for backward compat. New pipeline is `scanner.js` -> `classifier.js` -> Master Agents.
 
-## How it works
-
-1. Read the task and detect the likely domains.
-2. Rank the best matching skills, agents, plugins, and MCP servers.
-3. Dispatch to Claude Code master agents or the local semantic selector.
-4. Add proactive suggestions when the prompt implies security, observability, or another adjacent domain.
-5. Return a ranked bundle plus a fallback path when nothing is strong enough.
-
----
-
-Every asset carries a `domain` and `master_agent` tag in the index. In Claude Code, the Oracle dispatches in parallel and each master sees only its own cluster. In Overclock/Codex/local runtimes, `scripts/oracle-query.js` reads the same index, evaluates enriched semantic fields extracted from each `SKILL.md`, and ranks assets deterministically without requiring Claude Code's `Task` dispatcher. In Overclock, follow-up agent work should be delegated through visible `pane_spawn` panes only when the work genuinely splits into independent streams.
+Every asset carries a `domain` and `master_agent` tag in the index. In Claude Code, Oracle dispatches in parallel and each master sees only its own cluster. In Overclock/Codex/local runtimes, `scripts/oracle-query.js` reads the same index, evaluates enriched semantic fields extracted from each `SKILL.md`, and ranks assets deterministically without requiring Claude Code's `Task` dispatcher. In Overclock, follow-up agent work should be delegated through visible `pane_spawn` panes only when the work genuinely splits into independent streams.
 
 The local path is not a per-domain LLM orchestration layer. It is a semantic selector that approximates the master-agent bundle by combining:
 

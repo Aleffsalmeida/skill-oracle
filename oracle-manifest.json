@@ -1,6 +1,6 @@
 {
-  "version": "2.4.19",
-  "updated_at": "2026-05-20T03:30:34.5613248Z",
+  "version": "2.4.20",
+  "updated_at": "2026-05-20T04:13:02.3848442Z",
   "paths": [
     "SKILL.md",
     "README.md",
@@ -8,6 +8,7 @@
     "assets/demo.gif",
     "assets/demo.svg",
     "assets/demo.webm",
+    "assets/oracle-logo.svg",
     "demo-video/index.html",
     "scripts/auto-rebuild.js",
     "scripts/build-index.js",
