@@ -380,6 +380,19 @@ function buildHostAdapterPolicy(runtimeName, executorName, visiblePanes) {
     fallback_recommendations: supported
       ? []
       : ['overclock', 'claude-code', 'codex', 'antigravity'],
+    preWriteReadiness: visiblePanes
+      ? {
+          required: true,
+          probe: 'stable prompt visible',
+          disallowStates: [
+            'startup screen',
+            'auth screen',
+            'onboarding',
+            'context budget warning',
+          ],
+          fallbackAction: 're-spawn with a lighter verified provider/model or mission-bound pane before writing the prompt.',
+        }
+      : null,
     note: supported
       ? 'First-class host: Oracle can adapt natively.'
       : 'Unsupported host: Oracle should recommend one of the first-class standards.',
@@ -1524,10 +1537,22 @@ function overclockOrchestrationPolicy(recommended) {
     },
     executionLoop: [
       'pane_spawn',
+      'spawn_ready',
       'pane_write submit=true',
       'pane_wait_idle',
       'pane_read',
     ],
+    preWriteReadiness: {
+      required: true,
+      probe: 'stable prompt visible',
+      disallowStates: [
+        'startup screen',
+        'auth screen',
+        'onboarding',
+        'context budget warning',
+      ],
+      fallbackAction: 're-spawn with a lighter verified provider/model or mission-bound pane before writing the prompt.',
+    },
     outputCapture: {
       required: true,
       probeSentinel: OUTPUT_PROBE_SENTINEL,
@@ -2007,7 +2032,10 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
     notes: [
       visiblePanes
         ? 'Spawn one visible pane per independent workstream, pass the selected provider and selected model explicitly, and submit the prompt immediately.'
-      : 'Host does not expose visible panes; execute in the current runtime or route to a supported executor.',
+        : 'Host does not expose visible panes; execute in the current runtime or route to a supported executor.',
+      visiblePanes
+        ? 'Before pane_write, wait for the spawned pane to show a stable ready prompt. If the pane still shows startup chrome, auth screens, onboarding, or context-budget warnings, treat it as not ready and re-spawn or fallback.'
+        : null,
       !FIRST_CLASS_HOSTS.has(runtimeName)
         ? 'If the host cannot adapt cleanly, recommend the first-class standards: Overclock, Claude Code, Codex, or Antigravity CLI.'
         : null,
@@ -2022,6 +2050,7 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
   const visiblePanes = dispatchPlan?.host === 'overclock';
   const stages = [
     { id: 'spawn', label: 'spawn visible pane', required: visiblePanes },
+    { id: 'spawn_ready', label: 'wait until pane is ready for input', required: visiblePanes },
     { id: 'write', label: 'submit prompt with submit=true', required: visiblePanes },
     { id: 'wait_idle', label: 'wait for idle', required: visiblePanes },
     { id: 'read', label: 'read result', required: visiblePanes },
@@ -2079,10 +2108,11 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
     host_contract: {
       visible_panes: visiblePanes,
       dispatch_style: visiblePanes ? 'visible-pane-swarm' : 'local-plan',
-      state_machine: ['spawn', 'write', 'wait_idle', 'read'],
+      state_machine: ['spawn', 'spawn_ready', 'write', 'wait_idle', 'read'],
       pane_write_submission_required: true,
       empty_read_is_failure: true,
       output_capture_required: true,
+      spawn_ready_required: true,
     },
     stages,
     bundle: (bundle || []).map((asset) => ({

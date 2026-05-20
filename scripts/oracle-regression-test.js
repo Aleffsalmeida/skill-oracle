@@ -333,8 +333,17 @@ async function main() {
     'Overclock workstreams must carry the probe sentinel'
   );
   assertCheck(
+    Array.isArray(overclockResult.executionManifest?.stages) &&
+      overclockResult.executionManifest.stages.some((stage) => stage.id === 'spawn_ready'),
+    'Overclock execution manifest must include spawn_ready stage'
+  );
+  assertCheck(
     overclockResult.executionManifest?.host_contract?.output_capture_required === true,
     'Overclock host contract must require output capture'
+  );
+  assertCheck(
+    overclockResult.dispatchPlan?.host_adapter?.preWriteReadiness?.required === true,
+    'Overclock host adapter must require pre-write readiness'
   );
   assertCheck(
     detectExecutor('antigravity').name === 'agy',
