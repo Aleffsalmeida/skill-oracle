@@ -21,6 +21,10 @@ const { run: runBootstrap } = require('./oracle-bootstrap');
 const HOME = os.homedir();
 const DEFAULT_INDEX = path.join(HOME, '.claude', 'oracle-index.json');
 const EMBED_INDEX = path.join(HOME, '.claude', 'oracle-embeddings.json');
+const OVERCLOCK_APPDATA_DIR = path.join(HOME, 'AppData', 'Roaming', 'Overclock');
+const OVERCLOCK_PROVIDERS_PATH = path.join(OVERCLOCK_APPDATA_DIR, 'providers.json');
+const OVERCLOCK_MCP_CONFIG_PATH = path.join(OVERCLOCK_APPDATA_DIR, 'mcp-config.json');
+const OVERCLOCK_MAIN_LOG_PATH = path.join(OVERCLOCK_APPDATA_DIR, 'logs', 'main.log');
 const SYNTHESIS_MODEL = process.env.ORACLE_SYNTHESIS_MODEL || 'gpt-5.4-mini';
 const STRONG_MATCH_THRESHOLD = 5;
 const MAX_DOMAINS = 5;
@@ -28,6 +32,28 @@ const DEFAULT_LIMIT = 5;
 const MIN_TOKEN_LENGTH = 3;
 const SHORT_TOKEN_ALLOWLIST = new Set(['ai', 'ml', 'ui', 'ux', 'qa', '3d']);
 const STRONG_AUTHOR_SOURCES = ['agents:', 'codex:', 'user:'];
+const PROVIDER_KEY_ALIASES = {
+  claude: 'claude-oauth',
+  'claude-oauth': 'claude-oauth',
+  codex: 'codex-cli',
+  'codex-cli': 'codex-cli',
+  gemini: 'gemini-cli',
+  'gemini-cli': 'gemini-cli',
+  kimi: 'kimi-cli',
+  'kimi-cli': 'kimi-cli',
+  antigravity: 'antigravity-cli',
+  'antigravity-cli': 'antigravity-cli',
+  mimo: 'mimo-DMlOoB',
+  'mimo-dmloob': 'mimo-DMlOoB',
+};
+const PREFERRED_EXECUTION_PROVIDER_ORDER = [
+  'codex-cli',
+  'gemini-cli',
+  'kimi-cli',
+  'antigravity-cli',
+  'mimo-DMlOoB',
+  'claude-oauth',
+];
 const PREFERRED_SKILLS = new Set([
   'skill-oracle',
   'awesome-design-md',
@@ -270,7 +296,7 @@ function resolveSkillInvocation(asset, task, options = {}, projectRoot = findPro
 
   if (allowPaneSpawn && normalize(executor?.name || process.env.ORACLE_EXECUTOR || '') === 'pane_spawn') {
     return {
-      invoke: `pane_spawn visible pane, then prompt it to use ${skillName}`,
+      invoke: `pane_spawn visible pane, then submit a pane_write prompt to use ${skillName}`,
       mechanism: 'pane_spawn',
       command: null,
       pinned: false,
@@ -297,6 +323,7 @@ function executionPromptForAsset(asset, task, selectedModel) {
     const parts = [
       `Spawn a visible pane and use ${asset.name} to complete the task.`,
       `Task: ${task}`,
+      'Submit this prompt with pane_write submit=true before waiting for idle.',
     ];
     if (target) parts.push(`Target: ${target}`);
     if (selectedModel) parts.push(`Model: ${selectedModel}`);
@@ -326,6 +353,193 @@ function fallbackGuidance(task) {
       'Rerun Oracle or start a new session; the inventory signature will trigger an automatic rebuild.',
       'Oracle will classify it into the right domain/master agent and use it on the next query.',
     ],
+  };
+}
+
+function readJsonSafe(filePath, fallback = null) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+function normalizeProviderKey(value) {
+  return normalize(value);
+}
+
+function canonicalProviderId(value) {
+  const key = normalizeProviderKey(value);
+  return PROVIDER_KEY_ALIASES[key] || String(value || '').trim();
+}
+
+function parseOverclockAutoDetectedProviders(logText) {
+  const match = String(logText || '').match(/\[providers\]\s+auto-detected:\s*([^\n]+)/i);
+  if (!match) return [];
+  return match[1]
+    .split(',')
+    .map((part) => canonicalProviderId(part.trim()))
+    .filter(Boolean);
+}
+
+function detectExecutionProviderInventory() {
+  const providersJson = readJsonSafe(OVERCLOCK_PROVIDERS_PATH, null) || {};
+  const mcpConfig = readJsonSafe(OVERCLOCK_MCP_CONFIG_PATH, null) || {};
+  const logText = readTextFile(OVERCLOCK_MAIN_LOG_PATH);
+  const providerMap = new Map();
+
+  const upsertProvider = (provider) => {
+    if (!provider || !provider.id) return;
+    const id = canonicalProviderId(provider.id);
+    const current = providerMap.get(id) || {
+      id,
+      label: provider.label || id,
+      type: provider.type || 'unknown',
+      host: provider.host || null,
+      models: [],
+      source: provider.source || 'providers.json',
+      available: false,
+      confidence: 'low',
+    };
+    const mergedModels = new Set([...(current.models || []), ...(provider.models || [])].filter(Boolean));
+    providerMap.set(id, {
+      ...current,
+      ...provider,
+      id,
+      models: Array.from(mergedModels),
+      available: true,
+      confidence: provider.confidence || current.confidence || 'medium',
+    });
+  };
+
+  for (const provider of providersJson.providers || []) {
+    upsertProvider({
+      ...provider,
+      id: provider.id,
+      available: true,
+      confidence: 'medium',
+    });
+  }
+
+  for (const [rawId, enabled] of Object.entries(providersJson.builtinEnabled || {})) {
+    if (!enabled) continue;
+    const id = canonicalProviderId(rawId);
+    upsertProvider({
+      id,
+      label: id === 'claude-oauth' ? 'Claude via OAuth' : id,
+      type: 'builtin',
+      host: 'overclock',
+      models: (providersJson.builtinModels || {})[rawId] || [],
+      source: 'providers.json',
+      confidence: 'medium',
+    });
+  }
+
+  for (const id of parseOverclockAutoDetectedProviders(logText)) {
+    if (!providerMap.has(id)) {
+      upsertProvider({
+        id,
+        label: id,
+        type: 'auto-detected',
+        host: 'overclock',
+        models: [],
+        source: 'main.log',
+        confidence: 'high',
+      });
+    } else {
+      const existing = providerMap.get(id);
+      providerMap.set(id, { ...existing, confidence: existing.confidence === 'medium' ? 'high' : existing.confidence });
+    }
+  }
+
+  let activeProviderId = null;
+  let activeModel = null;
+  try {
+    const overclockUrl = mcpConfig?.mcpServers?.overclock?.url || '';
+    if (overclockUrl) {
+      const parsed = new URL(overclockUrl);
+      activeProviderId = canonicalProviderId(parsed.searchParams.get('providerId'));
+      activeModel = parsed.searchParams.get('model') || null;
+    }
+  } catch (_error) {
+    activeProviderId = null;
+    activeModel = null;
+  }
+
+  const providers = Array.from(providerMap.values()).sort((a, b) => {
+    const aIndex = PREFERRED_EXECUTION_PROVIDER_ORDER.indexOf(a.id);
+    const bIndex = PREFERRED_EXECUTION_PROVIDER_ORDER.indexOf(b.id);
+    return (aIndex === -1 ? 99 : aIndex) - (bIndex === -1 ? 99 : bIndex);
+  });
+  const availableProviderIds = providers.map((provider) => provider.id);
+
+  return {
+    providers,
+    providersById: Object.fromEntries(providers.map((provider) => [provider.id, provider])),
+    availableProviderIds,
+    activeProviderId: activeProviderId && availableProviderIds.includes(activeProviderId) ? activeProviderId : null,
+    activeModel,
+    available: availableProviderIds.length > 0,
+    source: {
+      providers_json: fs.existsSync(OVERCLOCK_PROVIDERS_PATH),
+      mcp_config: fs.existsSync(OVERCLOCK_MCP_CONFIG_PATH),
+      main_log: fs.existsSync(OVERCLOCK_MAIN_LOG_PATH),
+    },
+  };
+}
+
+function chooseProviderModel(provider, complexity = 'simple') {
+  if (!provider) return null;
+  const providerId = canonicalProviderId(provider.id);
+  const models = Array.isArray(provider.models) ? provider.models.filter(Boolean) : [];
+  const fromInventory = provider.inventory_model_map || {};
+  const pickByIndex = (index) => {
+    if (!models.length) return null;
+    return models[Math.min(index, models.length - 1)] || models[0] || null;
+  };
+
+  if (providerId === 'codex-cli') {
+    return MODEL_HINTS.codex[complexity] || pickByIndex(0);
+  }
+  if (providerId === 'claude-oauth') {
+    return MODEL_HINTS.claude[complexity] || pickByIndex(0);
+  }
+  if (fromInventory.simple || fromInventory.medium || fromInventory.heavy) {
+    return fromInventory[complexity] || fromInventory.medium || fromInventory.simple || models[0] || null;
+  }
+
+  if (complexity === 'heavy') return pickByIndex(2) || pickByIndex(models.length - 1);
+  if (complexity === 'medium') return pickByIndex(1) || pickByIndex(0);
+  return pickByIndex(0);
+}
+
+function selectExecutionProvider(task, complexity, providerInventory = null) {
+  const text = normalize(task);
+  const inventory = providerInventory || detectExecutionProviderInventory();
+  const explicitClaude = /\b(claude|anthropic)\b/.test(text);
+  const preferredOrder = explicitClaude
+    ? ['claude-oauth', 'codex-cli', 'gemini-cli', 'kimi-cli', 'antigravity-cli', 'mimo-DMlOoB']
+    : PREFERRED_EXECUTION_PROVIDER_ORDER;
+  const available = new Set(inventory.availableProviderIds || []);
+
+  let providerId = preferredOrder.find((id) => available.has(id)) || inventory.activeProviderId || null;
+  if (!providerId) {
+    const first = (inventory.providers || [])[0];
+    providerId = first ? first.id : null;
+  }
+
+  const provider = providerId ? inventory.providersById?.[providerId] || null : null;
+  const model = chooseProviderModel(provider, complexity);
+
+  return {
+    providerId,
+    provider,
+    model,
+    available: Boolean(provider && available.has(providerId)),
+    explicitClaude,
+    reason: provider
+      ? `${provider.id} selected from local provider inventory${explicitClaude ? ' (explicit Claude request)' : ''}.`
+      : 'No verified provider inventory found; host must choose a safe fallback.',
   };
 }
 
@@ -1519,7 +1733,7 @@ function workflowRecommendations(idx, task, domains) {
 function parallelExecutionPlan(task, domains, preflight) {
   const text = normalize(task);
   const executorName = normalize(preflight?.preflight?.executor?.name || preflight?.executor?.name || '');
-  const visiblePaneExecutor = executorName === 'pane_spawn' || /\boverclock\b/.test(normalize(preflight?.preflight?.runtime || ''));
+  const visiblePaneExecutor = executorName === 'pane_spawn';
   const multiStepRisk = /\b(parallel|architecture|arquitetura|api|schema|migration|migracao|migração|soft delete|lixeira|rls|security|seguranca|segurança|test|tests|teste|testes|playwright|multi-step|end-to-end|cross-domain|banco de dados|database|auth|checkout|payment|pagamento|stripe|pix)\b/.test(text);
   const heavy = domains.length >= 3 || (domains.length >= 2 && multiStepRisk);
 
@@ -1559,13 +1773,15 @@ function parallelExecutionPlan(task, domains, preflight) {
   };
 }
 
-function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, executor, preflight }) {
+function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, executor, preflight, providerInventory }) {
   const executorName = normalize(executor?.name || '');
   const runtimeName = normalize(preflight?.preflight?.runtime || preflight?.runtime || '');
   const visiblePanes = executorName === 'pane_spawn' || parallelPlan?.executor === 'pane_spawn';
-  const selectedModel = runtimeName === 'claude-code'
+  const executionTarget = selectExecutionProvider(task, modelHints?.complexity || 'simple', providerInventory);
+  const selectedProviderId = executionTarget.providerId;
+  const selectedModel = executionTarget.model || (runtimeName === 'claude-code'
     ? modelHints?.claude || null
-    : modelHints?.codex || modelHints?.claude || null;
+    : modelHints?.codex || modelHints?.claude || null);
   const mode = parallelPlan?.recommended ? 'parallel' : 'single';
   const taskPrompt = String(task || '').trim();
   const workstreamAssets = (description) => {
@@ -1596,10 +1812,12 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
       `User task: ${taskPrompt}`,
       '',
       'Instructions:',
+      '0. Submit this payload immediately with pane_write submit=true.',
       '1. Follow the user task exactly.',
       '2. Use the selected model for the pane.',
       '3. Produce only the result needed for this workstream.',
       '4. If you need to touch files, make the minimal safe change.',
+      '5. Do not leave the pane sitting at a shell prompt.',
     ];
     if (Array.isArray(assets) && assets.length) {
       lines.push('');
@@ -1618,17 +1836,33 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
     mode,
     host: visiblePanes ? 'overclock' : 'local',
     complexity: modelHints?.complexity || 'simple',
+    selected_provider: selectedProviderId,
+    selected_provider_reason: executionTarget.reason,
     models: {
       claude: modelHints?.claude || null,
       codex: modelHints?.codex || null,
     },
     selected_model: selectedModel,
-    selected_model_reason:
-      modelHints?.complexity === 'simple'
+    selected_model_reason: executionTarget.provider
+      ? `Use ${selectedProviderId}${selectedModel ? ` / ${selectedModel}` : ''} from the verified local provider inventory.`
+      : modelHints?.complexity === 'simple'
         ? 'Simple task; use the cheapest safe model.'
         : modelHints?.complexity === 'medium'
           ? 'Moderate task; use a mid-tier model.'
           : 'Heavy task; use the strongest model available.',
+    provider_inventory: providerInventory ? {
+      available_provider_ids: providerInventory.availableProviderIds || [],
+      active_provider_id: providerInventory.activeProviderId || null,
+      active_model: providerInventory.activeModel || null,
+      providers: (providerInventory.providers || []).map((provider) => ({
+        id: provider.id,
+        label: provider.label,
+        type: provider.type,
+        models: provider.models || [],
+        available: Boolean(provider.available),
+        confidence: provider.confidence || 'low',
+      })),
+    } : null,
     execution_target_count: Math.max(picks.length, bundle.length),
     execution_required: picks.map((asset) => ({
       name: asset.name,
@@ -1638,14 +1872,26 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
       mechanism: asset.invocation?.mechanism || null,
       command: asset.invocation?.command || null,
       pane_prompt: executionPromptForAsset(asset, task, selectedModel),
+      pane_write: (() => {
+        const prompt = executionPromptForAsset(asset, task, selectedModel);
+        return prompt
+          ? {
+              submit: true,
+              content: prompt,
+            }
+          : null;
+      })(),
+      provider_id: selectedProviderId,
       model: selectedModel,
     })),
     parallel_workstreams: parallelPlan?.recommended
       ? parallelPlan.workstreams.map((item, index) => {
           const assets = workstreamAssets(item);
+          const panePrompt = buildPanePrompt(item, index, assets);
           return {
             description: item,
             executor: parallelPlan.executor,
+            provider_id: selectedProviderId,
             model: selectedModel,
             assets: assets.map((asset) => ({
               name: asset.name,
@@ -1654,13 +1900,17 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
               invoke: asset.invoke,
               mechanism: asset.invocation?.mechanism || null,
             })),
-            pane_prompt: buildPanePrompt(item, index, assets),
+            pane_prompt: panePrompt,
+            pane_write: {
+              submit: true,
+              content: panePrompt,
+            },
           };
         })
       : [],
     notes: [
       visiblePanes
-        ? 'Spawn one visible pane per independent workstream and pass the selected model explicitly.'
+        ? 'Spawn one visible pane per independent workstream, pass the selected provider and selected model explicitly, and submit the prompt immediately.'
         : 'Host does not expose visible panes; execute in the current runtime or route to a supported executor.',
       'Do not downgrade execution-ready picks into discovery-only recommendations.',
       'If a pane is spawned, complete pane_write -> pane_wait_idle -> pane_read before treating the workstream as active.',
@@ -1672,7 +1922,7 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
   const visiblePanes = dispatchPlan?.host === 'overclock';
   const stages = [
     { id: 'spawn', label: 'spawn visible pane', required: visiblePanes },
-    { id: 'write', label: 'submit prompt', required: visiblePanes },
+    { id: 'write', label: 'submit prompt with submit=true', required: visiblePanes },
     { id: 'wait_idle', label: 'wait for idle', required: visiblePanes },
     { id: 'read', label: 'read result', required: visiblePanes },
   ];
@@ -1681,10 +1931,15 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
     id: `workstream-${index + 1}`,
     description: item.description,
     executor: item.executor,
+    provider_id: item.provider_id || dispatchPlan?.selected_provider || null,
     model: item.model,
     state: visiblePanes ? 'pending' : 'host-managed',
     assets: item.assets || [],
     pane_prompt: item.pane_prompt,
+    pane_write: item.pane_write || {
+      submit: true,
+      content: item.pane_prompt,
+    },
     completion_criteria: [
       'prompt submitted',
       'pane reached idle',
@@ -1702,11 +1957,14 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
     task,
     runtime: preflight?.preflight?.runtime || 'unknown',
     executor: dispatchPlan?.host || 'local',
+    selected_provider: dispatchPlan?.selected_provider || null,
     selected_model: dispatchPlan?.selected_model || null,
+    provider_inventory: dispatchPlan?.provider_inventory || null,
     host_contract: {
       visible_panes: visiblePanes,
       dispatch_style: visiblePanes ? 'visible-pane-swarm' : 'local-plan',
       state_machine: ['spawn', 'write', 'wait_idle', 'read'],
+      pane_write_submission_required: true,
     },
     stages,
     bundle: (bundle || []).map((asset) => ({
@@ -1888,6 +2146,7 @@ async function selectAssets(idx, task, options = {}) {
 
   const complexity = estimateComplexity(task, finalDomainIds, picks);
   const modelHints = recommendedModels(complexity);
+  const providerInventory = detectExecutionProviderInventory();
 
   const fallbackRecommended = picks.length === 0;
   const processWorkflow = workflowRecommendations(idx, task, finalDomainIds);
@@ -1900,6 +2159,7 @@ async function selectAssets(idx, task, options = {}) {
     modelHints,
     executor,
     preflight: options.preflight,
+    providerInventory,
   });
   const executionManifest = buildExecutionManifest({
     task,

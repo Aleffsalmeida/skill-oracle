@@ -61,6 +61,7 @@ Before routing, identify the current host runtime:
 
 - **Claude Code runtime:** `Task` subagents are available and `~/.claude/agents/oracle-master-*.md` can be discovered. Use the Master Agent procedure below.
 - **Overclock runtime:** visible panes may be available, but Oracle should only request `pane_spawn` when the host exposes that tool. Use `scripts/oracle-query.js` for ranking, then let the host perform visible-pane execution when supported. Do not open panes for simple local edits or standalone page-design work that one pane can finish safely.
+- Overclock pane execution must be based on verified local provider inventory. Do not select Claude or any other provider unless it appears in the current provider list.
 - **Codex or generic local runtime:** `Task(subagent_type=...)` is not available. Do not pretend to dispatch subagents. Use the local runner instead:
 
 ```bash
@@ -95,6 +96,7 @@ For Overclock visible panes, the model hint is mandatory execution metadata, not
 - Track every pane id you spawn for the current task. Those are the only panes Oracle may treat as disposable.
 - Never close panes you did not spawn in the current task. Never close the caller pane. If the user asks to close idle panes, list the Oracle-owned candidates first unless the user named exact pane ids.
 - A spawned pane is not considered active until Oracle completes `pane_write` with submission, then `pane_wait_idle`, then `pane_read`. If that loop does not complete, treat the pane as failed orchestration instead of "done".
+- The prompt sent to a spawned pane must be submitted with `pane_write submit=true`. A visible prompt that was not submitted is a failure.
 
 The bootstrap preflight should report the detected executor explicitly:
 

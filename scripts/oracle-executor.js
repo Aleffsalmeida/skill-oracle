@@ -33,13 +33,17 @@ function formatExecutionManifest(manifest) {
   lines.push(`Oracle executor manifest v${manifest.version}`);
   lines.push(`Runtime: ${manifest.runtime}`);
   lines.push(`Executor: ${manifest.executor}`);
+  lines.push(`Provider: ${manifest.selected_provider || 'n/a'}`);
+  lines.push(`Model: ${manifest.selected_model || 'n/a'}`);
   lines.push(`State machine: ${manifest.host_contract.state_machine.join(' -> ')}`);
   lines.push('');
   for (const workstream of manifest.workstreams || []) {
     lines.push(`${workstream.id}: ${workstream.description}`);
     lines.push(`  state: ${workstream.state}`);
+    lines.push(`  provider: ${workstream.provider_id || 'n/a'}`);
     lines.push(`  model: ${workstream.model || 'n/a'}`);
     lines.push(`  prompt: ${workstream.pane_prompt}`);
+    lines.push(`  submit: ${workstream.pane_write?.submit ? 'true' : 'false'}`);
   }
   return lines.join('\n');
 }

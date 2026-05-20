@@ -302,6 +302,20 @@ async function main() {
     Array.isArray(heavyPlan.orchestrationPolicy?.executionLoop) && heavyPlan.orchestrationPolicy.executionLoop.join(' -> ').includes('pane_write submit=true'),
     'heavy pane plan must require the full pane execution loop'
   );
+  const overclockResult = await selectAssets(
+    idx,
+    'refazer o projeto Estrelagithub com leaderboard premium, Supabase e GitHub OAuth',
+    { preflight: { preflight: { executor: { name: 'pane_spawn' }, runtime: 'Overclock' } } }
+  );
+  assertCheck(
+    overclockResult.dispatchPlan?.selected_provider === 'codex-cli',
+    `expected codex-cli to be selected for Overclock execution, got ${overclockResult.dispatchPlan?.selected_provider}`
+  );
+  assertCheck(
+    Array.isArray(overclockResult.executionManifest?.workstreams) &&
+      overclockResult.executionManifest.workstreams.every((workstream) => workstream.pane_write?.submit === true),
+    'Overclock workstreams must require pane_write submit=true'
+  );
   for (const report of reports) {
     console.log(`ok - ${report.name}: ${report.domains.join(', ')} -> picks ${report.picks.join(', ')} | bundle ${report.bundle.join(', ')}`);
   }
