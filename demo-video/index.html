@@ -8,32 +8,31 @@
     :root{
       color-scheme: dark;
       --bg:#05080d;
-      --bg2:#0a0e13;
-      --panel:rgba(10,14,19,.92);
-      --panel2:rgba(14,19,25,.94);
-      --line:rgba(90,99,110,.26);
-      --line2:rgba(90,99,110,.16);
+      --panel:rgba(9,13,18,.92);
+      --panel2:rgba(12,17,23,.96);
+      --line:rgba(90,99,110,.24);
+      --line2:rgba(90,99,110,.15);
       --fg:#edf3f7;
-      --muted:#7c8995;
+      --muted:#7d8994;
       --muted2:#56616c;
-      --green:#28d17c;
+      --green:#27d07b;
       --blue:#56b0ff;
       --red:#ff5b52;
-      --amber:#f2b84b;
-      --violet:#ae7dff;
+      --amber:#f0b24a;
+      --violet:#ac7cff;
     }
     html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:"JetBrains Mono","IBM Plex Mono",monospace}
     #stage{
       position:relative;width:100%;height:100%;overflow:hidden;color:var(--fg);
       background:
-        radial-gradient(circle at 14% 14%, rgba(86,176,255,.14), transparent 24%),
-        radial-gradient(circle at 84% 18%, rgba(174,125,255,.10), transparent 22%),
-        radial-gradient(circle at 60% 84%, rgba(40,209,124,.11), transparent 28%),
+        radial-gradient(circle at 15% 14%, rgba(86,176,255,.14), transparent 24%),
+        radial-gradient(circle at 84% 20%, rgba(172,124,255,.11), transparent 22%),
+        radial-gradient(circle at 50% 84%, rgba(39,208,123,.10), transparent 26%),
         linear-gradient(180deg,#0b1016 0%, #05080d 100%);
     }
-    .grid,.halo,.vignette,.grain{position:absolute;inset:0;pointer-events:none}
+    .grid,.halo,.grain,.vignette{position:absolute;inset:0;pointer-events:none}
     .grid{
-      opacity:.16;
+      opacity:.14;
       background-image:linear-gradient(rgba(125,133,144,.10) 1px,transparent 1px),linear-gradient(90deg,rgba(125,133,144,.10) 1px,transparent 1px);
       background-size:120px 120px;
     }
@@ -48,21 +47,21 @@
       content:"";position:absolute;border-radius:999px;filter:blur(16px);mix-blend-mode:screen
     }
     .halo::before{
-      width:620px;height:620px;left:-120px;top:-120px;
+      width:620px;height:620px;left:-140px;top:-130px;
       background:radial-gradient(circle, rgba(86,176,255,.20) 0%, rgba(86,176,255,.03) 56%, transparent 74%);
     }
     .halo::after{
-      width:760px;height:760px;right:-160px;top:60px;
-      background:radial-gradient(circle, rgba(174,125,255,.18) 0%, rgba(174,125,255,.04) 54%, transparent 75%);
+      width:760px;height:760px;right:-190px;top:70px;
+      background:radial-gradient(circle, rgba(172,124,255,.18) 0%, rgba(172,124,255,.04) 54%, transparent 75%);
     }
     .shell{
       position:absolute;inset:38px;border:1px solid rgba(90,99,110,.25);border-radius:18px;background:rgba(7,10,14,.60);
       box-shadow:0 34px 100px rgba(0,0,0,.50), inset 0 1px 0 rgba(255,255,255,.03);
       backdrop-filter:blur(18px);
     }
-    .topstrip{
-      display:flex;align-items:center;justify-content:space-between;gap:16px;
-      height:32px;padding:0 16px;border-bottom:1px solid var(--line2);color:var(--muted);font-size:11px;letter-spacing:.16em;text-transform:lowercase
+    .topbar{
+      display:flex;align-items:center;justify-content:space-between;gap:16px;height:32px;padding:0 16px;border-bottom:1px solid var(--line2);
+      color:var(--muted);font-size:11px;letter-spacing:.16em;text-transform:lowercase
     }
     .lights{display:flex;gap:8px}
     .lights span{width:10px;height:10px;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.35) inset}
@@ -74,9 +73,9 @@
     .brand .name{font-size:18px;letter-spacing:.24em;text-transform:uppercase;color:#f4f7fb}
     .brand .desc{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .live{display:flex;align-items:center;gap:10px;color:var(--green);font-size:12px;letter-spacing:.18em;text-transform:uppercase;white-space:nowrap}
-    .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 7px rgba(40,209,124,.12)}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 7px rgba(39,208,123,.12)}
     .hero{
-      display:grid;grid-template-columns:0.29fr 0.46fr 0.25fr;gap:14px;height:calc(100% - 82px);padding:16px;box-sizing:border-box
+      display:grid;grid-template-columns:0.31fr 0.39fr 0.30fr;gap:14px;height:calc(100% - 82px);padding:16px;box-sizing:border-box
     }
     .panel{
       border:1px solid var(--line);border-radius:14px;background:var(--panel);overflow:hidden;
@@ -92,39 +91,30 @@
       display:inline-flex;align-items:center;gap:8px;padding:7px 10px;border-radius:999px;background:rgba(7,10,14,.62);border:1px solid var(--line2);
       color:var(--muted);font-size:10px;letter-spacing:.18em;text-transform:uppercase;white-space:nowrap
     }
-    .badge .mini{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 5px rgba(40,209,124,.12)}
+    .badge .mini{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 5px rgba(39,208,123,.12)}
+
     .mission{display:flex;flex-direction:column;min-height:0}
-    .mission .body{display:flex;flex-direction:column;gap:12px;padding:14px;min-height:0}
-    .mission-note{
+    .body{display:flex;flex-direction:column;gap:12px;padding:14px;min-height:0}
+    .task{
       padding:12px 13px;border-radius:12px;border:1px solid rgba(86,176,255,.22);
       background:linear-gradient(180deg, rgba(12,16,22,.92), rgba(8,11,15,.84))
     }
-    .mission-note .eyebrow{font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--blue);margin-bottom:9px}
-    .mission-note p{margin:0;font-size:13px;line-height:1.45;color:#eef3f7}
-    .mission-note .small{margin-top:10px;font-size:11px;line-height:1.45;color:var(--muted)}
-    .feed{display:grid;gap:10px}
-    .msg{display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:start}
-    .av{
-      width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:#081015;font-weight:700;font-size:12px;
-      background:linear-gradient(180deg,#6fe6ff,#4f9fff);box-shadow:0 0 0 1px rgba(255,255,255,.05) inset
+    .task .eyebrow{font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--blue);margin-bottom:9px}
+    .task p{margin:0;font-size:13px;line-height:1.45;color:#eef3f7}
+    .task .small{margin-top:10px;font-size:11px;line-height:1.45;color:var(--muted)}
+    .prompt{
+      padding:11px 12px;border-radius:10px;border:1px solid var(--line2);background:rgba(0,0,0,.20);font-size:12px;line-height:1.5;color:#e9f1f7
     }
-    .av.p{background:linear-gradient(180deg,#cb9cff,#8e6bff)}
-    .av.g{background:linear-gradient(180deg,#61f0b0,#28d17c)}
-    .av.o{background:linear-gradient(180deg,#ffbf79,#ff8e49)}
-    .bubble{
-      padding:10px 11px;border-radius:10px;border:1px solid rgba(90,99,110,.20);background:rgba(0,0,0,.22);color:#eef3f7;font-size:12px;line-height:1.42
+    .prompt .q{color:var(--muted);font-size:10px;letter-spacing:.18em;text-transform:uppercase;margin-bottom:6px}
+    .statusbox{
+      display:grid;gap:8px;padding:12px;border:1px solid rgba(90,99,110,.18);border-radius:12px;background:rgba(7,10,14,.34);
+      font-size:11px;color:var(--muted)
     }
-    .meta{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:5px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
-    .meta strong{color:#f5f8fb}
-    .meta .ok{color:var(--green)}
-    .composer{
-      margin-top:auto;padding:10px 12px;border-radius:10px;border:1px solid var(--line2);background:rgba(0,0,0,.20);color:var(--muted);font-size:11px
-    }
+    .statusrow{display:flex;justify-content:space-between;gap:12px}
+    .statusrow strong{color:#f4f8fb}
+    .statusrow .ok{color:var(--green)}
 
-    .center{min-width:0;min-height:0}
-    .workbench{
-      display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:14px;height:100%;min-height:0
-    }
+    .center{min-width:0;min-height:0;display:grid;grid-template-rows:1.1fr .9fr;gap:14px}
     .pane{
       display:flex;flex-direction:column;min-height:0;border:1px solid rgba(90,99,110,.22);border-radius:13px;background:linear-gradient(180deg, rgba(16,21,27,.96), rgba(10,13,18,.96));
       box-shadow:inset 0 1px 0 rgba(255,255,255,.03), 0 18px 28px rgba(0,0,0,.22);overflow:hidden
@@ -136,47 +126,64 @@
     .pane .left{display:flex;align-items:center;gap:8px;min-width:0}
     .pane .status-dot{width:8px;height:8px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 6px rgba(86,176,255,.11)}
     .pane .score{color:var(--green)}
-    .pane pre{
-      margin:0;padding:10px 12px 0 12px;flex:1;font-size:11px;line-height:1.55;color:#dfe8f0;white-space:pre-wrap
+    .pane .scan{
+      margin:0;padding:12px 12px 0 12px;flex:1;font-size:11px;line-height:1.65;color:#dfe8f0;white-space:pre-wrap
     }
+    .scan .line{display:flex;justify-content:space-between;gap:12px}
+    .scan .dim{color:var(--muted)}
+    .scan .accent{color:var(--green)}
+    .scan .warn{color:var(--amber)}
     .pane .footer{
       margin:0 12px 12px;height:10px;border-radius:999px;border:1px solid var(--line2);background:#071016;overflow:hidden;position:relative
     }
     .pane .fill{position:absolute;inset:0;transform-origin:left center;background:linear-gradient(90deg,var(--blue),var(--green),var(--violet))}
     .pane .shimmer{position:absolute;top:0;bottom:0;width:130px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.16),transparent);opacity:.75}
-    .mono-green{color:#95e6a5}
-    .mono-blue{color:#8bc7ff}
-    .mono-red{color:#ff8c87}
-    .mono-violet{color:#d3b3ff}
-    .mono-amber{color:#ffd37f}
+    .rank{
+      display:grid;grid-template-columns:1fr;gap:10px;padding:12px;flex:1;min-height:0
+    }
+    .candidate{
+      padding:10px 12px;border-radius:12px;border:1px solid rgba(90,99,110,.18);background:rgba(7,10,14,.54)
+    }
+    .candidate .top{display:flex;justify-content:space-between;gap:12px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+    .candidate .top strong{color:#f4f8fb}
+    .candidate .title{font-size:12px;line-height:1.45;color:#edf3f7}
+    .candidate .bar2{margin-top:8px;height:8px;border-radius:999px;background:rgba(8,12,17,.85);border:1px solid var(--line2);overflow:hidden}
+    .candidate .bar2 span{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--green),var(--violet))}
+    .chips{display:flex;gap:8px;flex-wrap:wrap;padding:0 12px 12px}
+    .chip{padding:6px 10px;border-radius:999px;border:1px solid rgba(90,99,110,.18);background:rgba(7,10,14,.52);color:#dfe7ef;font-size:10px;letter-spacing:.18em;text-transform:uppercase}
+    .chip.green{color:var(--green);border-color:rgba(39,208,123,.22)}
+    .chip.blue{color:var(--blue);border-color:rgba(86,176,255,.22)}
+    .chip.violet{color:var(--violet);border-color:rgba(172,124,255,.22)}
 
     .right{display:flex;flex-direction:column;min-height:0}
-    .preview-wrap{display:flex;flex-direction:column;gap:12px;padding:14px;min-height:0;flex:1}
-    .monitor{
-      position:relative;min-height:306px;border-radius:14px;border:1px solid rgba(90,99,110,.22);overflow:hidden;
+    .result{
+      display:flex;flex-direction:column;gap:12px;padding:14px;min-height:0;flex:1
+    }
+    .bundle{
+      position:relative;min-height:320px;border-radius:14px;border:1px solid rgba(90,99,110,.22);overflow:hidden;
       background:linear-gradient(180deg, rgba(10,14,20,.96), rgba(7,9,13,.98))
     }
-    .monitor .head{
+    .bundle .head{
       display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;border-bottom:1px solid var(--line2);
       font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)
     }
-    .monitor .head .liveb{color:var(--green)}
-    .browser{
-      position:absolute;inset:48px 13px 58px;border-radius:12px;border:1px solid rgba(90,99,110,.18);
-      background:linear-gradient(180deg, rgba(23,29,37,.94), rgba(9,11,15,.97));overflow:hidden
+    .bundle .head .liveb{color:var(--green)}
+    .bundle .body{
+      position:absolute;inset:46px 13px 58px;border-radius:12px;border:1px solid rgba(90,99,110,.18);
+      background:linear-gradient(180deg, rgba(23,29,37,.94), rgba(9,11,15,.97));overflow:hidden;padding:0
     }
-    .browser::before{
+    .bundle .body::before{
       content:"";position:absolute;inset:0;
       background:linear-gradient(180deg, rgba(255,255,255,.03), transparent 20%), linear-gradient(90deg, rgba(255,255,255,.02), transparent 18%, rgba(255,255,255,.02) 82%, transparent)
     }
-    .sitehead{
+    .bundle .titlebar{
       position:absolute;left:12px;right:12px;top:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;color:#d9e2ea;
       font-size:12px;letter-spacing:.06em;text-transform:uppercase
     }
-    .sitehead .pill{
+    .bundle .pill{
       padding:6px 10px;border-radius:999px;border:1px solid rgba(86,176,255,.22);background:rgba(7,10,14,.62);color:var(--blue);font-size:10px;letter-spacing:.18em
     }
-    .dash{
+    .bundlegrid{
       position:absolute;inset:50px 12px 12px;display:grid;grid-template-columns:1.2fr .8fr;gap:10px
     }
     .card{
@@ -186,10 +193,7 @@
     .card .b{padding:12px}
     .headline{font-size:18px;line-height:1.15;color:#f4f8fb;margin-bottom:8px}
     .sub{font-size:11px;line-height:1.45;color:var(--muted)}
-    .bars{display:flex;align-items:end;gap:8px;height:94px;padding:0 12px 12px}
-    .bars span{flex:1;border-radius:8px 8px 4px 4px;background:linear-gradient(180deg, rgba(86,176,255,.95), rgba(40,209,124,.82));box-shadow:0 0 14px rgba(86,176,255,.18)}
-    .bars span:nth-child(1){height:28%}.bars span:nth-child(2){height:54%}.bars span:nth-child(3){height:40%}.bars span:nth-child(4){height:66%}.bars span:nth-child(5){height:44%}.bars span:nth-child(6){height:78%}.bars span:nth-child(7){height:58%}
-    .list{display:grid;gap:8px;padding:12px}
+    .rows{display:grid;gap:8px;padding:12px}
     .row{display:flex;justify-content:space-between;gap:12px;font-size:11px;color:var(--muted)}
     .row strong{color:#f4f8fb}
     .metrics{display:flex;justify-content:space-between;gap:12px;padding:0 12px 12px;font-size:11px;color:var(--muted)}
@@ -206,11 +210,6 @@
     .footer{
       display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 20px 16px;color:var(--muted);font-size:11px;letter-spacing:.16em;text-transform:uppercase
     }
-    .chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
-    .chip{padding:6px 10px;border-radius:999px;border:1px solid rgba(90,99,110,.18);background:rgba(7,10,14,.52);color:#dfe7ef}
-    .chip.green{color:var(--green);border-color:rgba(40,209,124,.22)}
-    .chip.blue{color:var(--blue);border-color:rgba(86,176,255,.22)}
-    .chip.violet{color:var(--violet);border-color:rgba(174,125,255,.22)}
   </style>
 </head>
 <body>
@@ -220,10 +219,10 @@
     <div class="vignette"></div>
     <div class="halo"></div>
     <div class="shell">
-      <div class="topstrip">
+      <div class="topbar">
         <div class="lights" aria-hidden="true"><span class="r"></span><span class="y"></span><span class="g"></span></div>
-        <div>overclock • live demo • multi-agent cockpit</div>
-        <div>live • 6 agents</div>
+        <div>skill-oracle live demo</div>
+        <div>unified index • routing • fallback</div>
       </div>
 
       <div class="header">
@@ -231,197 +230,138 @@
           <div class="name">skill-oracle</div>
           <div class="desc">find the right skill before the work starts</div>
         </div>
-        <div class="live"><span class="dot"></span> todos online</div>
+        <div class="live"><span class="dot"></span> live • 5,000+ assets indexed</div>
       </div>
 
       <div class="hero">
         <section class="panel mission">
           <div class="ph">
             <div class="pt">
-              <strong>Piloto</strong>
-              <span>mission room • 6 agents</span>
+              <strong>user task</strong>
+              <span>what the operator typed</span>
             </div>
-            <div class="badge"><span class="mini"></span> live</div>
+            <div class="badge"><span class="mini"></span> bootstrap</div>
           </div>
           <div class="body">
-            <div class="mission-note">
-              <div class="eyebrow">task brief</div>
-              <p>I keep losing time because the right Skill, Agent, Plugin, or MCP server is buried in a huge workspace.</p>
-              <div class="small">skill-oracle scans the stack, ranks the best fit, and keeps the fallback ready when nothing is obvious.</div>
+            <div class="task">
+              <div class="eyebrow">input</div>
+              <p>Preciso de uma skill para login, dashboard e motion. Quero achar a melhor de forma rapida, sem vasculhar o workspace inteiro.</p>
+              <div class="small">skill-oracle reads the task, scans Skills / Agents / Plugins / MCP servers, and returns the best match plus a fallback path.</div>
             </div>
 
-            <div class="feed">
-              <div class="msg">
-                <div class="av">P</div>
-                <div class="bubble">
-                  <div class="meta"><strong>pilot</strong><span class="ok">live</span></div>
-                  ship the landing page. keep the cockpit readable and the motion subtle.
-                </div>
-              </div>
-              <div class="msg">
-                <div class="av p">B1</div>
-                <div class="bubble">
-                  <div class="meta"><strong>builder-1</strong><span>code</span></div>
-                  routing the request to the right domain instead of guessing by title only.
-                </div>
-              </div>
-              <div class="msg">
-                <div class="av g">RV</div>
-                <div class="bubble">
-                  <div class="meta"><strong>reviewer</strong><span>check</span></div>
-                  the result should feel like a cockpit: structured, clear, and fast to parse.
-                </div>
-              </div>
-              <div class="msg">
-                <div class="av o">EX</div>
-                <div class="bubble">
-                  <div class="meta"><strong>executor</strong><span>done</span></div>
-                  no noise, no dead ends, just the best fit and a clean handoff.
-                </div>
-              </div>
+            <div class="prompt">
+              <div class="q">oracle-bootstrap</div>
+              bootstrap -> fresh index -> preflight ok
             </div>
 
-            <div class="composer">@executor esta digitando</div>
+            <div class="statusbox">
+              <div class="statusrow"><strong>runtime</strong><span class="ok">Codex / Overclock ready</span></div>
+              <div class="statusrow"><strong>index</strong><span class="ok">fresh unified inventory</span></div>
+              <div class="statusrow"><strong>mode</strong><span>local selector + master routing</span></div>
+            </div>
           </div>
         </section>
 
         <section class="center">
-          <div class="workbench">
-            <div class="pane">
-              <div class="bar">
-                <div class="left"><span class="status-dot"></span><span>scout</span></div>
-                <div class="score">$0.004</div>
-              </div>
-              <pre>
-grep "deprecated" -> 3 hits
-<span class="mono-amber">scanning</span> db/schema
-<span class="mono-amber">parsing</span> db/schema
-<span class="mono-green">routing to design + web</span>
-blocking analytics unless explicit
-              </pre>
-              <div class="footer"><div class="fill" style="width:78%"></div><div class="shimmer" style="left:-120px"></div></div>
+          <div class="pane">
+            <div class="bar">
+              <div class="left"><span class="status-dot"></span><span>scan</span></div>
+              <div class="score">9,599 assets / 20 domains</div>
             </div>
-
-            <div class="pane">
-              <div class="bar">
-                <div class="left"><span class="status-dot" style="background:var(--red);box-shadow:0 0 0 6px rgba(255,91,82,.11)"></span><span>builder-1</span></div>
-                <div class="score">$0.013</div>
-              </div>
-              <pre>
-<span class="mono-red">return res.status(401).end();</span>
-req.user = p; next();
-import { Router } from 'express';
-import { z } from 'zod';
-import { limiter } from '../lib/redis';
-const router = Router();
-const Login = z.object({
-  session: true
-});
-              </pre>
-              <div class="footer"><div class="fill" style="width:46%"></div><div class="shimmer" style="left:-90px"></div></div>
+            <div class="scan">
+              <div class="line"><span>scanning skills, agents, plugins, mcp</span><span class="accent">live</span></div>
+              <div class="line dim"><span>detect intent: login / dashboard / motion</span><span>ui-shell</span></div>
+              <div class="line dim"><span>score semantic signals from SKILL.md</span><span>content</span></div>
+              <div class="line"><span>boost domains: design, web, security</span><span class="warn">adjacent</span></div>
+              <div class="line dim"><span>ignore analytics unless explicit</span><span>guardrail</span></div>
+              <div class="line"><span>fallback ready: find-skills</span><span class="accent">armed</span></div>
             </div>
+            <div class="footer"><div class="fill" style="width:82%"></div><div class="shimmer" style="left:-120px"></div></div>
+          </div>
 
-            <div class="pane">
-              <div class="bar">
-                <div class="left"><span class="status-dot" style="background:var(--green);box-shadow:0 0 0 6px rgba(40,209,124,.11)"></span><span>builder-2</span></div>
-                <div class="score">$0.014</div>
-              </div>
-              <pre>
-<span class="mono-violet">CREATE INDEX</span> idx_users_email <span class="mono-violet">ON</span> users(email);
-<span class="mono-violet">ALTER TABLE</span> users ENABLE <span class="mono-violet">ROW LEVEL SECURITY</span>;
-<span class="mono-green">✓ migration applied</span>
-import { stripe } from '@lib/stripe';
-export async function POST(req) {
-  const session = await stripe.checkout.sessions.create({ ... })
-}
-              </pre>
-              <div class="footer"><div class="fill" style="width:57%"></div><div class="shimmer" style="left:-100px"></div></div>
+          <div class="pane">
+            <div class="bar">
+              <div class="left"><span class="status-dot" style="background:var(--green);box-shadow:0 0 0 6px rgba(39,208,123,.11)"></span><span>ranked bundle</span></div>
+              <div class="score">confidence high</div>
             </div>
-
-            <div class="pane">
-              <div class="bar">
-                <div class="left"><span class="status-dot" style="background:#d88cff;box-shadow:0 0 0 6px rgba(216,140,255,.11)"></span><span>reviewer</span></div>
-                <div class="score">$0.005</div>
+            <div class="rank">
+              <div class="candidate">
+                <div class="top"><strong>oracle-master-design</strong><span>top fit</span></div>
+                <div class="title">Best for motion-heavy UI structure, layout direction, and visual polish.</div>
+                <div class="bar2"><span style="width:92%"></span></div>
               </div>
-              <pre>
-res.json({ refresh })     <span class="mono-red">flagged</span>
-res.cookie("rt", refresh, { httpOnly: true })
-<span class="mono-green">approve -> merge ok</span>
-tsc --noEmit
-line 47: string not assignable
-npm test
-              </pre>
-              <div class="footer"><div class="fill" style="width:77%"></div><div class="shimmer" style="left:-140px"></div></div>
+              <div class="candidate">
+                <div class="top"><strong>oracle-master-web</strong><span>support</span></div>
+                <div class="title">Covers login, dashboard, and front-end surface area for the request.</div>
+                <div class="bar2"><span style="width:84%"></span></div>
+              </div>
+              <div class="candidate">
+                <div class="top"><strong>oracle-master-security</strong><span>suggested</span></div>
+                <div class="title">Proactive guardrail when a login flow might need auth review.</div>
+                <div class="bar2"><span style="width:63%"></span></div>
+              </div>
             </div>
           </div>
         </section>
 
-        <section class="panel right">
-          <div class="ph">
-            <div class="pt">
-              <strong>sentinela dashboard</strong>
-              <span>live build / preview</span>
-            </div>
-            <div class="badge"><span class="mini"></span> live build</div>
-          </div>
-          <div class="preview-wrap">
-            <div class="monitor">
-              <div class="head">
-                <div>sentinela.io/dashboard</div>
-                <div class="liveb">build live</div>
+        <section class="right">
+          <div class="panel">
+            <div class="ph">
+              <div class="pt">
+                <strong>output</strong>
+                <span>what oracle returns</span>
               </div>
-              <div class="browser">
-                <div class="sitehead">
-                  <div>production telemetry that explains itself</div>
-                  <div class="pill">star free</div>
+              <div class="badge"><span class="mini"></span> dispatch</div>
+            </div>
+            <div class="result">
+              <div class="bundle">
+                <div class="head">
+                  <div>final bundle</div>
+                  <div class="liveb">live answer</div>
                 </div>
-                <div class="dash">
-                  <div class="card">
-                    <div class="h">overview</div>
-                    <div class="b">
-                      <div class="headline">clean routing, clear handoff, no guessing.</div>
-                      <div class="sub">the demo keeps the signal structured so a visitor can understand the product at a glance.</div>
-                    </div>
-                    <div class="bars" aria-hidden="true">
-                      <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
-                    </div>
+                <div class="body">
+                  <div class="titlebar">
+                    <div>recommended path for this task</div>
+                    <div class="pill">start free</div>
                   </div>
-                  <div class="card">
-                    <div class="h">signal map</div>
-                    <div class="list">
-                      <div class="row"><strong>motion</strong><span>ui shell</span></div>
-                      <div class="row"><strong>security</strong><span>proactive</span></div>
-                      <div class="row"><strong>fallback</strong><span>ready</span></div>
-                      <div class="row"><strong>confidence</strong><span>high</span></div>
+                  <div class="bundlegrid">
+                    <div class="card">
+                      <div class="h">primary</div>
+                      <div class="b">
+                        <div class="headline">route to design + web.</div>
+                        <div class="sub">The task is about login, dashboard, and motion, so the Oracle returns the right domains instead of making you search manually.</div>
+                      </div>
                     </div>
-                    <div class="metrics">
-                      <span>lighthouse <strong>96</strong></span>
-                      <span>load <strong>0.8s</strong></span>
+                    <div class="card">
+                      <div class="h">fallback</div>
+                      <div class="rows">
+                        <div class="row"><strong>find-skills</strong><span>ready</span></div>
+                        <div class="row"><strong>master agents</strong><span>parallel</span></div>
+                        <div class="row"><strong>proactive</strong><span>security</span></div>
+                      </div>
+                      <div class="metrics">
+                        <span>rank <strong>1</strong></span>
+                        <span>latency <strong>fast</strong></span>
+                      </div>
                     </div>
                   </div>
                 </div>
+                <div class="corners">
+                  <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+                </div>
               </div>
-              <div class="corners">
-                <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+              <div class="telemetry">
+                <div>local selector -> master dispatch</div>
+                <div class="peak">fallback <strong>ready</strong></div>
               </div>
-            </div>
-            <div class="telemetry">
-              <div>monitor • live</div>
-              <div class="peak">peak <strong>1.00</strong></div>
             </div>
           </div>
         </section>
       </div>
 
       <div class="footer">
-        <div>skill-oracle / updated demo</div>
-        <div class="chips">
-          <div class="chip green">orchestrator</div>
-          <div class="chip blue">skill</div>
-          <div class="chip violet">agent</div>
-          <div class="chip">plugin</div>
-          <div class="chip">mcp</div>
-        </div>
+        <div>skill-oracle / demo of the real workflow</div>
+        <div>scan -> rank -> dispatch -> fallback</div>
       </div>
     </div>
   </div>
@@ -432,20 +372,24 @@ npm test
     tl.to(".grid", { backgroundPosition: "0 84px", duration: 13.5, ease: "none" }, 0);
     tl.to(".halo", { x: 18, y: -12, duration: 13.5, ease: "sine.inOut" }, 0);
     tl.fromTo(".header", { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.35, ease: "power2.out" }, 0.05);
-    tl.fromTo(".mission", { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.55, ease: "power3.out" }, 0.15);
-    tl.fromTo(".center", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.22);
-    tl.fromTo(".right", { opacity: 0, x: 30 }, { opacity: 1, x: 0, duration: 0.6, ease: "power3.out" }, 0.28);
-    tl.fromTo(".msg", { opacity: 0, x: -12 }, { opacity: 1, x: 0, duration: 0.32, stagger: 0.09, ease: "power2.out" }, 0.46);
-    tl.fromTo(".pane", { opacity: 0, scale: 0.98 }, { opacity: 1, scale: 1, duration: 0.36, stagger: 0.08, ease: "power2.out" }, 0.42);
-    tl.fromTo(".fill", { scaleX: 0 }, { scaleX: 1, duration: 1.05, stagger: 0.08, ease: "power2.out" }, 0.9);
-    tl.fromTo(".shimmer", { x: -160 }, { x: 700, duration: 1.0, stagger: 0.08, ease: "none" }, 1.0);
-    tl.fromTo(".monitor", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 0.36);
-    tl.fromTo(".telemetry", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.28, ease: "power2.out" }, 1.35);
-    tl.fromTo(".footer", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" }, 1.35);
-    tl.to(".dot", { boxShadow: "0 0 0 10px rgba(40,209,124,.08)", duration: 1.4, repeat: 1, yoyo: true, ease: "sine.inOut" }, 1.0);
-    tl.to(".badge .mini", { boxShadow: "0 0 0 10px rgba(40,209,124,.08)", duration: 1.4, repeat: 1, yoyo: true, ease: "sine.inOut" }, 1.05);
-    tl.to(".liveb", { color: "#8bf0ac", duration: 0.6, repeat: 1, yoyo: true, ease: "sine.inOut" }, 1.2);
-    tl.to(".peak strong", { color: "#ff7b70", duration: 0.4, repeat: 1, yoyo: true, ease: "sine.inOut" }, 1.5);
+    tl.fromTo(".mission", { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.55, ease: "power3.out" }, 0.12);
+    tl.fromTo(".center", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.2);
+    tl.fromTo(".right", { opacity: 0, x: 28 }, { opacity: 1, x: 0, duration: 0.6, ease: "power3.out" }, 0.28);
+    tl.fromTo(".task", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.38, ease: "power2.out" }, 0.18);
+    tl.fromTo(".prompt", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.28, ease: "power2.out" }, 0.40);
+    tl.fromTo(".statusbox", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.30, ease: "power2.out" }, 0.52);
+    tl.fromTo(".scan .line", { opacity: 0, x: -10 }, { opacity: 1, x: 0, duration: 0.30, stagger: 0.10, ease: "power2.out" }, 0.65);
+    tl.fromTo(".candidate", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.34, stagger: 0.10, ease: "power2.out" }, 1.30);
+    tl.fromTo(".fill", { scaleX: 0 }, { scaleX: 1, duration: 1.1, stagger: 0.08, ease: "power2.out" }, 0.95);
+    tl.fromTo(".shimmer", { x: -160 }, { x: 720, duration: 1.0, stagger: 0.08, ease: "none" }, 1.0);
+    tl.fromTo(".bundle", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 1.6);
+    tl.fromTo(".telemetry", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.28, ease: "power2.out" }, 1.95);
+    tl.fromTo(".footer", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.28, ease: "power2.out" }, 2.0);
+    tl.to(".dot", { boxShadow: "0 0 0 10px rgba(39,208,123,.08)", duration: 1.4, repeat: 1, yoyo: true, ease: "sine.inOut" }, 1.0);
+    tl.to(".badge .mini", { boxShadow: "0 0 0 10px rgba(39,208,123,.08)", duration: 1.4, repeat: 1, yoyo: true, ease: "sine.inOut" }, 1.08);
+    tl.to(".score", { color: "#8ef0aa", duration: 0.5, repeat: 1, yoyo: true, ease: "sine.inOut" }, 2.2);
+    tl.to(".peak strong", { color: "#ff7b70", duration: 0.4, repeat: 1, yoyo: true, ease: "sine.inOut" }, 2.0);
+    tl.to(".pill", { boxShadow: "0 0 0 10px rgba(86,176,255,.05)", duration: 1.4, repeat: 1, yoyo: true, ease: "sine.inOut" }, 2.25);
     window.__timelines = window.__timelines || {};
     window.__timelines["skill-oracle-demo"] = tl;
   </script>
