@@ -51,13 +51,13 @@ The full demo video is stored in [assets/demo.webm](assets/demo.webm). The inlin
 | Asset types | Skills only | Skills + Agents + Plugins + MCP |
 | Index size | ~90 skills | 5,000+ assets typical |
 | Discovery | Read every SKILL.md description on demand | 20 domain Master Agents in Claude Code; local domain selector in Codex |
-| Selection | Master-agent dispatch + debate | Semantic local selector over enriched skill content |
+| Selection | Master-agent dispatch + debate | Semantic local executor over enriched skill content |
 | Lazy-loading | None | Optimizer disables non-Oracle SessionStart hooks |
 | Fallback | Manual `--compare` to find-skills | Automatic when no local match exists |
 
 The old `build-index.js` is preserved for backward compat. New pipeline is `scanner.js` -> `classifier.js` -> Master Agents.
 
-Every asset carries a `domain` and `master_agent` tag in the index. In Claude Code, Oracle dispatches in parallel and each master sees only its own cluster. In Overclock/Codex/local runtimes, `scripts/oracle-query.js` reads the same index, evaluates enriched semantic fields extracted from each `SKILL.md`, and ranks assets deterministically without requiring Claude Code's `Task` dispatcher. In Overclock, follow-up agent work should be delegated through visible `pane_spawn` panes only when the work genuinely splits into independent streams.
+Every asset carries a `domain` and `master_agent` tag in the index. In Claude Code, Oracle dispatches in parallel and each master sees only its own cluster. In Overclock/Codex/local runtimes, `scripts/oracle-query.js` reads the same index, evaluates enriched semantic fields extracted from each `SKILL.md`, and ranks assets deterministically without requiring Claude Code's `Task` dispatcher. The ranked output is an execution bundle, not a suggestion list: Oracle should invoke every selected skill and agent through the host's supported mechanism. In Overclock, follow-up agent work should be delegated through visible `pane_spawn` panes only when the work genuinely splits into independent streams.
 
 The local path is not a per-domain LLM orchestration layer. It is a semantic selector that approximates the master-agent bundle by combining:
 
@@ -344,7 +344,7 @@ Safety filters applied to every ecosystem result:
 
 Accepted recommendations get **auto-indexed** on the next Oracle run because the inventory signature changes. No manual scanner/classifier command is required after the skill is installed.
 
-Overclock/Codex/local note: `oracle-query.js` cannot directly invoke another runtime skill by itself, so it exits with code `2` and prints the exact `find-skills` invocation. Claude Code skill orchestration should invoke `find-skills` immediately when it sees that fallback signal. In Overclock, visible panes are the supported delegation path for deeper agent review.
+Overclock/Codex/local note: `oracle-query.js` cannot directly invoke another runtime skill by itself, so it exits with code `2` and prints the exact `find-skills` invocation. Claude Code skill orchestration should invoke `find-skills` immediately when it sees that fallback signal. In Overclock, visible panes are the supported delegation path for deeper agent review. When Oracle returns a non-fallback bundle, treat every selected skill and agent as mandatory execution, not advisory reference material.
 
 ### Privacy and repository safety
 

@@ -6,7 +6,7 @@
  * This script executes the Oracle selection path without Claude Code's Task
  * subagent dispatcher. It reads ~/.claude/oracle-index.json, detects relevant
  * domains from a natural-language task, ranks assets directly, and prints the
- * top picks. It is intentionally deterministic and dependency-free.
+ * execution bundle. It is intentionally deterministic and dependency-free.
  *
  * When oracle-embeddings.json exists and an API key is configured, semantic
  * embedding similarity is used to augment keyword-based domain detection and
@@ -1544,6 +1544,7 @@ function formatResult(result) {
   const lines = [];
   lines.push(`Oracle local picks for: ${result.task}`);
   lines.push(`Domains: ${result.domains.join(', ')}`);
+  lines.push('Dispatch mode: execute every recommended asset that is available in the current runtime');
   if (result.embeddingUsed) lines.push('Mode: semantic (keyword + embedding hybrid)');
   if (result.modelHints) {
     lines.push(`Model hint: ${result.modelHints.complexity} | Claude=${result.modelHints.claude} | Codex=${result.modelHints.codex}`);
@@ -1579,7 +1580,7 @@ function formatResult(result) {
       lines.push('');
     }
     if (result.bundle && result.bundle.length) {
-      lines.push('Recommended bundle:');
+      lines.push('Execution bundle:');
       result.bundle.slice(0, 6).forEach((asset, index) => {
         lines.push(`  ${index + 1}. ${asset.name} (${asset.domain}) -> ${asset.invoke}`);
       });
@@ -1597,6 +1598,8 @@ function formatResult(result) {
       lines.push(`   Why: matched ${asset.matched.join(', ') || 'task context'}`);
       lines.push(`   Invoke: ${asset.invoke}`);
     });
+    lines.push('');
+    lines.push('Execution rule: treat every pick above as mandatory unless the user explicitly asked for discovery-only mode or the assets are mutually exclusive.');
   }
 
   if (result.parallelPlan && result.parallelPlan.recommended) {
@@ -1615,7 +1618,7 @@ function formatResult(result) {
 
   if (result.suggestions.length) {
     lines.push('');
-    lines.push('You may also want:');
+    lines.push('Companion domains to include when they are not mutually exclusive:');
     for (const s of result.suggestions) {
       lines.push(`- ${s.domain} (${s.master_agent}) - ${s.asset_count} assets`);
     }

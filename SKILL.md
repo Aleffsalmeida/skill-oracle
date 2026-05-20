@@ -19,6 +19,8 @@ You are the **single entry point** for all asset discovery in Claude Code and Co
 5. **Proactively suggest** domains the user forgot (security, audit, observability).
 6. **Fall back** to `find-skills` when no local asset matches.
 
+Oracle is a **dispatch engine**, not a passive recommender. Any asset it selects as a best fit is an execution target. If Oracle surfaces a skill, agent, plugin, or MCP tool, it must be invoked through the host's supported mechanism instead of being left as a reference list.
+
 ---
 
 ## When to Invoke
@@ -146,6 +148,8 @@ Task(subagent_type="oracle-master-<D>", prompt="<task description>\n\nReturn top
 
 Each master returns its top 3-5 picks following the structure defined in `oracle-master-<D>.md`.
 
+Treat every returned pick as an execution request, not a suggestion. If a returned asset is a skill, invoke `Skill("<id>")`. If it is an agent, dispatch it through the host's supported agent mechanism. If multiple picks are relevant and not mutually exclusive, dispatch all of them.
+
 ### Step 3b — Local/Codex selection
 
 Use this path when the host does not provide Claude Code's `Task` dispatcher:
@@ -164,9 +168,9 @@ node ~/.claude/skills/skill-oracle/scripts/oracle-query.js --rebuild
 node ~/.claude/skills/skill-oracle/scripts/oracle-smoke-test.js
 ```
 
-When using Overclock or Codex, summarize the `oracle-query.js` output to the user and then invoke the recommended skill or tool according to the host's available mechanism. For Overclock, agent recommendations should be treated as visible `pane_spawn` follow-up work; direct `Task(subagent_type=...)` is only valid in Claude Code. After every `pane_spawn`, immediately execute the full loop `pane_write -> pane_wait_idle -> pane_read`; do not leave spawned panes parked at an untouched prompt.
+When using Overclock or Codex, summarize the `oracle-query.js` output to the user and then invoke every recommended skill or tool according to the host's available mechanism. For Overclock, agent recommendations should be treated as visible `pane_spawn` follow-up work; direct `Task(subagent_type=...)` is only valid in Claude Code. After every `pane_spawn`, immediately execute the full loop `pane_write -> pane_wait_idle -> pane_read`; do not leave spawned panes parked at an untouched prompt.
 
-### Step 4 — Synthesize
+### Step 4 — Synthesize and dispatch
 
 Collect all picks. Deduplicate by `asset.id`. Re-rank by:
 - Score returned by master
@@ -174,7 +178,7 @@ Collect all picks. Deduplicate by `asset.id`. Re-rank by:
 - Capability-slot coverage for compound requests (logo + video + social, signup + email + tracking, SEO + schema, payments + pricing, etc.)
 - Type preference: `skill` > `agent` > `plugin` > `mcp` for declarative tasks; reverse for exploratory tasks
 
-Present **top 5 final** with invocation guidance:
+Present **top 5 final** with execution guidance, then dispatch every pick that remains relevant:
 
 ```
 ## Oracle picks for: <task summary>
@@ -186,6 +190,8 @@ Present **top 5 final** with invocation guidance:
 
 2. ...
 ```
+
+Do not stop after listing the picks. Immediately invoke the skills and agents in the final bundle unless the user explicitly asked for discovery-only mode.
 
 ### Step 5 — Proactive consulting (gap analysis)
 
@@ -208,7 +214,7 @@ Output as:
 > `testing-qa` (oracle-master-testing) — new code without tests usually regresses.
 ```
 
-Each suggestion is **one line + ask if the user wants it included**. Don't dispatch automatically.
+Each suggestion is **one line + ask if the user wants it included**. If the user asked Oracle to execute the task, and the suggestion is not mutually exclusive with the main bundle, include it in the dispatch set.
 
 ### Step 6 — Fallback to ecosystem search
 
