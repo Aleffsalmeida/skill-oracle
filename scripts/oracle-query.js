@@ -69,6 +69,36 @@ const NEGATION_BREAKS = new Set([
   'but', 'then', 'with', 'using',
   'mas', 'entao', 'então', 'com', 'usando',
 ]);
+const HARNESS_DIRS = [
+  '.claude', '.cursor', '.gemini', '.codex', '.agents',
+  '.trae', '.trae-cn', '.pi', '.opencode', '.kiro', '.rovodev',
+];
+const PIN_MARKER = '<!-- impeccable-pinned-skill -->';
+const COMMAND_INTENTS = [
+  { command: 'craft', re: /\b(craft|build|create|make|implement|compose)\b/ },
+  { command: 'shape', re: /\b(shape|brief|plan|define)\b/ },
+  { command: 'teach', re: /\b(teach|context|setup|prepare)\b/ },
+  { command: 'document', re: /\b(document|docs|doc|write up)\b/ },
+  { command: 'extract', re: /\b(extract|pull out|tokens|components)\b/ },
+  { command: 'critique', re: /\b(critique|review)\b/ },
+  { command: 'audit', re: /\b(audit|a11y|accessibility|performance|responsive|checks?)\b/ },
+  { command: 'polish', re: /\b(polish|refine|cleanup|clean up|improve|tighten|smooth)\b/ },
+  { command: 'bolder', re: /\b(bolder|louder|dramatic|more expressive)\b/ },
+  { command: 'quieter', re: /\b(quieter|subtle|tone down|less intense)\b/ },
+  { command: 'distill', re: /\b(distill|simplify|reduce|essence)\b/ },
+  { command: 'harden', re: /\b(harden|edge cases|production|robust)\b/ },
+  { command: 'onboard', re: /\b(onboard|empty state|first run|activation)\b/ },
+  { command: 'animate', re: /\b(animate|motion|transition|micro-interaction)\b/ },
+  { command: 'colorize', re: /\b(color|palette|theme)\b/ },
+  { command: 'typeset', re: /\b(typography|type|font|text)\b/ },
+  { command: 'layout', re: /\b(layout|spacing|grid|rhythm|arrange|page|screen|responsive)\b/ },
+  { command: 'delight', re: /\b(delight|personality|surprise)\b/ },
+  { command: 'overdrive', re: /\b(overdrive|extreme|ambitious)\b/ },
+  { command: 'clarify', re: /\b(clarify|copy|label|labels|error)\b/ },
+  { command: 'adapt', re: /\b(adapt|mobile|desktop|responsive)\b/ },
+  { command: 'optimize', re: /\b(optimize|performance|perf)\b/ },
+  { command: 'live', re: /\b(live|browser)\b/ },
+];
 
 function findLocalSkill(name) {
   const roots = [
@@ -81,6 +111,183 @@ function findLocalSkill(name) {
     if (fs.existsSync(skillPath)) return skillPath;
   }
   return null;
+}
+
+function findProjectRoot(startDir = process.cwd()) {
+  let dir = path.resolve(startDir);
+  while (dir !== path.dirname(dir)) {
+    if (
+      fs.existsSync(path.join(dir, '.git')) ||
+      fs.existsSync(path.join(dir, 'package.json')) ||
+      fs.existsSync(path.join(dir, 'skills-lock.json'))
+    ) {
+      return dir;
+    }
+    dir = path.dirname(dir);
+  }
+  return path.resolve(startDir);
+}
+
+function skillRootCandidates(projectRoot = findProjectRoot()) {
+  const roots = new Set([
+    path.join(HOME, '.claude', 'skills'),
+    path.join(HOME, '.codex', 'skills'),
+    path.join(HOME, '.agents', 'skills'),
+  ]);
+  for (const harness of HARNESS_DIRS) {
+    roots.add(path.join(projectRoot, harness, 'skills'));
+  }
+  return Array.from(roots).filter((root) => fs.existsSync(root));
+}
+
+function readTextFile(filePath) {
+  try {
+    return fs.readFileSync(filePath, 'utf8');
+  } catch (_error) {
+    return '';
+  }
+}
+
+function parseSkillCommands(skillText) {
+  const lines = String(skillText || '').split(/\r?\n/);
+  const sectionStart = lines.findIndex((line) => /^\s*##+\s+Commands\b/i.test(line));
+  if (sectionStart === -1) return [];
+  const start = lines.findIndex((line, index) => index > sectionStart && /^\s*\|\s*Command\s*\|/i.test(line));
+  if (start === -1) return [];
+
+  const commands = [];
+  for (let i = start + 2; i < lines.length; i += 1) {
+    const line = lines[i].trim();
+    if (!line || !line.startsWith('|')) break;
+    const cells = line.split('|').slice(1, -1).map((cell) => cell.trim());
+    if (cells.length < 3) continue;
+    const rawName = cells[0].replace(/`/g, '').trim();
+    const name = rawName.split(/\s+/)[0];
+    if (!name || /^-+$/.test(name)) continue;
+    commands.push({
+      name,
+      category: cells[1] || '',
+      description: cells[2] || '',
+      reference: cells[3] || '',
+    });
+  }
+  return commands;
+}
+
+function normalizeTaskTarget(task) {
+  const text = String(task || '').trim();
+  const pathMatch = text.match(/(?:[A-Za-z]:\\|\.{1,2}[\\/]|[A-Za-z]:\/|[^\s"'`]+\.[A-Za-z0-9]{2,})(?:[^\s"'`)]*)?/);
+  if (pathMatch && pathMatch[0]) return pathMatch[0].replace(/[.,;:]+$/, '');
+  const quoted = text.match(/["'`](.+?)["'`]/);
+  if (quoted && quoted[1]) return quoted[1].trim();
+  return '';
+}
+
+function selectSkillCommand(commands, task, skillName = '') {
+  if (!Array.isArray(commands) || commands.length === 0) return null;
+  const text = normalize(task);
+  const tokens = positiveTokens(task);
+  let best = null;
+
+  for (const command of commands) {
+    let score = 0;
+    const name = normalize(command.name);
+    const description = normalize(command.description);
+    if (text.includes(name)) score += 12;
+    for (const token of tokens) {
+      if (name === token) score += 10;
+      else if (name.includes(token)) score += 4;
+      if (description.includes(token)) score += 1.5;
+    }
+    for (const intent of COMMAND_INTENTS) {
+      if (intent.command === command.name && intent.re.test(text)) score += 10;
+    }
+    if (skillName === 'impeccable') {
+      if (command.name === 'layout' && /\b(layout|spacing|grid|page|screen|responsive|dashboard)\b/.test(text)) score += 8;
+      if (command.name === 'polish' && /\b(polish|refine|improve|cleanup|tighten)\b/.test(text)) score += 8;
+    }
+    if (best === null || score > best.score) {
+      best = { ...command, score };
+    }
+  }
+
+  if (!best || best.score <= 0) {
+    const fallback = commands.find((command) => command.name === 'polish') || commands[0];
+    return fallback ? { ...fallback, score: 0 } : null;
+  }
+  return best;
+}
+
+function shortcutExists(command, projectRoot = findProjectRoot()) {
+  const roots = skillRootCandidates(projectRoot);
+  for (const root of roots) {
+    const shortcutPath = path.join(root, command, 'SKILL.md');
+    if (fs.existsSync(shortcutPath)) {
+      return shortcutPath;
+    }
+  }
+  return null;
+}
+
+function resolveSkillInvocation(asset, task, executor = null, projectRoot = findProjectRoot()) {
+  const skillName = asset?.name || '';
+  if (!skillName) {
+    return { invoke: 'Skill("unknown")', mechanism: 'skill', command: null, pinned: false };
+  }
+
+  const skillPath = asset?.path || findLocalSkill(skillName);
+  const skillText = skillPath ? readTextFile(skillPath) : '';
+  const commands = parseSkillCommands(skillText);
+  const target = normalizeTaskTarget(task);
+  const command = selectSkillCommand(commands, task, skillName);
+  const executorName = normalize(executor?.name || process.env.ORACLE_EXECUTOR || '');
+
+  if (commands.length > 0 && command) {
+    const pinnedPath = shortcutExists(command.name, projectRoot);
+    const suffix = target ? ` ${target}` : '';
+    if (pinnedPath) {
+      return {
+        invoke: `/${command.name}${suffix}`,
+        mechanism: 'pinned-command',
+        command: command.name,
+        pinned: true,
+        skill: skillName,
+        target,
+        pinned_path: pinnedPath,
+      };
+    }
+    return {
+      invoke: `/${skillName} ${command.name}${suffix}`.trim(),
+      mechanism: 'skill-command',
+      command: command.name,
+      pinned: false,
+      skill: skillName,
+      target,
+      pinned_path: null,
+    };
+  }
+
+  if (executorName === 'pane_spawn') {
+    return {
+      invoke: `pane_spawn visible pane, then prompt it to use ${skillName}`,
+      mechanism: 'pane_spawn',
+      command: null,
+      pinned: false,
+      skill: skillName,
+      target,
+      pinned_path: null,
+    };
+  }
+
+  return {
+    invoke: `Skill("${skillName}")`,
+    mechanism: 'skill',
+    command: null,
+    pinned: false,
+    skill: skillName,
+    target,
+    pinned_path: null,
+  };
 }
 
 function fallbackGuidance(task) {
@@ -953,7 +1160,18 @@ function scoreAsset(asset, taskTokens, activeCapabilityIntents = []) {
   return { score, matched: Array.from(new Set(matched)).slice(0, 8) };
 }
 
-function enrichRankedAsset(asset, domain, result, executor = null) {
+function enrichRankedAsset(asset, domain, result, executor = null, task = '', projectRoot = findProjectRoot()) {
+  const invocation = asset.type === 'skill'
+    ? resolveSkillInvocation(asset, task, executor, projectRoot)
+    : {
+        invoke: invocationHint(asset, task, executor, projectRoot),
+        mechanism: null,
+        command: null,
+        pinned: false,
+        skill: asset.name,
+        target: normalizeTaskTarget(task),
+        pinned_path: null,
+      };
   const segments = semanticSegments(asset);
   return {
     id: asset.id,
@@ -976,7 +1194,8 @@ function enrichRankedAsset(asset, domain, result, executor = null) {
     },
     path: asset.path,
     source: asset.source,
-    invoke: invocationHint(asset, executor),
+    invoke: invocation.invoke,
+    invocation,
   };
 }
 
@@ -1001,8 +1220,10 @@ function assetTypeFit(asset, task) {
   return 0;
 }
 
-function invocationHint(asset, executor = null) {
-  if (asset.type === 'skill') return `Skill("${asset.name}")`;
+function invocationHint(asset, task, executor = null, projectRoot = findProjectRoot()) {
+  if (asset.type === 'skill') {
+    return resolveSkillInvocation(asset, task, executor, projectRoot).invoke;
+  }
   if (asset.type === 'agent') {
     const executorName = normalize(executor?.name || process.env.ORACLE_EXECUTOR || '');
     if (executorName === 'pane_spawn') {
@@ -1237,6 +1458,7 @@ function workflowRecommendations(idx, task, domains) {
   const nonTrivial = tokenCount >= 8 || domains.length >= 2 || isProductImplementationContext(task);
   const featureWork = /\b(build|create|add|implement|update|refactor|feature|app|dashboard|ui|ux|schema|migration|soft delete|criar|implementar|atualizar|melhorar|sistema|pagina|página|formulario|formulário)\b/.test(text);
   const multiStep = domains.length >= 3 || /\b(schema|migration|database|supabase|api|ui|dashboard|soft delete|lixeira|rls|multi-step|end-to-end|banco de dados)\b/.test(text);
+  const projectRoot = findProjectRoot();
 
   const names = [];
   if (nonTrivial) names.push('using-superpowers');
@@ -1252,13 +1474,15 @@ function workflowRecommendations(idx, task, domains) {
     })
     .map((name) => {
       const asset = findAssetByName(idx, name);
+      const resolved = asset ? resolveSkillInvocation(asset, task, null, projectRoot) : null;
       return {
         name,
         type: asset?.type || 'skill',
         domain: asset?.domain || 'tooling-meta',
         source: asset?.source || 'expected-local-skill',
         path: asset?.path || null,
-        invoke: `Skill("${name}")`,
+        invoke: resolved?.invoke || `Skill("${name}")`,
+        invocation: resolved || null,
         available: Boolean(asset),
       };
     });
@@ -1316,8 +1540,29 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
     : modelHints?.codex || modelHints?.claude || null;
   const mode = parallelPlan?.recommended ? 'parallel' : 'single';
   const taskPrompt = String(task || '').trim();
+  const workstreamAssets = (description) => {
+    const text = normalize(description);
+    const matched = picks.filter((asset) => {
+      const domain = normalize(asset.domain || '');
+      const name = normalize(asset.name || '');
+      if (/(database|schema|rls|migration|supabase|postgres|soft delete|banco de dados)/.test(text)) {
+        return /database-data|backend-api|devops-infra|security-audit/.test(domain) || /supabase|postgres|schema|migration|rls/.test(name);
+      }
+      if (/(dashboard|analytics|metric|kpi|funnel|period comparison)/.test(text)) {
+        return /data-analytics|web-dev|design-ui/.test(domain) || /analytics|dashboard|chart|metric|posthog/.test(name);
+      }
+      if (/(qa|security|playwright|audit|destructive-action|RLS)/.test(text)) {
+        return /testing-qa|security-audit/.test(domain) || /playwright|test|security|audit|rls/.test(name);
+      }
+      if (/(ui|ux|react|frontend|page|form|shadcn)/.test(text)) {
+        return /design-ui|web-dev/.test(domain) || /react|ui|ux|frontend|design|shadcn/.test(name);
+      }
+      return false;
+    });
+    return matched.length ? matched.slice(0, 3) : picks.slice(0, 3);
+  };
 
-  const buildPanePrompt = (description, index) => {
+  const buildPanePrompt = (description, index, assets) => {
     const lines = [
       `Execute this Oracle workstream: ${description}.`,
       `User task: ${taskPrompt}`,
@@ -1328,6 +1573,13 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
       '3. Produce only the result needed for this workstream.',
       '4. If you need to touch files, make the minimal safe change.',
     ];
+    if (Array.isArray(assets) && assets.length) {
+      lines.push('');
+      lines.push('Oracle execution targets:');
+      for (const asset of assets) {
+        lines.push(`- ${asset.name}: ${asset.invoke}`);
+      }
+    }
     if (index === 0) {
       lines.splice(1, 0, 'This is the first workstream in the current dispatch plan.');
     }
@@ -1355,15 +1607,27 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
       type: asset.type,
       domain: asset.domain,
       invoke: asset.invoke,
+      mechanism: asset.invocation?.mechanism || null,
+      command: asset.invocation?.command || null,
       model: selectedModel,
     })),
     parallel_workstreams: parallelPlan?.recommended
-      ? parallelPlan.workstreams.map((item, index) => ({
-          description: item,
-          executor: parallelPlan.executor,
-          model: selectedModel,
-          pane_prompt: buildPanePrompt(item, index),
-        }))
+      ? parallelPlan.workstreams.map((item, index) => {
+          const assets = workstreamAssets(item);
+          return {
+            description: item,
+            executor: parallelPlan.executor,
+            model: selectedModel,
+            assets: assets.map((asset) => ({
+              name: asset.name,
+              type: asset.type,
+              domain: asset.domain,
+              invoke: asset.invoke,
+              mechanism: asset.invocation?.mechanism || null,
+            })),
+            pane_prompt: buildPanePrompt(item, index, assets),
+          };
+        })
       : [],
     notes: [
       visiblePanes
@@ -1380,6 +1644,7 @@ async function selectAssets(idx, task, options = {}) {
   const domainIds = detectDomains(task, idx, options.domains || []);
   const taskTokens = positiveTokens(task);
   const executor = options.executor || options.preflight?.preflight?.executor || null;
+  const projectRoot = options.projectRoot || findProjectRoot();
   const activeCapabilityIntents = matchedCapabilityIntents(task);
   const blockedDomains = domainBlocksFromNegation(task);
 
@@ -1475,7 +1740,7 @@ async function selectAssets(idx, task, options = {}) {
           if (sim > 0.45) score += (sim - 0.45) * 50;
         }
 
-        return enrichRankedAsset(asset, domain, { score, matched: result.matched }, executor);
+        return enrichRankedAsset(asset, domain, { score, matched: result.matched }, executor, task, projectRoot);
       })
       .filter((asset) => asset.score > 0)
       .sort((a, b) => {
@@ -1682,7 +1947,7 @@ function formatResult(result) {
     result.picks.slice(0, 5).forEach((asset, index) => {
       lines.push(`${index + 1}. ${asset.name} - ${asset.type} - score ${asset.score} - ${asset.domain}`);
       lines.push(`   Why: matched ${asset.matched.join(', ') || 'task context'}`);
-      lines.push(`   Invoke: ${asset.invoke}`);
+      lines.push(`   Invoke: ${asset.invoke}${asset.invocation?.mechanism ? ` [${asset.invocation.mechanism}]` : ''}`);
     });
     lines.push('');
     lines.push('Execution rule: treat every pick above as mandatory unless the user explicitly asked for discovery-only mode or the assets are mutually exclusive.');
@@ -1716,6 +1981,12 @@ function formatResult(result) {
     result.dispatchPlan.parallel_workstreams.forEach((item, index) => {
       lines.push(`  ${index + 1}. ${item.description} -> ${item.executor} using ${item.model || 'runtime-default model'}`);
       lines.push(`     Prompt: ${item.pane_prompt}`);
+      if (Array.isArray(item.assets) && item.assets.length) {
+        lines.push('     Targets:');
+        for (const asset of item.assets) {
+          lines.push(`       - ${asset.name}: ${asset.invoke}${asset.mechanism ? ` [${asset.mechanism}]` : ''}`);
+        }
+      }
     });
   }
 
@@ -1833,6 +2104,8 @@ module.exports = {
   selectAssets,
   recommendedModels,
   parallelExecutionPlan,
+  resolveSkillInvocation,
+  parseSkillCommands,
   loadIndex,
   main,
 };

@@ -7,6 +7,7 @@ const {
   estimateComplexity,
   recommendedModels,
   parallelExecutionPlan,
+  resolveSkillInvocation,
 } = require('./oracle-query');
 
 function assertCheck(condition, message) {
@@ -248,6 +249,33 @@ async function main() {
   assertCheck(
     recommendedModels('simple').claude === 'claude-haiku-4-5',
     'simple Claude model must be claude-haiku-4-5'
+  );
+  const impeccableSkill = {
+    name: 'impeccable',
+    type: 'skill',
+    path: 'C:\\Users\\aleff\\.claude\\skills\\impeccable\\SKILL.md',
+  };
+  const layoutInvocation = resolveSkillInvocation(
+    impeccableSkill,
+    'ajustar layout src/pages/BotAccess.tsx',
+    null
+  );
+  assertCheck(
+    /^\/impeccable layout\s+src\/pages\/BotAccess\.tsx$/i.test(layoutInvocation.invoke),
+    `expected layout command invocation, got ${layoutInvocation.invoke}`
+  );
+  const polishInvocation = resolveSkillInvocation(
+    impeccableSkill,
+    'polish src/pages/BotAccess.tsx',
+    null
+  );
+  assertCheck(
+    /^\/polish\s+src\/pages\/BotAccess\.tsx$/i.test(polishInvocation.invoke),
+    `expected pinned polish invocation, got ${polishInvocation.invoke}`
+  );
+  assertCheck(
+    polishInvocation.mechanism === 'pinned-command',
+    `expected pinned-command mechanism, got ${polishInvocation.mechanism}`
   );
   assertCheck(
     estimateComplexity('fazer design da pagina metodo legalizada', ['design-ui', 'web-dev'], []) !== 'heavy',

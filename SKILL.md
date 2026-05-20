@@ -148,7 +148,14 @@ Task(subagent_type="oracle-master-<D>", prompt="<task description>\n\nReturn top
 
 Each master returns its top 3-5 picks following the structure defined in `oracle-master-<D>.md`.
 
-Treat every returned pick as an execution request, not a suggestion. If a returned asset is a skill, invoke `Skill("<id>")`. If it is an agent, dispatch it through the host's supported agent mechanism. If multiple picks are relevant and not mutually exclusive, dispatch all of them.
+Treat every returned pick as an execution request, not a suggestion. If a returned asset is a skill, resolve its executable command before dispatch:
+
+- If the skill exposes a `Commands` table, choose the matching subcommand for the task.
+- If a same-named shortcut skill exists, prefer `/<command> ...`.
+- Otherwise use `/<skill> <command> ...` for command-capable skills.
+- If the skill has no command table, invoke `Skill("<id>")`.
+
+If it is an agent, dispatch it through the host's supported agent mechanism. If multiple picks are relevant and not mutually exclusive, dispatch all of them.
 
 ### Step 3b — Local/Codex selection
 
