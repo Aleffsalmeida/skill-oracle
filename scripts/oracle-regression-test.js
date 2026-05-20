@@ -44,7 +44,7 @@ const CASES = [
     name: 'oracle-multi-skill-composition',
     task: 'preciso que o oracle junte as melhores skills para interface electron com identidade visual e atalhos do app',
     expectedDomains: ['tooling-meta', 'web-dev', 'design-ui'],
-    expectedPickNames: ['skill-oracle', 'brandkit', 'design-taste-frontend'],
+    expectedPickNames: ['superpowers', 'frontend-design', 'brandkit', 'design-taste-frontend'],
     expectSynthesisUsed: true,
   },
   {
@@ -292,6 +292,20 @@ async function main() {
   const pageResult = await selectAssets(idx, 'fazer design da pagina metodo legalizada', { limit: 8 });
   assertCheck(!pageResult.domains.includes('database-data'), 'standalone page design must not pull database-data without explicit db signal');
   assertCheck(!pageResult.parallelPlan?.recommended, 'standalone page design result must not recommend parallel panes');
+  const designPriorityResult = await selectAssets(idx, 'refazer design da homepage com visual premium e nada genérico', { limit: 8 });
+  assertCheck(
+    designPriorityResult.bundle?.[0]?.name === 'superpowers',
+    `expected superpowers to lead the design bundle, got ${designPriorityResult.bundle?.[0]?.name}`
+  );
+  assertCheck(
+    designPriorityResult.bundle.some((asset) => asset.name === 'frontend-design'),
+    'design bundle must include frontend-design'
+  );
+  assertCheck(
+    designPriorityResult.bundle.some((asset) => asset.name === 'gsd-autonomous') &&
+      designPriorityResult.bundle.some((asset) => asset.name === 'gsd-workstreams'),
+    'design bundle must include the priority GSD stack'
+  );
   const heavyPlan = parallelExecutionPlan(
     'implementar dashboard com api banco de dados rls testes playwright e auditoria de seguranca',
     ['web-dev', 'database-data', 'data-analytics', 'security-audit'],

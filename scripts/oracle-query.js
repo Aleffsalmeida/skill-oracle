@@ -58,9 +58,13 @@ const PREFERRED_EXECUTION_PROVIDER_ORDER = [
 const FIRST_CLASS_HOSTS = new Set(['overclock', 'claude-code', 'codex', 'antigravity']);
 const PREFERRED_SKILLS = new Set([
   'skill-oracle',
+  'superpowers',
+  'gsd-autonomous',
+  'gsd-workstreams',
   'awesome-design-md',
   'ui-ux-pro-max',
   'impeccable',
+  'polish',
   'motion',
   'imagegen-frontend-web',
   'imagegen-frontend-mobile',
@@ -1627,16 +1631,38 @@ function buildVirtualMasterReport(domain, ranked, task) {
   };
 }
 
-function buildRecommendedBundle(domainReports, picks, task) {
+function buildRecommendedBundle(idx, domainReports, picks, task) {
   const intents = intentBoosts(task);
+  const MAX_BUNDLE_SIZE = 9;
   const bundle = [];
   const seen = new Set();
   const taskText = normalize(task);
   const activeCapabilityIntents = matchedCapabilityIntents(task);
+  const designContext = isProductImplementationContext(task) || /\b(design|ui|ux|frontend|interface|visual|layout)\b/.test(taskText);
+  const videoContext = /\b(video|motion|hyperframes|remotion|reel|shorts|video-edit|video edit)\b/.test(taskText);
+  const databaseContext = /\b(supabase|schema|banco de dados|database|postgres|migration|migracao|migração|rls|edge function|api|soft delete|tabela|entidade|relacionamento)\b/.test(taskText);
+  const seoContext = /\b(seo|schema markup|json[- ]ld|technical seo|indexing|rich results|search console)\b/.test(taskText);
+  const docsContext = /\b(docx|pdf|xlsx|spreadsheet|planilha|documento|document|files?|file workflow)\b/.test(taskText);
+  const resolveAsset = (name) => findAssetByName(idx, name)
+    || picks.find((candidate) => candidate.name === name)
+    || domainReports.flatMap((report) => report.top || []).find((candidate) => candidate.name === name);
+  const pushIfAvailable = (name) => {
+    const asset = resolveAsset(name);
+    if (asset && !seen.has(canonicalAssetKey(asset))) {
+      bundle.push(asset);
+      seen.add(canonicalAssetKey(asset));
+      return true;
+    }
+    return false;
+  };
 
   const preferredByIntent = [];
   for (const intent of activeCapabilityIntents) {
     preferredByIntent.push(intent.skills);
+  }
+  preferredByIntent.unshift(['superpowers', 'gsd-autonomous', 'gsd-workstreams']);
+  if (designContext || intents.shortcuts || intents.branding) {
+    preferredByIntent.unshift(['frontend-design', 'design-taste-frontend', 'impeccable']);
   }
   if (intents.branding) preferredByIntent.push(['brandkit', 'design', 'brand', 'impeccable', 'high-end-visual-design']);
   if (intents.ui || intents.shortcuts) preferredByIntent.push(['awesome-design-md', 'ui-ux-pro-max', 'impeccable', 'design-taste-frontend', 'frontend-design', 'high-end-visual-design', 'emil-design-eng', 'shadcn-ui', 'react:components']);
@@ -1646,6 +1672,9 @@ function buildRecommendedBundle(domainReports, picks, task) {
   }
   if (activeCapabilityIntents.some((intent) => intent.id === 'video-motion')) {
     preferredByIntent.push(['hyperframes', 'higgsfield', 'higgs-field', 'remotion', 'remotion-video-creation', 'remotion-to-hyperframes', 'website-to-hyperframes', 'frontend-slides']);
+  }
+  if (videoContext) {
+    preferredByIntent.unshift(['hyperframes', 'hyperframes-cli', 'remotion-video-creation', 'remotion-to-hyperframes', 'remotion', 'frontend-slides']);
   }
   if (/\bawesome design\b/.test(taskText)) preferredByIntent.unshift(['awesome-design-md', 'polish']);
   if (isProductImplementationContext(task)) {
@@ -1661,34 +1690,56 @@ function buildRecommendedBundle(domainReports, picks, task) {
   if (/\b(ga4|gtm|google analytics|tag manager|utm|utms|tracking|conversion tracking|event tracking|attribution)\b/.test(taskText)) {
     preferredByIntent.unshift(['analytics-tracking', 'product-tracking-generate-implementation-guide', 'configuring-experiment-analytics']);
   }
+  if (seoContext) {
+    preferredByIntent.unshift(['seo-audit', 'schema-markup', 'technical-seo', 'seo']);
+  }
+  if (docsContext) {
+    preferredByIntent.unshift(['docx', 'pdf', 'xlsx']);
+  }
   if (/\boracle\b/.test(taskText) || (/\bskill/.test(taskText) && /\bjunt/.test(taskText))) {
     preferredByIntent.unshift(['skill-oracle', 'workspace-surface-audit', 'plugin-structure']);
   }
 
   const requiredBundleNames = [];
-  if (isProductImplementationContext(task)) {
-    requiredBundleNames.push('awesome-design-md', 'ui-ux-pro-max', 'impeccable', 'react:components');
+  requiredBundleNames.push('superpowers', 'gsd-autonomous', 'gsd-workstreams');
+  if (designContext) {
+    requiredBundleNames.push('frontend-design');
   }
-  if (/\b(supabase|schema|banco de dados|database|postgres|migration|migracao|migração|rls|edge function|api|soft delete|tabela|entidade|relacionamento)\b/.test(taskText)) {
+  if (isProductImplementationContext(task)) {
+    requiredBundleNames.push('awesome-design-md');
+  }
+  if (/\bawesome design\b/.test(taskText)) {
+    requiredBundleNames.push('polish');
+  }
+  if (intents.branding) {
+    requiredBundleNames.push('brandkit');
+  }
+  if (databaseContext) {
     requiredBundleNames.push('supabase', 'postgres-patterns');
+  }
+  if (seoContext) {
+    requiredBundleNames.push('seo-audit', 'schema-markup', 'technical-seo', 'seo');
+  }
+  if (docsContext) {
+    requiredBundleNames.push('docx', 'pdf', 'xlsx');
+  }
+  if (videoContext) {
+    requiredBundleNames.push('hyperframes', 'hyperframes-cli', 'remotion-video-creation', 'remotion-to-hyperframes', 'remotion');
+  }
+  if (designContext && !videoContext && !isProductImplementationContext(task)) {
+    requiredBundleNames.push('ui-ux-pro-max', 'polish');
+  }
+  if (isProductImplementationContext(task)) {
+    requiredBundleNames.push('impeccable', 'ui-ux-pro-max', 'react:components');
   }
 
   for (const name of requiredBundleNames) {
-    const asset = picks.find((candidate) => candidate.name === name)
-      || domainReports.flatMap((report) => report.top || []).find((candidate) => candidate.name === name);
-    if (asset && !seen.has(canonicalAssetKey(asset))) {
-      bundle.push(asset);
-      seen.add(canonicalAssetKey(asset));
-    }
+    pushIfAvailable(name);
   }
 
   for (const names of preferredByIntent) {
     for (const name of names) {
-      const asset = picks.find((candidate) => candidate.name === name)
-        || domainReports.flatMap((report) => report.top || []).find((candidate) => candidate.name === name);
-      if (asset && !seen.has(canonicalAssetKey(asset))) {
-        bundle.push(asset);
-        seen.add(canonicalAssetKey(asset));
+      if (pushIfAvailable(name)) {
         break;
       }
     }
@@ -1701,7 +1752,7 @@ function buildRecommendedBundle(domainReports, picks, task) {
     if (seen.has(key)) continue;
     bundle.push(primary);
     seen.add(key);
-    if (bundle.length >= 6) return bundle.slice(0, 6);
+    if (bundle.length >= MAX_BUNDLE_SIZE) return bundle.slice(0, MAX_BUNDLE_SIZE);
   }
 
   for (const report of domainReports) {
@@ -1710,17 +1761,13 @@ function buildRecommendedBundle(domainReports, picks, task) {
       if (seen.has(key)) continue;
       bundle.push(asset);
       seen.add(key);
-      if (bundle.length >= 6) return bundle.slice(0, 6);
+      if (bundle.length >= MAX_BUNDLE_SIZE) return bundle.slice(0, MAX_BUNDLE_SIZE);
     }
   }
 
   for (const names of preferredByIntent) {
     for (const name of names) {
-      const asset = picks.find((candidate) => candidate.name === name)
-        || domainReports.flatMap((report) => report.top || []).find((candidate) => candidate.name === name);
-      if (asset && !seen.has(canonicalAssetKey(asset))) {
-        bundle.push(asset);
-        seen.add(canonicalAssetKey(asset));
+      if (pushIfAvailable(name)) {
         break;
       }
     }
@@ -1734,7 +1781,7 @@ function buildRecommendedBundle(domainReports, picks, task) {
     }
   }
 
-  return bundle.slice(0, 6);
+  return bundle.slice(0, MAX_BUNDLE_SIZE);
 }
 
 function mergeBundleIntoPicks(bundle, picks, limit) {
@@ -2262,7 +2309,7 @@ async function selectAssets(idx, task, options = {}) {
     .filter((asset) => asset.score >= STRONG_MATCH_THRESHOLD)
     .sort((a, b) => b.score - a.score)
     .slice(0, options.limit || DEFAULT_LIMIT);
-  const bundle = buildRecommendedBundle(domainReports, rankedPicks, task);
+  const bundle = buildRecommendedBundle(idx, domainReports, rankedPicks, task);
   const picks = mergeBundleIntoPicks(bundle, rankedPicks, options.limit || DEFAULT_LIMIT);
 
   let synthesis = null;
@@ -2295,8 +2342,14 @@ async function selectAssets(idx, task, options = {}) {
   const complexity = estimateComplexity(task, finalDomainIds, picks);
   const modelHints = recommendedModels(complexity);
   const providerInventory = detectExecutionProviderInventory();
+  const taskTokensForFallback = positiveTokens(task).filter((token) => token.length >= MIN_TOKEN_LENGTH && !STOPWORDS.has(token));
+  const directTaskMatch = picks.some((asset) => {
+    const haystack = normalize(`${asset.name} ${asset.id}`);
+    return taskTokensForFallback.some((token) => haystack.includes(token));
+  });
 
-  const fallbackRecommended = picks.length === 0;
+  const fallbackRecommended = picks.length === 0
+    || (finalDomainIds.length === 1 && finalDomainIds[0] === 'misc' && !directTaskMatch);
   const processWorkflow = workflowRecommendations(idx, task, finalDomainIds);
   const parallelPlan = parallelExecutionPlan(task, finalDomainIds, options.preflight || { executor });
   const dispatchPlan = buildDispatchPlan({

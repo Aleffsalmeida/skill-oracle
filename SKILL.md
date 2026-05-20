@@ -92,6 +92,22 @@ If the task is clearly local and low-risk, do not spend an expensive model on it
 
 For Overclock visible panes, the model hint is mandatory execution metadata, not advisory text. Pass the selected `model` explicitly to `pane_spawn`. Never let a simple task inherit the current premium session model.
 
+### Priority Skill Stack
+
+- Canonical first-priority references:
+  - `superpowers` -> https://github.com/obra/superpowers
+  - `gsd` -> https://github.com/gsd-build/get-shit-done
+    - canonical workstream skills: `gsd-autonomous` and `gsd-workstreams`
+  - `frontend-design` -> https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md
+- Always prefer `superpowers` first when it exists in the current index or host inventory.
+- Always prefer the GSD stack (`gsd-autonomous` and `gsd-workstreams`) before ordinary skills when the task is non-trivial.
+- In any design context, prioritize `frontend-design` before other design or UI execution skills so the result does not drift toward generic AI-looking output.
+- For design work, keep the quality stack in front of the bundle as well:
+  - `frontend-design`
+  - `ui-ux-pro-max`
+  - `polish`
+- After those priority skills, continue with the normal Oracle ranking and execution flow for the rest of the stack.
+
 ### Overclock pane safety contract
 
 - Only spawn panes for genuinely independent workstreams. Simple page polish, local UI edits, copy tweaks, and single-surface design tasks stay in the current pane.
