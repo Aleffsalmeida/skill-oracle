@@ -63,6 +63,8 @@ Overclock pane execution must use the verified local provider inventory. Oracle 
 
 When a visible pane is still in command-mode or startup chrome, Oracle should not treat it as ready just because the pane exists. The pane has to show a stable prompt surface first. If the Codex pane presents a command prompt such as `Run /review on my current changes`, Oracle should submit that visible activation command first, wait for the pane to enter a working state, and only then submit the actual workstream prompt. An echoed prompt is not execution. This avoids the common failure mode where a prompt is written too early and only gets echoed back instead of executed.
 
+If Codex opens a review-preset menu after `/review`, choose the preset that reviews the current uncommitted changes, then wait for the `Working` spinner before sending the Oracle workstream. A `pane_wait_idle` timeout during that activation flow is not enough to declare failure; check `pane_read` for `Working` before falling back.
+
 First-class host standards are:
 
 - `Overclock`
@@ -89,7 +91,7 @@ The local runner also emits a model hint so simple tasks can stay on a cheaper m
 - **medium** -> `claude-sonnet-4-6` / `gpt-5.4`
 - **heavy** -> `claude-opus-4-7` / `gpt-5.5`
 
-Rule of thumb: start with the smallest model that can safely close the task, and only escalate when the task is multi-domain, long-running, or architecture-heavy.
+Rule of thumb: start with the smallest model that can safely close the task, and only escalate when the task is multi-domain, long-running, or architecture-heavy. For Overclock visible panes, treat `gpt-5.5` as the default Codex execution model when the pane must actually run a workstream; `gpt-5.4-mini` is for cheap local guidance, not for the execution path that has to reach `Working`.
 
 Simple page-design work, local UI polish, and other single-surface tasks should usually stay in the current pane. Opening premium-model panes for that class of work is a policy violation, not an optimization.
 

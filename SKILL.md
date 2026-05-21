@@ -91,6 +91,7 @@ Use the smallest model that can safely finish the work.
 If the task is clearly local and low-risk, do not spend an expensive model on it. Escalate only when the task spans multiple domains, needs deep reasoning, or the cheaper model cannot close the loop cleanly.
 
 For Overclock visible panes, the model hint is mandatory execution metadata, not advisory text. Pass the selected `model` explicitly to `pane_spawn`. Never let a simple task inherit the current premium session model.
+Visible Codex panes that must actually execute work should default to `gpt-5.5`, not `gpt-5.4-mini`. The smaller model is fine for non-visible, cheap, local guidance, but it was not reliable enough for the real pane-execution path that needs to reach `Working` before the workstream is written.
 
 ### Priority Skill Stack
 
@@ -117,6 +118,7 @@ For Overclock visible panes, the model hint is mandatory execution metadata, not
 - The prompt sent to a spawned pane must be submitted with `pane_write submit=true`. A visible prompt that was not submitted is a failure.
 - Before `pane_write`, wait for the spawned pane to reach a stable ready prompt. If the pane is still showing startup chrome, auth screens, onboarding, context-budget warnings, or a booting MCP server, do not submit the task yet. Re-spawn with a lighter verified provider/model or use a mission-bound pane before writing.
 - If the pane is command-mode rather than a blank shell, submit the visible activation command first and wait until the pane transitions into a real working state before sending the Oracle workstream. For Codex panes that present `Run /review on my current changes`, `/review` is the activation command.
+- If `/review` opens a preset menu, choose the option that reviews the current uncommitted changes, then wait until the pane shows `Working` before sending the Oracle workstream.
 - An echoed prompt is not execution. Do not treat a pane as successful until it has shown a working-state acknowledgement and then produced readable work output.
 - If `pane_read` returns no readable output after idle, retry once with the same prompt and then fall back to the next verified provider. Treat empty reads as orchestration failure, not success.
 - If the host is not one of the first-class standards, Oracle should recommend the standards instead of pretending to support the unknown host.

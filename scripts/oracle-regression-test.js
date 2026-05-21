@@ -354,8 +354,9 @@ async function main() {
   assertCheck(
     Array.isArray(overclockResult.executionManifest?.stages) &&
       overclockResult.executionManifest.stages.some((stage) => stage.id === 'activate_command') &&
+      overclockResult.executionManifest.stages.some((stage) => stage.id === 'select_review_preset') &&
       overclockResult.executionManifest.stages.some((stage) => stage.id === 'working_ack'),
-    'Overclock execution manifest must include activate_command and working_ack stages'
+    'Overclock execution manifest must include activate_command, select_review_preset, and working_ack stages'
   );
   assertCheck(
     overclockResult.executionManifest?.host_contract?.output_capture_required === true,
@@ -398,7 +399,7 @@ async function main() {
     },
     modelHints: {
       complexity: 'simple',
-      codex: 'gpt-5.4-mini',
+      codex: 'gpt-5.5',
     },
     executor: { name: 'pane_spawn' },
     preflight: { preflight: { runtime: 'Overclock', executor: { name: 'pane_spawn' } } },
@@ -408,7 +409,7 @@ async function main() {
           id: 'codex-cli',
           label: 'Codex CLI',
           type: 'cli',
-          models: ['gpt-5.4-mini'],
+          models: ['gpt-5.4-mini', 'gpt-5.4', 'gpt-5.5'],
           available: true,
         },
       ],
@@ -419,17 +420,18 @@ async function main() {
     `expected command-mode dispatch to prefer codex-cli, got ${commandModeDispatch.selected_provider}`
   );
   assertCheck(
-    commandModeDispatch.selected_model === 'gpt-5.4-mini',
-    `expected command-mode dispatch to prefer gpt-5.4-mini, got ${commandModeDispatch.selected_model}`
+    commandModeDispatch.selected_model === 'gpt-5.5',
+    `expected command-mode dispatch to prefer gpt-5.5 for visible panes, got ${commandModeDispatch.selected_model}`
   );
   assertCheck(
     Array.isArray(commandModeDispatch.parallel_workstreams) &&
-      commandModeDispatch.parallel_workstreams[0]?.pane_prompt?.includes('submit that activation command first'),
-    'command-mode dispatch must instruct activating the visible command before the workstream prompt'
+      commandModeDispatch.parallel_workstreams[0]?.pane_prompt?.includes('choose the preset that reviews the current uncommitted changes'),
+    'command-mode dispatch must instruct choosing the review preset before the workstream prompt'
   );
   assertCheck(
     Array.isArray(commandModeDispatch.notes) &&
       commandModeDispatch.notes.some((note) => /command-mode panes/i.test(note)) &&
+      commandModeDispatch.notes.some((note) => /review preset/i.test(note)) &&
       commandModeDispatch.notes.some((note) => /working-state/i.test(note) || /working state/i.test(note)),
     'command-mode dispatch must document the command-mode pane behavior'
   );

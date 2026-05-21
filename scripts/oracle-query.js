@@ -549,7 +549,12 @@ function chooseProviderModel(provider, complexity = 'simple', options = {}) {
   };
 
   if (providerId === 'codex-cli') {
-    if (visiblePanes) return MODEL_HINTS.codex.simple || pickByIndex(0);
+    if (visiblePanes) {
+      // Visible-pane execution needs the model that actually reaches a working
+      // state reliably. In practice, gpt-5.5 was the first Codex model that
+      // consistently moved from shell chrome into real execution in Overclock.
+      return MODEL_HINTS.codex.heavy || pickByIndex(2) || pickByIndex(models.length - 1);
+    }
     return MODEL_HINTS.codex[complexity] || pickByIndex(0);
   }
   if (providerId === 'claude-oauth') {
@@ -1982,7 +1987,7 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
       '0. Submit this payload immediately with pane_write submit=true.',
       `0a. Your first visible line must be exactly: ${OUTPUT_PROBE_SENTINEL}.`,
       '0b. Before submitting the workstream, inspect the pane surface and only write after the visible prompt is stable.',
-      '0c. If the pane is showing a command-style Codex prompt such as "Run /review on my current changes", submit that activation command first, wait for the pane to enter Working, and then continue with the workstream prompt.',
+      '0c. If the pane is showing a command-style Codex prompt such as "Run /review on my current changes", submit that activation command first. If Codex opens a review-preset menu, choose the preset that reviews the current uncommitted changes (usually option 2), then wait for an explicit Working state before continuing with the workstream prompt.',
       '1. Follow the user task exactly.',
       '2. Use the selected model for the pane.',
       '3. Produce only the result needed for this workstream.',
@@ -2108,18 +2113,19 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
       : [],
     notes: [
       visiblePanes
-        ? 'Spawn one visible pane per independent workstream, pass the selected provider and selected model explicitly, and submit only after the pane surface is stable. For Codex command-mode panes, activate the command shown on screen first (for example /review), wait for an explicit working-state acknowledgement, and only then send the workstream prompt.'
+        ? 'Spawn one visible pane per independent workstream, pass the selected provider and selected model explicitly, and submit only after the pane surface is stable. For Codex command-mode panes, activate the command shown on screen first (for example /review), choose the review preset if Codex asks for one, wait for an explicit working-state acknowledgement, and only then send the workstream prompt.'
         : 'Host does not expose visible panes; execute in the current runtime or route to a supported executor.',
       visiblePanes
-        ? 'Before pane_write, wait for the spawned pane to show a stable ready prompt. If the pane still shows startup chrome, auth screens, onboarding, context-budget warnings, or a booting MCP server, treat it as not ready and re-spawn or fallback. If the prompt surface is command-mode, send the visible activation command first, confirm the working state, and only then send the Oracle workstream.'
+        ? 'Before pane_write, wait for the spawned pane to show a stable ready prompt. If the pane still shows startup chrome, auth screens, onboarding, context-budget warnings, or a booting MCP server, treat it as not ready and re-spawn or fallback. If the prompt surface is command-mode, send the visible activation command first, choose the review preset when prompted, confirm the working state, and only then send the Oracle workstream. A pane_wait_idle timeout during this activation flow is not enough to declare failure; inspect pane_read for the Working spinner before falling back.'
         : null,
       !FIRST_CLASS_HOSTS.has(runtimeName)
         ? 'If the host cannot adapt cleanly, recommend the first-class standards: Overclock, Claude Code, Codex, or Antigravity CLI.'
         : null,
       'Do not downgrade execution-ready picks into discovery-only recommendations.',
       'If a pane is spawned, complete pane_write -> pane_wait_idle -> pane_read before treating the workstream as active.',
-      'If a Codex pane is command-mode, use the visible activation command on the pane first, then submit the workstream prompt only after the pane shows an explicit working state.',
+      'If a Codex pane is command-mode, use the visible activation command on the pane first. If a review preset appears, choose the preset that reviews the current uncommitted changes, then submit the workstream prompt only after the pane shows an explicit working state.',
       'A spawned pane is not execution-ready until the prompt is stable, any command-mode activation has completed, and a working-state acknowledgement has been observed.',
+      'A pane_wait_idle timeout during command-mode activation is not proof of failure; check pane_read for the Working spinner before falling back.',
       `If pane_read returns no readable output, retry with the same prompt once and use ${OUTPUT_PROBE_SENTINEL} as the visible probe before falling back to the next verified provider.`,
     ].filter(Boolean),
   };
@@ -2132,6 +2138,7 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
     { id: 'spawn', label: 'spawn visible pane', required: visiblePanes },
     { id: 'spawn_ready', label: 'wait until pane is ready for input', required: visiblePanes },
     { id: 'activate_command', label: 'if command-mode, submit the visible activation command', required: visiblePanes },
+    { id: 'select_review_preset', label: 'if Codex opens a review menu, choose the review preset and wait for Working', required: visiblePanes },
     { id: 'working_ack', label: 'wait until the pane shows an explicit working state', required: visiblePanes },
     { id: 'write', label: 'submit prompt with submit=true', required: visiblePanes },
     { id: 'wait_idle', label: 'wait for idle', required: visiblePanes },
@@ -2190,7 +2197,7 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
     host_contract: {
       visible_panes: visiblePanes,
       dispatch_style: visiblePanes ? 'visible-pane-swarm' : 'local-plan',
-      state_machine: ['spawn', 'spawn_ready', 'activate_command', 'working_ack', 'write', 'wait_idle', 'read'],
+      state_machine: ['spawn', 'spawn_ready', 'activate_command', 'select_review_preset', 'working_ack', 'write', 'wait_idle', 'read'],
       command_mode_activation_required: commandModeActivationRequired,
       working_ack_required: commandModeActivationRequired,
       pane_write_submission_required: true,
