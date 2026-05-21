@@ -115,7 +115,8 @@ For Overclock visible panes, the model hint is mandatory execution metadata, not
 - Never close panes you did not spawn in the current task. Never close the caller pane. If the user asks to close idle panes, list the Oracle-owned candidates first unless the user named exact pane ids.
 - A spawned pane is not considered active until Oracle completes `pane_write` with submission, then `pane_wait_idle`, then `pane_read`. If that loop does not complete, treat the pane as failed orchestration instead of "done".
 - The prompt sent to a spawned pane must be submitted with `pane_write submit=true`. A visible prompt that was not submitted is a failure.
-- Before `pane_write`, wait for the spawned pane to reach a stable ready prompt. If the pane is still showing startup chrome, auth screens, onboarding, or context-budget warnings, do not submit the task yet. Re-spawn with a lighter verified provider/model or use a mission-bound pane before writing.
+- Before `pane_write`, wait for the spawned pane to reach a stable ready prompt. If the pane is still showing startup chrome, auth screens, onboarding, context-budget warnings, or a booting MCP server, do not submit the task yet. Re-spawn with a lighter verified provider/model or use a mission-bound pane before writing.
+- If the pane is command-mode rather than a blank shell, submit the visible activation command first and wait until the pane transitions into a real working state before sending the Oracle workstream. For Codex panes that present `Run /review on my current changes`, `/review` is the activation command.
 - If `pane_read` returns no readable output after idle, retry once with the same prompt and then fall back to the next verified provider. Treat empty reads as orchestration failure, not success.
 - If the host is not one of the first-class standards, Oracle should recommend the standards instead of pretending to support the unknown host.
 
@@ -227,6 +228,7 @@ node ~/.claude/skills/skill-oracle/scripts/oracle-smoke-test.js
 
 When using Overclock or Codex, summarize the `oracle-query.js` output to the user and then invoke every recommended skill or tool according to the host's available mechanism. For Overclock, agent recommendations should be treated as visible `pane_spawn` follow-up work; direct `Task(subagent_type=...)` is only valid in Claude Code. After every `pane_spawn`, immediately execute the full loop `pane_write -> pane_wait_idle -> pane_read`; do not leave spawned panes parked at an untouched prompt.
 The pane must receive the exact workstream prompt before waiting idle; spawning alone is not enough.
+If the visible pane is command-mode, submit the activation command shown on screen first, wait for the pane to begin working, and only then submit the Oracle workstream prompt. Do not treat a command prompt as ready until it has transitioned into a working state.
 
 ### Step 4 — Synthesize and dispatch
 
@@ -282,7 +284,38 @@ If **no master returned a strong match** (all scores below threshold), invoke th
 Skill("find-skills") with the task description
 ```
 
-**If `find-skills` is not installed**, tell the user exactly this (do not invent paths or commands):
+### Step 6a — Mandatory missing-skill repair
+
+If the user explicitly requested a priority skill, or Oracle selected any skill as required, and that skill is not present in the current host inventory, Oracle must stop execution and repair discovery before doing the user task manually.
+
+Required repair order:
+
+1. Search the host skill roots for the requested skill by directory name and by `name:` metadata.
+2. If the skill exists outside the active inventory, copy or install it into the active runtime skill root and rerun bootstrap.
+3. If the skill is not local, invoke `find-skills` automatically to search the ecosystem.
+4. If `find-skills` is not installed, install it from the official Vercel Labs package before continuing:
+
+```bash
+npx skills add vercel-labs/skills@find-skills -g -y
+```
+
+5. Use `find-skills` to locate and install the missing Oracle-required skills.
+6. Rebuild the Oracle index after every install:
+
+```bash
+node ~/.codex/skills/skill-oracle/scripts/oracle-bootstrap.js --rebuild
+```
+
+7. Only continue to routing, swarm, or manual execution after the priority stack has been resolved and the Oracle preflight reports `ready: true`.
+
+For frontend/product UI tasks, the mandatory priority stack is:
+
+- `using-superpowers` or the canonical `superpowers` equivalent
+- `gsd`
+- `frontend-design`
+- any additional skills returned by Oracle for the specific task
+
+**If `find-skills` is not installed and cannot be installed**, tell the user exactly this (do not invent paths or commands):
 
 > The `find-skills` skill is not installed locally. Install it from the official Vercel Labs repository so Oracle can search the ecosystem:
 > **https://github.com/vercel-labs/skills**

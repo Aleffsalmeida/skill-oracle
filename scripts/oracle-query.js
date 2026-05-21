@@ -58,7 +58,9 @@ const PREFERRED_EXECUTION_PROVIDER_ORDER = [
 const FIRST_CLASS_HOSTS = new Set(['overclock', 'claude-code', 'codex', 'antigravity']);
 const PREFERRED_SKILLS = new Set([
   'skill-oracle',
+  'using-superpowers',
   'superpowers',
+  'gsd',
   'gsd-autonomous',
   'gsd-workstreams',
   'awesome-design-md',
@@ -535,9 +537,10 @@ function detectExecutionProviderInventory() {
   };
 }
 
-function chooseProviderModel(provider, complexity = 'simple') {
+function chooseProviderModel(provider, complexity = 'simple', options = {}) {
   if (!provider) return null;
   const providerId = canonicalProviderId(provider.id);
+  const visiblePanes = Boolean(options.visiblePanes);
   const models = Array.isArray(provider.models) ? provider.models.filter(Boolean) : [];
   const fromInventory = provider.inventory_model_map || {};
   const pickByIndex = (index) => {
@@ -546,6 +549,7 @@ function chooseProviderModel(provider, complexity = 'simple') {
   };
 
   if (providerId === 'codex-cli') {
+    if (visiblePanes) return MODEL_HINTS.codex.simple || pickByIndex(0);
     return MODEL_HINTS.codex[complexity] || pickByIndex(0);
   }
   if (providerId === 'claude-oauth') {
@@ -560,7 +564,7 @@ function chooseProviderModel(provider, complexity = 'simple') {
   return pickByIndex(0);
 }
 
-function selectExecutionProvider(task, complexity, providerInventory = null) {
+function selectExecutionProvider(task, complexity, providerInventory = null, options = {}) {
   const text = normalize(task);
   const inventory = providerInventory || detectExecutionProviderInventory();
   const explicitClaude = /\b(claude|anthropic)\b/.test(text);
@@ -576,7 +580,7 @@ function selectExecutionProvider(task, complexity, providerInventory = null) {
   }
 
   const provider = providerId ? inventory.providersById?.[providerId] || null : null;
-  const model = chooseProviderModel(provider, complexity);
+  const model = chooseProviderModel(provider, complexity, options);
 
   return {
     providerId,
@@ -1631,7 +1635,7 @@ function buildVirtualMasterReport(domain, ranked, task) {
   };
 }
 
-function buildRecommendedBundle(idx, domainReports, picks, task) {
+function buildRecommendedBundle(idx, domainReports, picks, task, executor = null, projectRoot = findProjectRoot()) {
   const intents = intentBoosts(task);
   const MAX_BUNDLE_SIZE = 9;
   const bundle = [];
@@ -1649,8 +1653,24 @@ function buildRecommendedBundle(idx, domainReports, picks, task) {
   const pushIfAvailable = (name) => {
     const asset = resolveAsset(name);
     if (asset && !seen.has(canonicalAssetKey(asset))) {
-      bundle.push(asset);
-      seen.add(canonicalAssetKey(asset));
+      const domain = idx.domains.find((candidate) => candidate.id === asset.domain || candidate.master_agent === asset.master_agent)
+        || idx.domains.find((candidate) => candidate.id === 'tooling-meta')
+        || { id: asset.domain || 'misc', master_agent: asset.master_agent || 'oracle-master-misc' };
+      const enriched = asset.invoke
+        ? asset
+        : enrichRankedAsset(
+            asset,
+            domain,
+            {
+              score: Number.isFinite(asset.score) ? asset.score : STRONG_MATCH_THRESHOLD,
+              matched: Array.isArray(asset.matched) ? asset.matched : ['required-priority-stack'],
+            },
+            executor,
+            task,
+            projectRoot,
+          );
+      bundle.push(enriched);
+      seen.add(canonicalAssetKey(enriched));
       return true;
     }
     return false;
@@ -1660,7 +1680,7 @@ function buildRecommendedBundle(idx, domainReports, picks, task) {
   for (const intent of activeCapabilityIntents) {
     preferredByIntent.push(intent.skills);
   }
-  preferredByIntent.unshift(['superpowers', 'gsd-autonomous', 'gsd-workstreams']);
+  preferredByIntent.unshift(['using-superpowers', 'superpowers', 'gsd', 'gsd-autonomous', 'gsd-workstreams']);
   if (designContext || intents.shortcuts || intents.branding) {
     preferredByIntent.unshift(['frontend-design', 'design-taste-frontend', 'impeccable']);
   }
@@ -1701,7 +1721,7 @@ function buildRecommendedBundle(idx, domainReports, picks, task) {
   }
 
   const requiredBundleNames = [];
-  requiredBundleNames.push('superpowers', 'gsd-autonomous', 'gsd-workstreams');
+  requiredBundleNames.push('using-superpowers', 'gsd');
   if (designContext) {
     requiredBundleNames.push('frontend-design');
   }
@@ -1844,8 +1864,9 @@ function parallelExecutionPlan(task, domains, preflight) {
   const executorName = normalize(preflight?.preflight?.executor?.name || preflight?.executor?.name || '');
   const runtimeName = normalize(preflight?.preflight?.runtime || preflight?.runtime || '');
   const visiblePaneExecutor = executorName === 'pane_spawn';
+  const explicitSwarm = /\b(swarm|parallel|paralelo|paralela|pane|panes|agents|agentes|workstreams|subagents|multi-agent|orquestracao|orquestração)\b/.test(text);
   const multiStepRisk = /\b(parallel|architecture|arquitetura|api|schema|migration|migracao|migração|soft delete|lixeira|rls|security|seguranca|segurança|test|tests|teste|testes|playwright|multi-step|end-to-end|cross-domain|banco de dados|database|auth|checkout|payment|pagamento|stripe|pix)\b/.test(text);
-  const heavy = domains.length >= 3 || (domains.length >= 2 && multiStepRisk);
+  const heavy = explicitSwarm || domains.length >= 3 || (domains.length >= 2 && multiStepRisk);
 
   if (!heavy) {
     return {
@@ -1858,6 +1879,11 @@ function parallelExecutionPlan(task, domains, preflight) {
   }
 
   const workstreams = [];
+  if (explicitSwarm && (domains.includes('design-ui') || domains.includes('web-dev') || /\b(ui|ux|react|frontend|surface|interface|visual|layout)\b/.test(text))) {
+    workstreams.push('Design critique: inspect the current surface, identify generic UI patterns, and propose a sharper premium direction');
+    workstreams.push('Implementation pass: edit the app surface, components, and CSS while preserving existing data flow');
+    workstreams.push('Validation pass: run typecheck/build and review responsive, accessibility, and regression risks');
+  }
   if (domains.includes('database-data') || /\b(supabase|schema|postgres|migration|rls|soft delete|banco de dados)\b/.test(text)) {
     workstreams.push('Database/Supabase schema, RLS, migrations, soft delete, restore semantics');
   }
@@ -1901,7 +1927,9 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
   const executorName = normalize(executor?.name || '');
   const runtimeName = normalize(preflight?.preflight?.runtime || preflight?.runtime || '');
   const visiblePanes = executorName === 'pane_spawn' || parallelPlan?.executor === 'pane_spawn';
-  const executionTarget = selectExecutionProvider(task, modelHints?.complexity || 'simple', providerInventory);
+  const executionTarget = selectExecutionProvider(task, modelHints?.complexity || 'simple', providerInventory, {
+    visiblePanes,
+  });
   const selectedProviderId = executionTarget.providerId;
   const selectedModel = executionTarget.model || (runtimeName === 'claude-code'
     ? modelHints?.claude || null
@@ -1953,6 +1981,8 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
       'Instructions:',
       '0. Submit this payload immediately with pane_write submit=true.',
       `0a. Your first visible line must be exactly: ${OUTPUT_PROBE_SENTINEL}.`,
+      '0b. Before submitting the workstream, inspect the pane surface and only write after the visible prompt is stable.',
+      '0c. If the pane is showing a command-style Codex prompt such as "Run /review on my current changes", submit that activation command first, wait for the pane to enter Working, and then continue with the workstream prompt.',
       '1. Follow the user task exactly.',
       '2. Use the selected model for the pane.',
       '3. Produce only the result needed for this workstream.',
@@ -2078,16 +2108,17 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
       : [],
     notes: [
       visiblePanes
-        ? 'Spawn one visible pane per independent workstream, pass the selected provider and selected model explicitly, and submit the prompt immediately.'
+        ? 'Spawn one visible pane per independent workstream, pass the selected provider and selected model explicitly, and submit only after the pane surface is stable. For Codex command-mode panes, activate the command shown on screen first (for example /review) before sending the workstream prompt.'
         : 'Host does not expose visible panes; execute in the current runtime or route to a supported executor.',
       visiblePanes
-        ? 'Before pane_write, wait for the spawned pane to show a stable ready prompt. If the pane still shows startup chrome, auth screens, onboarding, or context-budget warnings, treat it as not ready and re-spawn or fallback.'
+        ? 'Before pane_write, wait for the spawned pane to show a stable ready prompt. If the pane still shows startup chrome, auth screens, onboarding, context-budget warnings, or a booting MCP server, treat it as not ready and re-spawn or fallback. If the prompt surface is command-mode, send the visible activation command first and only then the Oracle workstream.'
         : null,
       !FIRST_CLASS_HOSTS.has(runtimeName)
         ? 'If the host cannot adapt cleanly, recommend the first-class standards: Overclock, Claude Code, Codex, or Antigravity CLI.'
         : null,
       'Do not downgrade execution-ready picks into discovery-only recommendations.',
       'If a pane is spawned, complete pane_write -> pane_wait_idle -> pane_read before treating the workstream as active.',
+      'If a Codex pane is command-mode, use the visible activation command on the pane first, then submit the workstream prompt after the pane starts working.',
       `If pane_read returns no readable output, retry with the same prompt once and use ${OUTPUT_PROBE_SENTINEL} as the visible probe before falling back to the next verified provider.`,
     ].filter(Boolean),
   };
@@ -2309,7 +2340,7 @@ async function selectAssets(idx, task, options = {}) {
     .filter((asset) => asset.score >= STRONG_MATCH_THRESHOLD)
     .sort((a, b) => b.score - a.score)
     .slice(0, options.limit || DEFAULT_LIMIT);
-  const bundle = buildRecommendedBundle(idx, domainReports, rankedPicks, task);
+  const bundle = buildRecommendedBundle(idx, domainReports, rankedPicks, task, executor, projectRoot);
   const picks = mergeBundleIntoPicks(bundle, rankedPicks, options.limit || DEFAULT_LIMIT);
 
   let synthesis = null;
@@ -2446,7 +2477,7 @@ function formatDomains(idx) {
 function formatResult(result) {
   const lines = [];
   lines.push(`Oracle local picks for: ${result.task}`);
-  lines.push(`Domains: ${result.domains.join(', ')}`);
+  lines.push(`Domains: ${(result.domains || []).join(', ')}`);
   lines.push('Dispatch mode: execute every recommended asset that is available in the current runtime');
   if (result.embeddingUsed) lines.push('Mode: semantic (keyword + embedding hybrid)');
   if (result.modelHints) {
@@ -2472,7 +2503,7 @@ function formatResult(result) {
     if (Array.isArray(result.executionManifest.supported_hosts)) {
       lines.push(`Supported hosts: ${result.executionManifest.supported_hosts.join(', ')}`);
     }
-    lines.push(`State machine: ${result.executionManifest.host_contract.state_machine.join(' -> ')}`);
+    lines.push(`State machine: ${(result.executionManifest.host_contract.state_machine || []).join(' -> ')}`);
     lines.push(`Workstreams: ${result.executionManifest.workstreams.length}`);
   }
   if (result.synthesis && result.synthesis.reasoning) {
@@ -2521,7 +2552,7 @@ function formatResult(result) {
     }
     result.picks.slice(0, 5).forEach((asset, index) => {
       lines.push(`${index + 1}. ${asset.name} - ${asset.type} - score ${asset.score} - ${asset.domain}`);
-      lines.push(`   Why: matched ${asset.matched.join(', ') || 'task context'}`);
+      lines.push(`   Why: matched ${(asset.matched || []).join(', ') || 'task context'}`);
       lines.push(`   Invoke: ${asset.invoke}${asset.invocation?.mechanism ? ` [${asset.invocation.mechanism}]` : ''}`);
     });
     lines.push('');
@@ -2535,7 +2566,7 @@ function formatResult(result) {
     if (result.parallelPlan.orchestrationPolicy) {
       lines.push(`Policy: ${result.parallelPlan.orchestrationPolicy.spawnScope}`);
       lines.push('Ownership guard: close only Oracle-owned panes from the current task; never close the caller pane.');
-      lines.push(`Execution loop: ${result.parallelPlan.orchestrationPolicy.executionLoop.join(' -> ')}`);
+      lines.push(`Execution loop: ${(result.parallelPlan.orchestrationPolicy.executionLoop || []).join(' -> ')}`);
     }
     result.parallelPlan.workstreams.forEach((item, index) => {
       lines.push(`  ${index + 1}. ${item}`);

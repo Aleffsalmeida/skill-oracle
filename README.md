@@ -61,6 +61,8 @@ Every asset carries a `domain` and `master_agent` tag in the index. In Claude Co
 
 Overclock pane execution must use the verified local provider inventory. Oracle must not choose a provider that is not present in the current install, and it must always submit pane prompts with `pane_write submit=true` rather than leaving them visible at a shell prompt.
 
+When a visible pane is still in command-mode or startup chrome, Oracle should not treat it as ready just because the pane exists. The pane has to show a stable prompt surface first. If the Codex pane presents a command prompt such as `Run /review on my current changes`, Oracle should submit that visible activation command first, wait for the pane to enter a working state, and only then submit the actual workstream prompt. This avoids the common failure mode where a prompt is written too early and only gets echoed back instead of executed.
+
 First-class host standards are:
 
 - `Overclock`
@@ -256,6 +258,9 @@ node ~/.claude/skills/skill-oracle/scripts/oracle-smoke-test.js
 - Never close panes that Oracle did not spawn for the current task, and never close the pane that is coordinating the work.
 - If the user asks to clean up idle panes, only close Oracle-owned panes after verifying they are idle; otherwise present the candidate ids first.
 - After every `pane_spawn`, Oracle must immediately complete `pane_write` with submission, then `pane_wait_idle`, then `pane_read`. A pane that was spawned but never received a submitted prompt counts as an orchestration failure.
+- Before `pane_write`, inspect the visible pane and wait for a stable ready prompt. If the pane is still loading MCP servers, showing onboarding, auth, or budget warnings, do not write yet.
+- If the pane is command-mode instead of a blank shell, submit the visible activation command first, wait for the pane to switch into a working state, and only then send the Oracle workstream prompt.
+- For Codex visible panes, a command-style prompt such as `Run /review on my current changes` should be treated as the activation step, not the final workstream target.
 
 Exit codes:
 
