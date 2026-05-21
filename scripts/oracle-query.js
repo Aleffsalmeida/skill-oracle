@@ -2715,6 +2715,7 @@ module.exports = {
   recommendedModels,
   parallelExecutionPlan,
   resolveSkillInvocation,
+  buildDispatchPlan,
   buildExecutionManifest,
   parseSkillCommands,
   loadIndex,

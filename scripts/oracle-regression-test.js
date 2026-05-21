@@ -8,6 +8,7 @@ const {
   recommendedModels,
   parallelExecutionPlan,
   resolveSkillInvocation,
+  buildDispatchPlan,
 } = require('./oracle-query');
 const { detectExecutor } = require('./oracle-bootstrap');
 
@@ -294,16 +295,15 @@ async function main() {
   assertCheck(!pageResult.parallelPlan?.recommended, 'standalone page design result must not recommend parallel panes');
   const designPriorityResult = await selectAssets(idx, 'refazer design da homepage com visual premium e nada genérico', { limit: 8 });
   assertCheck(
-    designPriorityResult.bundle?.[0]?.name === 'superpowers',
-    `expected superpowers to lead the design bundle, got ${designPriorityResult.bundle?.[0]?.name}`
+    designPriorityResult.bundle?.[0]?.name === 'using-superpowers',
+    `expected using-superpowers to lead the design bundle, got ${designPriorityResult.bundle?.[0]?.name}`
   );
   assertCheck(
     designPriorityResult.bundle.some((asset) => asset.name === 'frontend-design'),
     'design bundle must include frontend-design'
   );
   assertCheck(
-    designPriorityResult.bundle.some((asset) => asset.name === 'gsd-autonomous') &&
-      designPriorityResult.bundle.some((asset) => asset.name === 'gsd-workstreams'),
+    designPriorityResult.bundle.some((asset) => asset.name === 'gsd'),
     'design bundle must include the priority GSD stack'
   );
   const heavyPlan = parallelExecutionPlan(
@@ -358,6 +358,63 @@ async function main() {
   assertCheck(
     overclockResult.dispatchPlan?.host_adapter?.preWriteReadiness?.required === true,
     'Overclock host adapter must require pre-write readiness'
+  );
+  const commandModeDispatch = buildDispatchPlan({
+    task: 'refazer o projeto Estrelagithub com leaderboard premium e GitHub OAuth',
+    picks: [{
+      name: 'superpowers',
+      type: 'skill',
+      domain: 'tooling-meta',
+      invoke: 'using-superpowers',
+      invocation: { mechanism: 'command' },
+    }],
+    bundle: [{
+      name: 'superpowers',
+      type: 'skill',
+      domain: 'tooling-meta',
+      invoke: 'using-superpowers',
+      invocation: { mechanism: 'command' },
+    }],
+    parallelPlan: {
+      recommended: true,
+      executor: 'pane_spawn',
+      workstreams: ['Revisar a superfície visível do pane e aplicar o prompt real após a ativação do comando'],
+    },
+    modelHints: {
+      complexity: 'simple',
+      codex: 'gpt-5.4-mini',
+    },
+    executor: { name: 'pane_spawn' },
+    preflight: { preflight: { runtime: 'Overclock', executor: { name: 'pane_spawn' } } },
+    providerInventory: {
+      providers: [
+        {
+          id: 'codex-cli',
+          label: 'Codex CLI',
+          type: 'cli',
+          models: ['gpt-5.4-mini'],
+          available: true,
+        },
+      ],
+    },
+  });
+  assertCheck(
+    commandModeDispatch.selected_provider === 'codex-cli',
+    `expected command-mode dispatch to prefer codex-cli, got ${commandModeDispatch.selected_provider}`
+  );
+  assertCheck(
+    commandModeDispatch.selected_model === 'gpt-5.4-mini',
+    `expected command-mode dispatch to prefer gpt-5.4-mini, got ${commandModeDispatch.selected_model}`
+  );
+  assertCheck(
+    Array.isArray(commandModeDispatch.parallel_workstreams) &&
+      commandModeDispatch.parallel_workstreams[0]?.pane_prompt?.includes('submit that activation command first'),
+    'command-mode dispatch must instruct activating the visible command before the workstream prompt'
+  );
+  assertCheck(
+    Array.isArray(commandModeDispatch.notes) &&
+      commandModeDispatch.notes.some((note) => /command-mode panes/i.test(note)),
+    'command-mode dispatch must document the command-mode pane behavior'
   );
   assertCheck(
     detectExecutor('antigravity').name === 'agy',
