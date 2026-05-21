@@ -92,6 +92,7 @@ If the task is clearly local and low-risk, do not spend an expensive model on it
 
 For Overclock visible panes, the model hint is mandatory execution metadata, not advisory text. Pass the selected `model` explicitly to `pane_spawn`. Never let a simple task inherit the current premium session model.
 Visible Codex panes that must actually execute work should default to `gpt-5.5`, not `gpt-5.4-mini`. The smaller model is fine for non-visible, cheap, local guidance, but it was not reliable enough for the real pane-execution path that needs to reach `Working` before the workstream is written.
+Within a visible swarm, assign the model per workstream: `gpt-5.4-mini` for review/read/analysis work, `gpt-5.4` for ordinary implementation, and `gpt-5.5` only for critical or problematic workstreams such as security, auth, redirects, migrations, or stubborn failures.
 
 ### Priority Skill Stack
 

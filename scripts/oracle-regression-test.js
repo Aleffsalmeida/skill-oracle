@@ -395,7 +395,11 @@ async function main() {
     parallelPlan: {
       recommended: true,
       executor: 'pane_spawn',
-      workstreams: ['Revisar a superfície visível do pane e aplicar o prompt real após a ativação do comando'],
+      workstreams: [
+        'Revisar a superfície visível do pane e resumir riscos',
+        'Implementar as mudancas da interface e dos componentes',
+        'Corrigir o problema critico de redirecionamento e validacao',
+      ],
     },
     modelHints: {
       complexity: 'simple',
@@ -422,6 +426,18 @@ async function main() {
   assertCheck(
     commandModeDispatch.selected_model === 'gpt-5.5',
     `expected command-mode dispatch to prefer gpt-5.5 for visible panes, got ${commandModeDispatch.selected_model}`
+  );
+  assertCheck(
+    commandModeDispatch.parallel_workstreams[0]?.model === 'gpt-5.4-mini',
+    `expected review/light workstream to use gpt-5.4-mini, got ${commandModeDispatch.parallel_workstreams[0]?.model}`
+  );
+  assertCheck(
+    commandModeDispatch.parallel_workstreams[1]?.model === 'gpt-5.4',
+    `expected normal implementation workstream to use gpt-5.4, got ${commandModeDispatch.parallel_workstreams[1]?.model}`
+  );
+  assertCheck(
+    commandModeDispatch.parallel_workstreams[2]?.model === 'gpt-5.5',
+    `expected critical/problematic workstream to use gpt-5.5, got ${commandModeDispatch.parallel_workstreams[2]?.model}`
   );
   assertCheck(
     Array.isArray(commandModeDispatch.parallel_workstreams) &&

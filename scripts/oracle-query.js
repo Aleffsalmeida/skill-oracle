@@ -576,11 +576,18 @@ function selectExecutionProvider(task, complexity, providerInventory = null, opt
   const preferredOrder = explicitClaude
     ? ['claude-oauth', 'codex-cli', 'gemini-cli', 'kimi-cli', 'antigravity-cli', 'mimo-DMlOoB']
     : PREFERRED_EXECUTION_PROVIDER_ORDER;
-  const available = new Set(inventory.availableProviderIds || []);
+  const discoveredProviders = Array.isArray(inventory.providers) ? inventory.providers : [];
+  const availableIds = Array.isArray(inventory.availableProviderIds) && inventory.availableProviderIds.length
+    ? inventory.availableProviderIds
+    : discoveredProviders
+      .filter((provider) => provider && provider.available !== false)
+      .map((provider) => canonicalProviderId(provider.id))
+      .filter(Boolean);
+  const available = new Set(availableIds);
 
   let providerId = preferredOrder.find((id) => available.has(id)) || inventory.activeProviderId || null;
   if (!providerId) {
-    const first = (inventory.providers || [])[0];
+    const first = discoveredProviders.find((provider) => provider && provider.available !== false) || discoveredProviders[0];
     providerId = first ? first.id : null;
   }
 
@@ -611,6 +618,80 @@ const MODEL_HINTS = {
     heavy: 'gpt-5.5',
   },
 };
+
+const VISUAL_PANE_MODEL_LADDER = {
+  light: 'gpt-5.4-mini',
+  normal: 'gpt-5.4',
+  critical: 'gpt-5.5',
+};
+
+function inferVisibleWorkstreamTier(description, task) {
+  const descriptionText = normalize(description);
+  const taskText = normalize(task);
+
+  if (/\b(critical|critico|crítico|problematic|problemático|problem|issue|bug|broken|breaks|failed|failure|error|errors|erro|erros|timeout|stuck|travado|regression|security|seguranca|segurança|auth|oauth|open redirect|redirect|redirecionamento|rls|privilege|privilegio|privilégio|permission|permissao|permissão|exploit|attack|ataque|vulnerability|vulnerabilidade|data loss|integrity|integridade|payment|billing|checkout|migration|migracao|migração|schema|database|banco de dados|supabase)\b/.test(descriptionText)) {
+    return 'critical';
+  }
+
+  if (/\b(implement|implementation|implementar|implementacao|implementação|edit|editing|editar|corrigir|fix|build|create|criar|add|adicionar|update|atualizar|rewrite|reescrever|apply|aplicar|change|changes|mudar|alterar|components|componentes|forms|formularios|formulários|page|pages|pagina|página|ui|ux|shadcn)\b/.test(descriptionText)) {
+    return 'normal';
+  }
+
+  if (/\b(review|revisar|revisao|revisão|critique|criticar|audit|auditar|validate|validation|validar|validacao|validação|check|checks|checar|verificar|inspect|inspecionar|read|reading|ler|leitura|summarize|summary|resumir|resumo|docs|documentation|documentacao|documentação|doc|analysis|analyze|analise|análise|compare|comparar|verify)\b/.test(descriptionText)) {
+    return 'light';
+  }
+
+  if (/\b(critical|critico|crítico|problematic|problemático|problem|issue|bug|broken|breaks|failed|failure|error|errors|erro|erros|timeout|stuck|travado|regression|security|seguranca|segurança|auth|oauth|open redirect|redirect|redirecionamento|rls|privilege|privilegio|privilégio|permission|permissao|permissão|exploit|attack|ataque|vulnerability|vulnerabilidade|data loss|integrity|integridade|payment|billing|checkout|migration|migracao|migração|schema|database|banco de dados|supabase)\b/.test(taskText)) {
+    return 'critical';
+  }
+
+  if (/\b(review|revisar|revisao|revisão|critique|criticar|audit|auditar|validate|validation|validar|validacao|validação|check|checks|checar|verificar|inspect|inspecionar|read|reading|ler|leitura|summarize|summary|resumir|resumo|docs|documentation|documentacao|documentação|doc|analysis|analyze|analise|análise|compare|comparar|verify)\b/.test(taskText)) {
+    return 'light';
+  }
+
+  return 'normal';
+}
+
+function selectVisibleWorkstreamModel(provider, description, task, options = {}) {
+  const providerId = canonicalProviderId(provider?.id || '');
+  const visiblePanes = Boolean(options.visiblePanes);
+
+  if (providerId !== 'codex-cli' || !visiblePanes) {
+    return chooseProviderModel(provider, options.complexity || 'simple', options);
+  }
+
+  const tier = inferVisibleWorkstreamTier(description, task);
+  const models = Array.isArray(provider.models) ? provider.models.filter(Boolean) : [];
+  const fallback = () => models[0] || chooseProviderModel(provider, options.complexity || 'simple', options);
+
+  if (tier === 'light') {
+    return models.includes(VISUAL_PANE_MODEL_LADDER.light)
+      ? VISUAL_PANE_MODEL_LADDER.light
+      : models.includes(VISUAL_PANE_MODEL_LADDER.normal)
+        ? VISUAL_PANE_MODEL_LADDER.normal
+        : models.includes(VISUAL_PANE_MODEL_LADDER.critical)
+          ? VISUAL_PANE_MODEL_LADDER.critical
+          : fallback();
+  }
+
+  if (tier === 'normal') {
+    return models.includes(VISUAL_PANE_MODEL_LADDER.normal)
+      ? VISUAL_PANE_MODEL_LADDER.normal
+      : models.includes(VISUAL_PANE_MODEL_LADDER.critical)
+        ? VISUAL_PANE_MODEL_LADDER.critical
+        : models.includes(VISUAL_PANE_MODEL_LADDER.light)
+          ? VISUAL_PANE_MODEL_LADDER.light
+          : fallback();
+  }
+
+  return models.includes(VISUAL_PANE_MODEL_LADDER.critical)
+    ? VISUAL_PANE_MODEL_LADDER.critical
+    : models.includes(VISUAL_PANE_MODEL_LADDER.normal)
+      ? VISUAL_PANE_MODEL_LADDER.normal
+      : models.includes(VISUAL_PANE_MODEL_LADDER.light)
+        ? VISUAL_PANE_MODEL_LADDER.light
+        : fallback();
+}
 
 const DOMAIN_KEYWORDS = [
   {
@@ -1939,6 +2020,12 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
   const selectedModel = executionTarget.model || (runtimeName === 'claude-code'
     ? modelHints?.claude || null
     : modelHints?.codex || modelHints?.claude || null);
+  const executionProvider = executionTarget.provider
+    || providerInventory?.providersById?.[selectedProviderId]
+    || (Array.isArray(providerInventory?.providers)
+      ? providerInventory.providers.find((provider) => canonicalProviderId(provider.id) === selectedProviderId)
+      : null)
+    || null;
   const mode = parallelPlan?.recommended ? 'parallel' : 'single';
   const taskPrompt = String(task || '').trim();
   const workstreamAssets = (description) => {
@@ -2078,11 +2165,20 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
       ? parallelPlan.workstreams.map((item, index) => {
           const assets = workstreamAssets(item);
           const panePrompt = buildPanePrompt(item, index, assets);
+          const workstreamModel = selectVisibleWorkstreamModel(
+            executionProvider,
+            item,
+            task,
+            {
+              visiblePanes,
+              complexity: modelHints?.complexity || 'simple',
+            },
+          );
           return {
             description: item,
             executor: parallelPlan.executor,
             provider_id: selectedProviderId,
-            model: selectedModel,
+            model: workstreamModel || selectedModel,
             assets: assets.map((asset) => ({
               name: asset.name,
               type: asset.type,
@@ -2093,7 +2189,7 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
             pane_prompt: panePrompt,
             pane_spawn: {
               provider_id: selectedProviderId,
-              model: selectedModel,
+              model: workstreamModel || selectedModel,
               override_host_session: true,
             },
             pane_write: {

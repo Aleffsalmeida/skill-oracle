@@ -91,7 +91,7 @@ The local runner also emits a model hint so simple tasks can stay on a cheaper m
 - **medium** -> `claude-sonnet-4-6` / `gpt-5.4`
 - **heavy** -> `claude-opus-4-7` / `gpt-5.5`
 
-Rule of thumb: start with the smallest model that can safely close the task, and only escalate when the task is multi-domain, long-running, or architecture-heavy. For Overclock visible panes, treat `gpt-5.5` as the default Codex execution model when the pane must actually run a workstream; `gpt-5.4-mini` is for cheap local guidance, not for the execution path that has to reach `Working`.
+Rule of thumb: start with the smallest model that can safely close the task, and only escalate when the task is multi-domain, long-running, or architecture-heavy. For Overclock visible panes, keep a per-workstream ladder: `gpt-5.4-mini` for review/read/analysis, `gpt-5.4` for ordinary implementation, and `gpt-5.5` for critical or problematic workstreams that need the most reliable execution path.
 
 Simple page-design work, local UI polish, and other single-surface tasks should usually stay in the current pane. Opening premium-model panes for that class of work is a policy violation, not an optimization.
 
