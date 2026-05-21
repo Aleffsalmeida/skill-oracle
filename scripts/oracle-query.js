@@ -2108,17 +2108,18 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
       : [],
     notes: [
       visiblePanes
-        ? 'Spawn one visible pane per independent workstream, pass the selected provider and selected model explicitly, and submit only after the pane surface is stable. For Codex command-mode panes, activate the command shown on screen first (for example /review) before sending the workstream prompt.'
+        ? 'Spawn one visible pane per independent workstream, pass the selected provider and selected model explicitly, and submit only after the pane surface is stable. For Codex command-mode panes, activate the command shown on screen first (for example /review), wait for an explicit working-state acknowledgement, and only then send the workstream prompt.'
         : 'Host does not expose visible panes; execute in the current runtime or route to a supported executor.',
       visiblePanes
-        ? 'Before pane_write, wait for the spawned pane to show a stable ready prompt. If the pane still shows startup chrome, auth screens, onboarding, context-budget warnings, or a booting MCP server, treat it as not ready and re-spawn or fallback. If the prompt surface is command-mode, send the visible activation command first and only then the Oracle workstream.'
+        ? 'Before pane_write, wait for the spawned pane to show a stable ready prompt. If the pane still shows startup chrome, auth screens, onboarding, context-budget warnings, or a booting MCP server, treat it as not ready and re-spawn or fallback. If the prompt surface is command-mode, send the visible activation command first, confirm the working state, and only then send the Oracle workstream.'
         : null,
       !FIRST_CLASS_HOSTS.has(runtimeName)
         ? 'If the host cannot adapt cleanly, recommend the first-class standards: Overclock, Claude Code, Codex, or Antigravity CLI.'
         : null,
       'Do not downgrade execution-ready picks into discovery-only recommendations.',
       'If a pane is spawned, complete pane_write -> pane_wait_idle -> pane_read before treating the workstream as active.',
-      'If a Codex pane is command-mode, use the visible activation command on the pane first, then submit the workstream prompt after the pane starts working.',
+      'If a Codex pane is command-mode, use the visible activation command on the pane first, then submit the workstream prompt only after the pane shows an explicit working state.',
+      'A spawned pane is not execution-ready until the prompt is stable, any command-mode activation has completed, and a working-state acknowledgement has been observed.',
       `If pane_read returns no readable output, retry with the same prompt once and use ${OUTPUT_PROBE_SENTINEL} as the visible probe before falling back to the next verified provider.`,
     ].filter(Boolean),
   };
@@ -2126,9 +2127,12 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
 
 function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPlan, preflight }) {
   const visiblePanes = dispatchPlan?.host === 'overclock';
+  const commandModeActivationRequired = Boolean(visiblePanes);
   const stages = [
     { id: 'spawn', label: 'spawn visible pane', required: visiblePanes },
     { id: 'spawn_ready', label: 'wait until pane is ready for input', required: visiblePanes },
+    { id: 'activate_command', label: 'if command-mode, submit the visible activation command', required: visiblePanes },
+    { id: 'working_ack', label: 'wait until the pane shows an explicit working state', required: visiblePanes },
     { id: 'write', label: 'submit prompt with submit=true', required: visiblePanes },
     { id: 'wait_idle', label: 'wait for idle', required: visiblePanes },
     { id: 'read', label: 'read result', required: visiblePanes },
@@ -2186,7 +2190,9 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
     host_contract: {
       visible_panes: visiblePanes,
       dispatch_style: visiblePanes ? 'visible-pane-swarm' : 'local-plan',
-      state_machine: ['spawn', 'spawn_ready', 'write', 'wait_idle', 'read'],
+      state_machine: ['spawn', 'spawn_ready', 'activate_command', 'working_ack', 'write', 'wait_idle', 'read'],
+      command_mode_activation_required: commandModeActivationRequired,
+      working_ack_required: commandModeActivationRequired,
       pane_write_submission_required: true,
       empty_read_is_failure: true,
       output_capture_required: true,
@@ -2209,6 +2215,13 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
       command: asset.invocation?.command || null,
     })),
     workstreams,
+    execution_guardrails: {
+      pane_spawn_alone_is_not_execution: true,
+      command_mode_requires_activation: commandModeActivationRequired,
+      working_ack_required: commandModeActivationRequired,
+      blank_prompt_is_not_approval: true,
+      echoed_prompt_is_not_work_result: true,
+    },
   };
 }
 

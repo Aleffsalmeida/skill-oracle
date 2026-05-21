@@ -352,12 +352,28 @@ async function main() {
     'Overclock execution manifest must include spawn_ready stage'
   );
   assertCheck(
+    Array.isArray(overclockResult.executionManifest?.stages) &&
+      overclockResult.executionManifest.stages.some((stage) => stage.id === 'activate_command') &&
+      overclockResult.executionManifest.stages.some((stage) => stage.id === 'working_ack'),
+    'Overclock execution manifest must include activate_command and working_ack stages'
+  );
+  assertCheck(
     overclockResult.executionManifest?.host_contract?.output_capture_required === true,
     'Overclock host contract must require output capture'
   );
   assertCheck(
     overclockResult.dispatchPlan?.host_adapter?.preWriteReadiness?.required === true,
     'Overclock host adapter must require pre-write readiness'
+  );
+  assertCheck(
+    overclockResult.executionManifest?.host_contract?.working_ack_required === true &&
+      overclockResult.executionManifest?.host_contract?.command_mode_activation_required === true,
+    'Overclock host contract must require command activation and working acknowledgement'
+  );
+  assertCheck(
+    overclockResult.executionManifest?.execution_guardrails?.echoed_prompt_is_not_work_result === true &&
+      overclockResult.executionManifest?.execution_guardrails?.blank_prompt_is_not_approval === true,
+    'Overclock execution guardrails must reject echoed prompts and blank prompts as success'
   );
   const commandModeDispatch = buildDispatchPlan({
     task: 'refazer o projeto Estrelagithub com leaderboard premium e GitHub OAuth',
@@ -413,7 +429,8 @@ async function main() {
   );
   assertCheck(
     Array.isArray(commandModeDispatch.notes) &&
-      commandModeDispatch.notes.some((note) => /command-mode panes/i.test(note)),
+      commandModeDispatch.notes.some((note) => /command-mode panes/i.test(note)) &&
+      commandModeDispatch.notes.some((note) => /working-state/i.test(note) || /working state/i.test(note)),
     'command-mode dispatch must document the command-mode pane behavior'
   );
   assertCheck(

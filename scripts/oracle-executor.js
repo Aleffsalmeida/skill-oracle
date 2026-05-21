@@ -36,6 +36,8 @@ function formatExecutionManifest(manifest) {
   lines.push(`Provider: ${manifest.selected_provider || 'n/a'}`);
   lines.push(`Model: ${manifest.selected_model || 'n/a'}`);
   lines.push(`State machine: ${manifest.host_contract.state_machine.join(' -> ')}`);
+  lines.push(`Working ack required: ${manifest.host_contract.working_ack_required ? 'yes' : 'no'}`);
+  lines.push(`Command activation required: ${manifest.host_contract.command_mode_activation_required ? 'yes' : 'no'}`);
   lines.push('');
   for (const workstream of manifest.workstreams || []) {
     lines.push(`${workstream.id}: ${workstream.description}`);

@@ -61,7 +61,7 @@ Every asset carries a `domain` and `master_agent` tag in the index. In Claude Co
 
 Overclock pane execution must use the verified local provider inventory. Oracle must not choose a provider that is not present in the current install, and it must always submit pane prompts with `pane_write submit=true` rather than leaving them visible at a shell prompt.
 
-When a visible pane is still in command-mode or startup chrome, Oracle should not treat it as ready just because the pane exists. The pane has to show a stable prompt surface first. If the Codex pane presents a command prompt such as `Run /review on my current changes`, Oracle should submit that visible activation command first, wait for the pane to enter a working state, and only then submit the actual workstream prompt. This avoids the common failure mode where a prompt is written too early and only gets echoed back instead of executed.
+When a visible pane is still in command-mode or startup chrome, Oracle should not treat it as ready just because the pane exists. The pane has to show a stable prompt surface first. If the Codex pane presents a command prompt such as `Run /review on my current changes`, Oracle should submit that visible activation command first, wait for the pane to enter a working state, and only then submit the actual workstream prompt. An echoed prompt is not execution. This avoids the common failure mode where a prompt is written too early and only gets echoed back instead of executed.
 
 First-class host standards are:
 

@@ -117,6 +117,7 @@ For Overclock visible panes, the model hint is mandatory execution metadata, not
 - The prompt sent to a spawned pane must be submitted with `pane_write submit=true`. A visible prompt that was not submitted is a failure.
 - Before `pane_write`, wait for the spawned pane to reach a stable ready prompt. If the pane is still showing startup chrome, auth screens, onboarding, context-budget warnings, or a booting MCP server, do not submit the task yet. Re-spawn with a lighter verified provider/model or use a mission-bound pane before writing.
 - If the pane is command-mode rather than a blank shell, submit the visible activation command first and wait until the pane transitions into a real working state before sending the Oracle workstream. For Codex panes that present `Run /review on my current changes`, `/review` is the activation command.
+- An echoed prompt is not execution. Do not treat a pane as successful until it has shown a working-state acknowledgement and then produced readable work output.
 - If `pane_read` returns no readable output after idle, retry once with the same prompt and then fall back to the next verified provider. Treat empty reads as orchestration failure, not success.
 - If the host is not one of the first-class standards, Oracle should recommend the standards instead of pretending to support the unknown host.
 
@@ -228,7 +229,7 @@ node ~/.claude/skills/skill-oracle/scripts/oracle-smoke-test.js
 
 When using Overclock or Codex, summarize the `oracle-query.js` output to the user and then invoke every recommended skill or tool according to the host's available mechanism. For Overclock, agent recommendations should be treated as visible `pane_spawn` follow-up work; direct `Task(subagent_type=...)` is only valid in Claude Code. After every `pane_spawn`, immediately execute the full loop `pane_write -> pane_wait_idle -> pane_read`; do not leave spawned panes parked at an untouched prompt.
 The pane must receive the exact workstream prompt before waiting idle; spawning alone is not enough.
-If the visible pane is command-mode, submit the activation command shown on screen first, wait for the pane to begin working, and only then submit the Oracle workstream prompt. Do not treat a command prompt as ready until it has transitioned into a working state.
+If the visible pane is command-mode, submit the activation command shown on screen first, wait for the pane to begin working, and only then submit the Oracle workstream prompt. Do not treat a command prompt as ready until it has transitioned into a working state and the pane has acknowledged work starting.
 
 ### Step 4 — Synthesize and dispatch
 
