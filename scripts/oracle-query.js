@@ -2089,12 +2089,7 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
     return lines.join('\n');
   };
 
-  const buildActivationCommand = (providerId) => {
-    if (visiblePanes && canonicalProviderId(providerId) === 'codex-cli') {
-      return '/review';
-    }
-    return null;
-  };
+  const buildActivationCommand = (_providerId) => null;
 
   return {
     mode,
@@ -2190,19 +2185,14 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
               mechanism: asset.invocation?.mechanism || null,
             })),
             activation_command: activationCommand,
-            activation_required: Boolean(activationCommand),
+            activation_required: false,
             pane_prompt: panePrompt,
             pane_spawn: {
               provider_id: selectedProviderId,
               model: workstreamModel || selectedModel,
               override_host_session: true,
             },
-            pane_activation: activationCommand
-              ? {
-                  submit: true,
-                  content: activationCommand,
-                }
-              : null,
+            pane_activation: null,
             pane_write: {
               submit: true,
               content: panePrompt,
@@ -2240,13 +2230,12 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
 
 function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPlan, preflight }) {
   const visiblePanes = dispatchPlan?.host === 'overclock';
-  const commandModeActivationRequired = Boolean(visiblePanes);
   const stages = [
     { id: 'spawn', label: 'spawn visible pane', required: visiblePanes },
     { id: 'spawn_ready', label: 'wait until pane is ready for input', required: visiblePanes },
-    { id: 'activate_command', label: 'if command-mode, submit the visible activation command', required: visiblePanes },
-    { id: 'select_review_preset', label: 'if Codex opens a review menu, choose the review preset and wait for Working', required: visiblePanes },
-    { id: 'working_ack', label: 'wait until the pane shows an explicit working state', required: visiblePanes },
+    { id: 'activate_command', label: 'if command-mode, submit the visible activation command', required: false },
+    { id: 'select_review_preset', label: 'if Codex opens a review menu, choose the review preset and wait for Working', required: false },
+    { id: 'working_ack', label: 'wait until the pane shows an explicit working state', required: false },
     { id: 'write', label: 'submit prompt with submit=true', required: visiblePanes },
     { id: 'wait_idle', label: 'wait for idle', required: visiblePanes },
     { id: 'read', label: 'read result', required: visiblePanes },
@@ -2305,8 +2294,8 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
       visible_panes: visiblePanes,
       dispatch_style: visiblePanes ? 'visible-pane-swarm' : 'local-plan',
       state_machine: ['spawn', 'spawn_ready', 'activate_command', 'select_review_preset', 'working_ack', 'write', 'wait_idle', 'read'],
-      command_mode_activation_required: commandModeActivationRequired,
-      working_ack_required: commandModeActivationRequired,
+      command_mode_activation_required: false,
+      working_ack_required: false,
       pane_write_submission_required: true,
       empty_read_is_failure: true,
       output_capture_required: true,
@@ -2331,8 +2320,8 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
     workstreams,
     execution_guardrails: {
       pane_spawn_alone_is_not_execution: true,
-      command_mode_requires_activation: commandModeActivationRequired,
-      working_ack_required: commandModeActivationRequired,
+      command_mode_requires_activation: false,
+      working_ack_required: false,
       blank_prompt_is_not_approval: true,
       echoed_prompt_is_not_work_result: true,
     },
