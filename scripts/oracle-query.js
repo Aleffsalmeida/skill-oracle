@@ -1172,6 +1172,12 @@ function normalize(s) {
     .toLowerCase();
 }
 
+function truncateText(text, maxLength = 160) {
+  const value = String(text || '').replace(/\s+/g, ' ').trim();
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
+}
+
 function tokenize(s) {
   return normalize(s)
     .split(/[^a-z0-9.+#-]+/)
@@ -2065,34 +2071,29 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
     return ordered.filter((id) => id !== selectedProviderId);
   };
 
-  const buildPanePrompt = (description, index, assets) => {
+  const buildPanePrompt = (description, index, assets, paneModel) => {
     const lines = [
-      `Execute this Oracle workstream: ${description}.`,
-      `User task: ${taskPrompt}`,
-      '',
-      'Instructions:',
-      '0. Submit this payload immediately with pane_write submit=true.',
-      `0a. Your first visible line must be exactly: ${OUTPUT_PROBE_SENTINEL}.`,
-      '0b. Before submitting the workstream, inspect the pane surface and only write after the visible prompt is stable.',
-      '0c. If the pane is showing a command-style Codex prompt such as "Run /review on my current changes", submit that activation command first. If Codex opens a review-preset menu, choose the preset that reviews the current uncommitted changes (usually option 2), then wait for an explicit Working state before continuing with the workstream prompt.',
-      '1. Follow the user task exactly.',
-      '2. Use the selected model for the pane.',
-      '3. Produce only the result needed for this workstream.',
-      '4. If you need to touch files, make the minimal safe change.',
-      '5. Do not leave the pane sitting at a shell prompt.',
-      '6. If the pane reaches idle but no readable output is captured, retry once with the same prompt and then fall back to the next verified provider.',
+      OUTPUT_PROBE_SENTINEL,
+      `Workstream: ${description}`,
+      `Task: ${truncateText(taskPrompt, 180)}`,
     ];
-    if (Array.isArray(assets) && assets.length) {
-      lines.push('');
-      lines.push('Oracle execution targets:');
-      for (const asset of assets) {
-        lines.push(`- ${asset.name}: ${asset.invoke}`);
-      }
-    }
     if (index === 0) {
-      lines.splice(1, 0, 'This is the first workstream in the current dispatch plan.');
+      lines.splice(1, 0, 'First workstream in the current dispatch plan.');
+    }
+    if (paneModel) {
+      lines.push(`Model: ${paneModel}`);
+    }
+    if (Array.isArray(assets) && assets.length) {
+      lines.push(`Assets: ${assets.slice(0, 3).map((asset) => asset.name).join(', ')}`);
     }
     return lines.join('\n');
+  };
+
+  const buildActivationCommand = (providerId) => {
+    if (visiblePanes && canonicalProviderId(providerId) === 'codex-cli') {
+      return '/review';
+    }
+    return null;
   };
 
   return {
@@ -2136,6 +2137,7 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
       mechanism: asset.invocation?.mechanism || null,
       command: asset.invocation?.command || null,
       pane_prompt: executionPromptForAsset(asset, task, selectedModel),
+      activation_command: null,
       pane_spawn: {
         provider_id: selectedProviderId,
         model: selectedModel,
@@ -2164,7 +2166,7 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
     parallel_workstreams: parallelPlan?.recommended
       ? parallelPlan.workstreams.map((item, index) => {
           const assets = workstreamAssets(item);
-          const panePrompt = buildPanePrompt(item, index, assets);
+          const activationCommand = buildActivationCommand(selectedProviderId);
           const workstreamModel = selectVisibleWorkstreamModel(
             executionProvider,
             item,
@@ -2174,6 +2176,7 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
               complexity: modelHints?.complexity || 'simple',
             },
           );
+          const panePrompt = buildPanePrompt(item, index, assets, workstreamModel || selectedModel);
           return {
             description: item,
             executor: parallelPlan.executor,
@@ -2186,12 +2189,20 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
               invoke: asset.invoke,
               mechanism: asset.invocation?.mechanism || null,
             })),
+            activation_command: activationCommand,
+            activation_required: Boolean(activationCommand),
             pane_prompt: panePrompt,
             pane_spawn: {
               provider_id: selectedProviderId,
               model: workstreamModel || selectedModel,
               override_host_session: true,
             },
+            pane_activation: activationCommand
+              ? {
+                  submit: true,
+                  content: activationCommand,
+                }
+              : null,
             pane_write: {
               submit: true,
               content: panePrompt,
@@ -2702,7 +2713,11 @@ function formatResult(result) {
     lines.push('Dispatch workstreams:');
     result.dispatchPlan.parallel_workstreams.forEach((item, index) => {
       lines.push(`  ${index + 1}. ${item.description} -> ${item.executor} using ${item.model || 'runtime-default model'}`);
+      lines.push(`     Activation: ${item.activation_command || 'n/a'}`);
       lines.push(`     Prompt: ${item.pane_prompt}`);
+      if (item.pane_activation?.content) {
+        lines.push(`     Activation submit: ${item.pane_activation.content}`);
+      }
       if (Array.isArray(item.assets) && item.assets.length) {
         lines.push('     Targets:');
         for (const asset of item.assets) {

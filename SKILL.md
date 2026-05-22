@@ -117,12 +117,34 @@ Within a visible swarm, assign the model per workstream: `gpt-5.4-mini` for revi
 - Never close panes you did not spawn in the current task. Never close the caller pane. If the user asks to close idle panes, list the Oracle-owned candidates first unless the user named exact pane ids.
 - A spawned pane is not considered active until Oracle completes `pane_write` with submission, then `pane_wait_idle`, then `pane_read`. If that loop does not complete, treat the pane as failed orchestration instead of "done".
 - The prompt sent to a spawned pane must be submitted with `pane_write submit=true`. A visible prompt that was not submitted is a failure.
+- Do not send the workstream immediately after `pane_spawn` unless the pane is visibly ready. First run `pane_read` or `pane_wait_idle` and inspect for a stable prompt. Startup banners such as `Starting MCP servers`, context-budget warnings, preset prompts, or onboarding text mean the pane is not ready yet.
+- Prefer short ASCII-only one-line workstream prompts for the first write. Long prompts with accents, line wrapping, or pasted paragraphs can be echoed into the terminal without starting work in some Codex pane states.
+- After every `pane_write`, always run `pane_wait_idle` and then `pane_read`. Do not tell the user that a swarm is running until `pane_read` shows actual generated output or a working-state acknowledgement beyond the echoed prompt.
+- A buffer that only contains the submitted prompt, prompt marker (`›`), preset text such as `Improve documentation in @filename`, or idle chrome is not execution. Treat it as a failed write, wait for startup to finish, then retry once with a shorter ASCII prompt.
+- If the retry still only echoes the prompt, abandon that pane for the workstream and spawn a new visible pane with a verified provider/model. Report the failed pane id as orchestration failure rather than claiming it ran.
 - Before `pane_write`, wait for the spawned pane to reach a stable ready prompt. If the pane is still showing startup chrome, auth screens, onboarding, context-budget warnings, or a booting MCP server, do not submit the task yet. Re-spawn with a lighter verified provider/model or use a mission-bound pane before writing.
 - If the pane is command-mode rather than a blank shell, submit the visible activation command first and wait until the pane transitions into a real working state before sending the Oracle workstream. For Codex panes that present `Run /review on my current changes`, `/review` is the activation command.
 - If `/review` opens a preset menu, choose the option that reviews the current uncommitted changes, then wait until the pane shows `Working` before sending the Oracle workstream.
 - An echoed prompt is not execution. Do not treat a pane as successful until it has shown a working-state acknowledgement and then produced readable work output.
 - If `pane_read` returns no readable output after idle, retry once with the same prompt and then fall back to the next verified provider. Treat empty reads as orchestration failure, not success.
 - If the host is not one of the first-class standards, Oracle should recommend the standards instead of pretending to support the unknown host.
+
+Recommended Overclock swarm loop:
+
+```text
+1. pane_spawn(cwd, providerId/model selected from provider inventory)
+2. pane_wait_idle(paneId)
+3. pane_read(paneId) and verify the pane is past startup/onboarding
+4. pane_activation = "/review" for Codex command-mode panes, submit=true
+5. pane_wait_idle(paneId)
+6. pane_read(paneId) and verify the pane shows a working-state acknowledgement
+7. pane_write(paneId, short ASCII workstream prompt, submit=true)
+8. pane_wait_idle(paneId)
+9. pane_read(paneId)
+10. verify output contains findings, edits, or explicit completion; otherwise retry once
+```
+
+Never count steps 1-4 alone as execution. The swarm has executed only after step 9 returns useful output.
 
 The bootstrap preflight should report the detected executor explicitly:
 
@@ -230,8 +252,8 @@ node ~/.claude/skills/skill-oracle/scripts/oracle-query.js --rebuild
 node ~/.claude/skills/skill-oracle/scripts/oracle-smoke-test.js
 ```
 
-When using Overclock or Codex, summarize the `oracle-query.js` output to the user and then invoke every recommended skill or tool according to the host's available mechanism. For Overclock, agent recommendations should be treated as visible `pane_spawn` follow-up work; direct `Task(subagent_type=...)` is only valid in Claude Code. After every `pane_spawn`, immediately execute the full loop `pane_write -> pane_wait_idle -> pane_read`; do not leave spawned panes parked at an untouched prompt.
-The pane must receive the exact workstream prompt before waiting idle; spawning alone is not enough.
+When using Overclock or Codex, summarize the `oracle-query.js` output to the user and then invoke every recommended skill or tool according to the host's available mechanism. For Overclock, agent recommendations should be treated as visible `pane_spawn` follow-up work; direct `Task(subagent_type=...)` is only valid in Claude Code. After every `pane_spawn`, immediately execute the full loop `pane_activation (/review for Codex) -> pane_wait_idle -> pane_read -> pane_write(workstream) -> pane_wait_idle -> pane_read`; do not leave spawned panes parked at an untouched prompt.
+The pane must receive the activation step before the workstream prompt; spawning alone is not enough.
 If the visible pane is command-mode, submit the activation command shown on screen first, wait for the pane to begin working, and only then submit the Oracle workstream prompt. Do not treat a command prompt as ready until it has transitioned into a working state and the pane has acknowledged work starting.
 
 ### Step 4 — Synthesize and dispatch
