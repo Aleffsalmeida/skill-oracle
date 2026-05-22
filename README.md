@@ -64,6 +64,28 @@ The full demo video is stored in [assets/demo.webm](assets/demo.webm). The inlin
 
 ---
 
+## Architecture at a glance
+
+```text
+task -> inventory scan -> ranking -> runtime selection -> execution manifest -> cleanup
+```
+
+- `scanner.js` and `classifier.js` build the unified inventory.
+- `oracle-query.js` ranks the best-fit assets and emits the execution contract.
+- The host runs the selected path using the local provider inventory it already has.
+- Visible Overclock swarms are cleaned incrementally, with cleanup scoped to the current workspace only.
+
+---
+
+## Safety model
+
+- The manifest is workspace-scoped, not global.
+- Cleanup only applies to Oracle-owned panes.
+- Pane cleanup is incremental: finished panes are closed as soon as their output is captured.
+- The public repository stays free of local machine data, secrets, and runtime state.
+
+---
+
 ## Installation
 
 ### Step 1 — Install the skill files
