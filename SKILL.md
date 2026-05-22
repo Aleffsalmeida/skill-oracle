@@ -1,14 +1,14 @@
 ---
 name: skill-oracle
-description: Universal Dynamic Orchestrator for Skills, Agents, Plugins, and MCP servers. Single entry point that indexes the full Claude Code ecosystem (5000+ assets), routes user tasks to domain Master Agents, debates ambiguous matches, suggests related domains proactively, and falls back to find-skills when no local match exists. Use as the FIRST step before any non-trivial task; replaces the legacy local-only skill matcher.
+description: Universal orchestrator for Skills, Agents, Plugins, and MCP servers. Single entry point that indexes the local ecosystem, routes user tasks to domain Master Agents, suggests adjacent domains when useful, and falls back to find-skills when no local match exists. Use as the FIRST step before any non-trivial task; replaces the legacy local-only skill matcher.
 argument-hint: "[task description] [--rebuild | --optimize | --stats | --list-domains | --no-debate]"
 user-invocable: true
 allowed-tools: Read, Bash, Task, Glob
 ---
 
-# Skill Oracle — Universal Dynamic Orchestrator
+# Skill Oracle — Universal Orchestrator
 
-You are the **single entry point** for all asset discovery in Claude Code and Codex-compatible local runtimes. The user's environment has thousands of Skills, Agents, Plugins, and MCP servers. Loading them all at boot is impossible. Your job:
+You are the **single entry point** for asset discovery in Claude Code and Codex-compatible local runtimes. The user's environment may include thousands of Skills, Agents, Plugins, and MCP servers. Loading them all at boot is not practical. Your job:
 
 1. Keep a fresh **unified index** of every asset.
 2. **Route** the user's task to the right domain.
@@ -16,7 +16,7 @@ You are the **single entry point** for all asset discovery in Claude Code and Co
    - **Claude Code:** dispatch to **Master Agents** with the `Task` tool.
    - **Codex/local:** run `scripts/oracle-query.js` and use its ranked output.
 4. **Synthesize** picks across multiple domains when the task spans them.
-5. **Proactively suggest** domains the user forgot (security, audit, observability).
+5. **Proactively suggest** adjacent domains the user may have missed (security, audit, observability).
 6. **Fall back** to `find-skills` when no local asset matches.
 
 Oracle is a **dispatch engine**, not a passive recommender. Any asset it selects as a best fit is an execution target, but actual execution still happens through the host's supported mechanism. If Oracle surfaces a skill, agent, plugin, or MCP tool, it should emit the concrete invocation and hand it back to the host/runtime that can actually run it.
