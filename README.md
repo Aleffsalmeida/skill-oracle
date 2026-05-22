@@ -259,6 +259,7 @@ node ~/.claude/skills/skill-oracle/scripts/oracle-smoke-test.js
 - Keep a list of pane ids spawned by Oracle for the current task. Only those panes may be considered for cleanup.
 - Never close panes that Oracle did not spawn for the current task, and never close the pane that is coordinating the work.
 - If the user asks to clean up idle panes, only close Oracle-owned panes after verifying they are idle; otherwise present the candidate ids first.
+- When every delegated workstream is complete, close each Oracle-owned spawned pane and leave only the coordinating host pane open. If a spawned pane cannot be closed, report cleanup failure instead of treating the swarm as done.
 - After every `pane_spawn`, Oracle must complete `pane_write` with submission, then `pane_wait_idle`, then `pane_read` only after the pane is visibly ready. A pane that was spawned but never received a submitted prompt counts as an orchestration failure. If a warm visible pane is already in `Working` state, reuse it instead of spawning a cold replacement.
 - Before `pane_write`, inspect the visible pane and wait for a stable ready prompt. If the pane is still loading MCP servers, showing onboarding, auth, or budget warnings, do not write yet.
 - If the pane is command-mode instead of a blank shell, submit the visible activation command first, wait for the pane to switch into a working state, and only then send the Oracle workstream prompt.

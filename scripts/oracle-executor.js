@@ -38,6 +38,10 @@ function formatExecutionManifest(manifest) {
   lines.push(`State machine: ${manifest.host_contract.state_machine.join(' -> ')}`);
   lines.push(`Working ack required: ${manifest.host_contract.working_ack_required ? 'yes' : 'no'}`);
   lines.push(`Command activation required: ${manifest.host_contract.command_mode_activation_required ? 'yes' : 'no'}`);
+  if (manifest.cleanup_policy) {
+    lines.push(`Cleanup after completion: ${manifest.cleanup_policy.close_spawned_panes_after_completion ? 'yes' : 'no'}`);
+    lines.push(`Keep host pane open: ${manifest.cleanup_policy.preserve_host_pane ? 'yes' : 'no'}`);
+  }
   lines.push('');
   for (const workstream of manifest.workstreams || []) {
     lines.push(`${workstream.id}: ${workstream.description}`);

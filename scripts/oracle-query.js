@@ -1665,6 +1665,9 @@ function overclockOrchestrationPolicy(recommended) {
     cleanupPolicy: {
       requireIdleCheck: true,
       requireExecutionLoopCompletion: true,
+      closeSpawnedPanesAfterCompletion: Boolean(recommended),
+      preserveHostPane: true,
+      preserveCallerPane: true,
       failureMode: 'If the loop is incomplete, report failed orchestration instead of treating the pane as done or disposable.',
     },
   };
@@ -2241,6 +2244,7 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
     { id: 'write', label: 'submit prompt with submit=true', required: visiblePanes },
     { id: 'wait_idle', label: 'wait for idle', required: visiblePanes },
     { id: 'read', label: 'read result', required: visiblePanes },
+    { id: 'cleanup', label: 'close spawned panes and keep only the host pane open', required: visiblePanes },
   ];
 
   const workstreams = (dispatchPlan?.parallel_workstreams || []).map((item, index) => ({
@@ -2295,13 +2299,15 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
     host_contract: {
       visible_panes: visiblePanes,
       dispatch_style: visiblePanes ? 'visible-pane-swarm' : 'local-plan',
-      state_machine: ['spawn', 'spawn_ready', 'activate_command', 'select_review_preset', 'working_ack', 'write', 'wait_idle', 'read'],
+      state_machine: ['spawn', 'spawn_ready', 'activate_command', 'select_review_preset', 'working_ack', 'write', 'wait_idle', 'read', 'cleanup'],
       command_mode_activation_required: false,
       working_ack_required: false,
       pane_write_submission_required: true,
       empty_read_is_failure: true,
       output_capture_required: true,
       spawn_ready_required: true,
+      cleanup_after_completion_required: visiblePanes,
+      preserve_host_pane: true,
     },
     stages,
     bundle: (bundle || []).map((asset) => ({
@@ -2326,6 +2332,14 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
       working_ack_required: false,
       blank_prompt_is_not_approval: true,
       echoed_prompt_is_not_work_result: true,
+      cleanup_owned_panes_after_completion: visiblePanes,
+      never_close_host_pane: true,
+    },
+    cleanup_policy: {
+      close_spawned_panes_after_completion: visiblePanes,
+      preserve_host_pane: true,
+      preserve_caller_pane: true,
+      scope: 'spawned-panes-only',
     },
   };
 }
