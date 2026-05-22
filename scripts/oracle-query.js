@@ -2235,6 +2235,7 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
 
 function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPlan, preflight }) {
   const visiblePanes = dispatchPlan?.host === 'overclock';
+  const workspaceRoot = preflight?.workspace_root || preflight?.cwd || process.cwd();
   const stages = [
     { id: 'spawn', label: 'spawn visible pane', required: visiblePanes },
     { id: 'spawn_ready', label: 'wait until pane is ready for input', required: visiblePanes },
@@ -2284,12 +2285,14 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
       never_close_caller_pane: true,
       track_spawned_pane_ids: true,
       close_after_workstream_completion: true,
+      workspace_scoped: true,
     },
     cleanup: {
       close_after_read: true,
       close_mode: visiblePanes ? 'incremental' : 'host-managed',
       owner_only: true,
       reap_candidate: true,
+      workspace_scoped: true,
     },
   }));
 
@@ -2297,6 +2300,7 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
     version: 1,
     task,
     runtime: preflight?.preflight?.runtime || 'unknown',
+    workspace_root: workspaceRoot,
     executor: dispatchPlan?.host || 'local',
     host_adapter: dispatchPlan?.host_adapter || null,
     selected_provider: dispatchPlan?.selected_provider || null,
@@ -2316,6 +2320,7 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
       cleanup_after_completion_required: visiblePanes,
       cleanup_after_each_workstream_required: visiblePanes,
       preserve_host_pane: true,
+      workspace_scoped_cleanup_required: true,
     },
     stages,
     bundle: (bundle || []).map((asset) => ({
@@ -2344,6 +2349,7 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
       cleanup_owned_panes_after_each_workstream: visiblePanes,
       never_close_host_pane: true,
       never_leave_finished_panes_open: true,
+      cleanup_only_within_workspace_root: true,
     },
     cleanup_policy: {
       mode: visiblePanes ? 'incremental-after-each-workstream' : 'host-managed',
@@ -2356,6 +2362,9 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
       cadence: visiblePanes ? 'after_each_workstream_read' : 'host-managed',
       check_finished_panes_on_every_read: visiblePanes,
       reap_interval_hint: visiblePanes ? 'immediate-after-read' : 'host-managed',
+      workspace_scope: 'current-workspace-only',
+      workspace_root: workspaceRoot,
+      close_only_when_pane_cwd_matches_workspace: true,
     },
   };
 }

@@ -35,6 +35,7 @@ function formatExecutionManifest(manifest) {
   lines.push(`Executor: ${manifest.executor}`);
   lines.push(`Provider: ${manifest.selected_provider || 'n/a'}`);
   lines.push(`Model: ${manifest.selected_model || 'n/a'}`);
+  lines.push(`Workspace root: ${manifest.workspace_root || 'n/a'}`);
   lines.push(`State machine: ${manifest.host_contract.state_machine.join(' -> ')}`);
   lines.push(`Working ack required: ${manifest.host_contract.working_ack_required ? 'yes' : 'no'}`);
   lines.push(`Command activation required: ${manifest.host_contract.command_mode_activation_required ? 'yes' : 'no'}`);
@@ -42,6 +43,7 @@ function formatExecutionManifest(manifest) {
     lines.push(`Cleanup after completion: ${manifest.cleanup_policy.close_spawned_panes_after_completion ? 'yes' : 'no'}`);
     lines.push(`Keep host pane open: ${manifest.cleanup_policy.preserve_host_pane ? 'yes' : 'no'}`);
     lines.push(`Cleanup cadence: ${manifest.cleanup_policy.cadence || 'n/a'}`);
+    lines.push(`Cleanup scope: ${manifest.cleanup_policy.workspace_scope || 'n/a'}`);
   }
   lines.push('');
   for (const workstream of manifest.workstreams || []) {

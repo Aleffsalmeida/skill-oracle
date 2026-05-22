@@ -258,6 +258,7 @@ node ~/.claude/skills/skill-oracle/scripts/oracle-smoke-test.js
 
 - Keep a list of pane ids spawned by Oracle for the current task. Only those panes may be considered for cleanup.
 - Never close panes that Oracle did not spawn for the current task, and never close the pane that is coordinating the work.
+- Never close panes outside the current workspace root. A pane is eligible for cleanup only when its `cwd` matches the workspace where Oracle was executed.
 - If the user asks to clean up idle panes, only close Oracle-owned panes after verifying they are idle; otherwise present the candidate ids first.
 - Close Oracle-owned panes incrementally. As soon as a delegated pane finishes its own work and its output has been captured, close that pane instead of waiting for the entire swarm to finish.
 - The host should re-check spawned panes after every `pane_read` and close any pane that has already completed, so finished panes do not keep CPU, sandbox, or memory resources alive unnecessarily.

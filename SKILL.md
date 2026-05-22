@@ -115,6 +115,7 @@ Within a visible swarm, assign the model per workstream: `gpt-5.4-mini` for revi
 - Only spawn panes for genuinely independent workstreams. Simple page polish, local UI edits, copy tweaks, and single-surface design tasks stay in the current pane.
 - Track every pane id you spawn for the current task. Those are the only panes Oracle may treat as disposable.
 - Never close panes you did not spawn in the current task. Never close the caller pane. If the user asks to close idle panes, list the Oracle-owned candidates first unless the user named exact pane ids.
+- Never close panes outside the current workspace root. A pane is eligible for cleanup only if its `cwd` matches the workspace where Oracle was executed.
 - Close Oracle-owned panes incrementally. As soon as a delegated pane finishes its own work and the output has been captured, close that pane instead of waiting for the whole swarm to finish.
 - Re-check spawned panes after every `pane_read` and close any pane that has already completed. Finished panes should not stay alive consuming CPU or sandbox resources.
 - A spawned pane is not considered active until Oracle completes `pane_write` with submission, then `pane_wait_idle`, then `pane_read`. If that loop does not complete, treat the pane as failed orchestration instead of "done".
@@ -146,7 +147,7 @@ Recommended Overclock swarm loop:
 8. pane_wait_idle(paneId)
 9. pane_read(paneId)
 10. verify output contains findings, edits, or explicit completion; otherwise retry once
-11. close each Oracle-owned pane as soon as its workstream is complete
+11. close each Oracle-owned pane as soon as its workstream is complete, but only when the pane belongs to the current workspace
 ```
 
 Never count steps 1-4 alone as execution. The swarm has executed only after step 9 returns useful output.
