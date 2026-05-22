@@ -41,6 +41,7 @@ function formatExecutionManifest(manifest) {
   if (manifest.cleanup_policy) {
     lines.push(`Cleanup after completion: ${manifest.cleanup_policy.close_spawned_panes_after_completion ? 'yes' : 'no'}`);
     lines.push(`Keep host pane open: ${manifest.cleanup_policy.preserve_host_pane ? 'yes' : 'no'}`);
+    lines.push(`Cleanup cadence: ${manifest.cleanup_policy.cadence || 'n/a'}`);
   }
   lines.push('');
   for (const workstream of manifest.workstreams || []) {

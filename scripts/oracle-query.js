@@ -2285,6 +2285,12 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
       track_spawned_pane_ids: true,
       close_after_workstream_completion: true,
     },
+    cleanup: {
+      close_after_read: true,
+      close_mode: visiblePanes ? 'incremental' : 'host-managed',
+      owner_only: true,
+      reap_candidate: true,
+    },
   }));
 
   return {
@@ -2337,6 +2343,7 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
       cleanup_owned_panes_after_completion: visiblePanes,
       cleanup_owned_panes_after_each_workstream: visiblePanes,
       never_close_host_pane: true,
+      never_leave_finished_panes_open: true,
     },
     cleanup_policy: {
       mode: visiblePanes ? 'incremental-after-each-workstream' : 'host-managed',
@@ -2347,6 +2354,8 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
       preserve_caller_pane: true,
       scope: 'spawned-panes-only',
       cadence: visiblePanes ? 'after_each_workstream_read' : 'host-managed',
+      check_finished_panes_on_every_read: visiblePanes,
+      reap_interval_hint: visiblePanes ? 'immediate-after-read' : 'host-managed',
     },
   };
 }
