@@ -55,7 +55,6 @@ const PREFERRED_EXECUTION_PROVIDER_ORDER = [
   'mimo-DMlOoB',
   'claude-oauth',
 ];
-const MAX_VISIBLE_SWARM_WORKSTREAMS = Math.max(1, Number.parseInt(process.env.ORACLE_MAX_VISIBLE_WORKSTREAMS || '2', 10) || 2);
 const FIRST_CLASS_HOSTS = new Set(['overclock', 'claude-code', 'codex', 'antigravity']);
 const PREFERRED_SKILLS = new Set([
   'skill-oracle',
@@ -2017,7 +2016,7 @@ function parallelExecutionPlan(task, domains, preflight) {
             ? 'Use the Antigravity CLI adapter and local manifest execution.'
             : 'Use visible panes/agents only; do not use invisible Task subagents in Overclock.',
     orchestrationPolicy: overclockOrchestrationPolicy(workstreams.length >= 2),
-    workstreams: workstreams.slice(0, MAX_VISIBLE_SWARM_WORKSTREAMS),
+    workstreams,
   };
 }
 
@@ -2165,7 +2164,7 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
       model: selectedModel,
     })),
     parallel_workstreams: parallelPlan?.recommended
-      ? parallelPlan.workstreams.slice(0, MAX_VISIBLE_SWARM_WORKSTREAMS).map((item, index) => {
+      ? parallelPlan.workstreams.map((item, index) => {
           const assets = workstreamAssets(item);
           const activationCommand = buildActivationCommand(selectedProviderId);
           const workstreamModel = selectVisibleWorkstreamModel(
@@ -2284,6 +2283,7 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
       close_only_owned_panes: true,
       never_close_caller_pane: true,
       track_spawned_pane_ids: true,
+      close_after_workstream_completion: true,
     },
   }));
 
@@ -2308,6 +2308,7 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
       output_capture_required: true,
       spawn_ready_required: true,
       cleanup_after_completion_required: visiblePanes,
+      cleanup_after_each_workstream_required: visiblePanes,
       preserve_host_pane: true,
     },
     stages,
@@ -2334,13 +2335,18 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
       blank_prompt_is_not_approval: true,
       echoed_prompt_is_not_work_result: true,
       cleanup_owned_panes_after_completion: visiblePanes,
+      cleanup_owned_panes_after_each_workstream: visiblePanes,
       never_close_host_pane: true,
     },
     cleanup_policy: {
+      mode: visiblePanes ? 'incremental-after-each-workstream' : 'host-managed',
       close_spawned_panes_after_completion: visiblePanes,
+      close_completed_panes_immediately: visiblePanes,
+      review_completed_panes_during_execution: visiblePanes,
       preserve_host_pane: true,
       preserve_caller_pane: true,
       scope: 'spawned-panes-only',
+      cadence: visiblePanes ? 'after_each_workstream_read' : 'host-managed',
     },
   };
 }
