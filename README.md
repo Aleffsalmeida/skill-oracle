@@ -22,11 +22,11 @@
 
 It was built to solve a specific problem: when the right tool already exists in the workspace, but finding it fast is harder than doing the work itself.
 
-## Why it exists
+## Operational Goals
 
-- Stop the user from hunting through a huge workspace by hand
+- Reduce manual searching across large workspaces
 - Turn a simple prompt into a ranked set of skills and agents
-- Keep adjacent domains visible without overwhelming the user
+- Keep adjacent domains visible without overloading the operator
 - Route to the best runtime path for Claude Code, Overclock, or Codex/local
 - Fall back to `find-skills` when the local match is weak
 
@@ -34,7 +34,7 @@ The full demo video is stored in [assets/demo.webm](assets/demo.webm). The inlin
 
 ---
 
-## What it does
+## Core Flow
 
 1. Read the task and detect the likely domains.
 2. Scan the unified index of Skills, Agents, Plugins, and MCP servers.
@@ -44,12 +44,12 @@ The full demo video is stored in [assets/demo.webm](assets/demo.webm). The inlin
 
 ---
 
-## How it works
+## Design Principles
 
-- Oracle reads the installed skills, agents, plugins, and MCP servers.
-- It ranks the best matches by task intent and local context.
-- It chooses a runtime path for Claude Code, Overclock, Codex/local, or Antigravity CLI.
-- It uses the cheapest safe model first, then escalates only when the task is more complex.
+- Prefer local, deterministic selection before escalation.
+- Rank by task intent and workspace context, not just keyword overlap.
+- Choose a runtime path for Claude Code, Overclock, Codex/local, or Antigravity CLI.
+- Use the cheapest safe model first, then escalate only when the task is more complex.
 - In Overclock, visible panes are used only when the task genuinely splits into independent workstreams.
 
 ---
