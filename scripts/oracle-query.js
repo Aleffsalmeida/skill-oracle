@@ -2221,8 +2221,8 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
       'Do not downgrade execution-ready picks into discovery-only recommendations.',
       'If a pane is spawned, complete pane_write -> pane_wait_idle -> pane_read before treating the workstream as active.',
       'If a Codex pane is command-mode, use the visible activation command on the pane first. If a review preset appears, choose the preset that reviews the current uncommitted changes, then submit the workstream prompt only after the pane shows an explicit working state.',
-      'A spawned pane is not execution-ready until the prompt is stable, any command-mode activation has completed, and a working-state acknowledgement has been observed.',
-      'A pane_wait_idle timeout during command-mode activation is not proof of failure; check pane_read for the Working spinner before falling back.',
+      'A spawned pane is not execution-ready until the prompt is stable, any command-mode activation has completed, and a working-state acknowledgement has been observed. If a warm pane is already in Working state, reuse it instead of spawning a cold replacement.',
+      'A pane_wait_idle timeout during command-mode activation is not proof of failure; check pane_read for the Working spinner before falling back. If a fresh pane reports access-token refresh failure or stays on booting MCP servers, treat that as an auth/runtime failure and reuse a warm pane or re-authenticate.',
       `If pane_read returns no readable output, retry with the same prompt once and use ${OUTPUT_PROBE_SENTINEL} as the visible probe before falling back to the next verified provider.`,
     ].filter(Boolean),
   };
