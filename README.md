@@ -1,7 +1,7 @@
 # Oracle — Universal Orchestrator for Skills, Agents, Plugins, and MCP
 
 <p align="center">
-  <img src="assets/oracle-logo.svg" alt="Oracle logo" width="540"/>
+  <img src="assets/oracle-logo.png" alt="Oracle logo" width="540"/>
 </p>
 
 <p align="center">
@@ -58,7 +58,7 @@ It was built to solve a specific problem: when the right tool already exists in 
 - `scripts/oracle-query.js` does the local ranking and manifest generation.
 - `scripts/oracle-bootstrap.js` installs/refreshes the index and runtime support.
 - `scripts/oracle-smoke-test.js` checks that the install is healthy.
-- `assets/oracle-logo.svg` is the public logo shown on GitHub.
+- `assets/oracle-logo.png` is the public logo shown on GitHub.
 
 ---
 
