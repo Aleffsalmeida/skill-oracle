@@ -1958,12 +1958,14 @@ function workflowRecommendations(idx, task, domains) {
 
 function parallelExecutionPlan(task, domains, preflight) {
   const text = normalize(task);
+  const tokenCount = tokenize(task).length;
   const executorName = normalize(preflight?.preflight?.executor?.name || preflight?.executor?.name || '');
   const runtimeName = normalize(preflight?.preflight?.runtime || preflight?.runtime || '');
   const visiblePaneExecutor = executorName === 'pane_spawn';
-  const explicitSwarm = /\b(swarm|parallel|paralelo|paralela|pane|panes|agents|agentes|workstreams|subagents|multi-agent|orquestracao|orquestração)\b/.test(text);
-  const multiStepRisk = /\b(parallel|architecture|arquitetura|api|schema|migration|migracao|migração|soft delete|lixeira|rls|security|seguranca|segurança|test|tests|teste|testes|playwright|multi-step|end-to-end|cross-domain|banco de dados|database|auth|checkout|payment|pagamento|stripe|pix)\b/.test(text);
-  const heavy = explicitSwarm || domains.length >= 3 || (domains.length >= 2 && multiStepRisk);
+  const explicitSwarm = /\b(swarm|parallel|paralelo|paralela|multi-agent|multiagent|orquestracao|orquestração)\b/.test(text);
+  const multiStepRisk = /\b(architecture|arquitetura|api|schema|migration|migracao|migração|soft delete|lixeira|rls|security|seguranca|segurança|test|tests|teste|testes|playwright|multi-step|end-to-end|cross-domain|banco de dados|database|auth|checkout|payment|pagamento|stripe|pix)\b/.test(text);
+  const projectScale = tokenCount >= 12 || /\b(project|projeto|rebuild|refactor|refatorar|restruct|reestrut|implement|implementar|build|fullstack)\b/.test(text);
+  const heavy = explicitSwarm || domains.length >= 3 || (domains.length >= 2 && multiStepRisk && projectScale);
 
   if (!heavy) {
     return {
@@ -2293,6 +2295,7 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
       owner_only: true,
       reap_candidate: true,
       workspace_scoped: true,
+      workspace_match_keys: ['cwd', 'workspaceId', 'worktreePath'],
     },
   }));
 
@@ -2301,6 +2304,8 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
     task,
     runtime: preflight?.preflight?.runtime || 'unknown',
     workspace_root: workspaceRoot,
+    workspace_id: workspaceRoot,
+    worktree_path: workspaceRoot,
     executor: dispatchPlan?.host || 'local',
     host_adapter: dispatchPlan?.host_adapter || null,
     selected_provider: dispatchPlan?.selected_provider || null,
@@ -2321,6 +2326,7 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
       cleanup_after_each_workstream_required: visiblePanes,
       preserve_host_pane: true,
       workspace_scoped_cleanup_required: true,
+      workspace_identity_keys: ['cwd', 'workspaceId', 'worktreePath'],
     },
     stages,
     bundle: (bundle || []).map((asset) => ({
@@ -2364,6 +2370,8 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
       reap_interval_hint: visiblePanes ? 'immediate-after-read' : 'host-managed',
       workspace_scope: 'current-workspace-only',
       workspace_root: workspaceRoot,
+      workspace_id: workspaceRoot,
+      worktree_path: workspaceRoot,
       close_only_when_pane_cwd_matches_workspace: true,
     },
   };

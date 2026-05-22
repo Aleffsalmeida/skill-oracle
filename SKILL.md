@@ -60,7 +60,7 @@ Oracle must also keep the user-facing summary minimal and operational:
 Before routing, identify the current host runtime:
 
 - **Claude Code runtime:** `Task` subagents are available and `~/.claude/agents/oracle-master-*.md` can be discovered. Use the Master Agent procedure below.
-- **Overclock runtime:** visible panes may be available, but Oracle should only request `pane_spawn` when the host exposes that tool. Use `scripts/oracle-query.js` for ranking, then let the host perform visible-pane execution when supported. Do not open panes for simple local edits or standalone page-design work that one pane can finish safely.
+- **Overclock runtime:** visible panes may be available, but Oracle should only request `pane_spawn` when the host exposes that tool and the task truly splits into independent workstreams. Use `scripts/oracle-query.js` for ranking, then let the host perform visible-pane execution when supported. Do not open panes for simple local edits, single-surface design work, or other tasks one pane can finish safely.
 - Overclock pane execution must be based on verified local provider inventory. Do not select Claude or any other provider unless it appears in the current provider list.
 - **Codex runtime:** use the local runner and manifest path. Prefer safe local execution and let the host adapter submit the work.
 - **Antigravity CLI runtime:** treat it as a first-class host. Use the local manifest/adapter path and prefer the verified provider inventory before spawning work.
@@ -116,8 +116,10 @@ Within a visible swarm, assign the model per workstream: `gpt-5.4-mini` for revi
 - Track every pane id you spawn for the current task. Those are the only panes Oracle may treat as disposable.
 - Never close panes you did not spawn in the current task. Never close the caller pane. If the user asks to close idle panes, list the Oracle-owned candidates first unless the user named exact pane ids.
 - Never close panes outside the current workspace root. A pane is eligible for cleanup only if its `cwd` matches the workspace where Oracle was executed.
+- When the host exposes mission metadata, use `cwd`, `workspaceId`, and `worktreePath` as the workspace identity keys for cleanup decisions.
 - Close Oracle-owned panes incrementally. As soon as a delegated pane finishes its own work and the output has been captured, close that pane instead of waiting for the whole swarm to finish.
 - Re-check spawned panes after every `pane_read` and close any pane that has already completed. Finished panes should not stay alive consuming CPU or sandbox resources.
+- Do not convert a simple task into a swarm just because the user mentioned panes, agents, or orchestration. Reserve `pane_spawn` for tasks with a clear multi-workstream split.
 - A spawned pane is not considered active until Oracle completes `pane_write` with submission, then `pane_wait_idle`, then `pane_read`. If that loop does not complete, treat the pane as failed orchestration instead of "done".
 - The prompt sent to a spawned pane must be submitted with `pane_write submit=true`. A visible prompt that was not submitted is a failure.
 - Do not send the workstream immediately after `pane_spawn` unless the pane is visibly ready. First run `pane_read` or `pane_wait_idle` and inspect for a stable prompt. Startup banners such as `Starting MCP servers`, context-budget warnings, preset prompts, or onboarding text mean the pane is not ready yet.
