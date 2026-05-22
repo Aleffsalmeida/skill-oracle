@@ -1,12 +1,12 @@
-# skill-oracle — Universal Orchestrator for Skills, Agents, Plugins, and MCP
+# Oracle — Universal Orchestrator for Skills, Agents, Plugins, and MCP
 
 <p align="center">
   <img src="assets/oracle-logo.svg" alt="Oracle logo" width="540"/>
 </p>
 
 <p align="center">
-  <a href="assets/demo.webm" aria-label="Open the full skill-oracle demo video">
-    <img src="assets/demo.gif" alt="skill-oracle demo" width="760"/>
+  <a href="assets/demo.webm" aria-label="Open the full Oracle demo video">
+    <img src="assets/demo.gif" alt="Oracle demo" width="760"/>
   </a>
 </p>
 
@@ -18,7 +18,7 @@
   <img src="https://img.shields.io/badge/schema-v2-purple?style=flat-square" alt="schema"/>
 </p>
 
-**skill-oracle is the orchestration layer for overloaded local AI setups.** It reads the task, scans the installed Skills, Agents, Plugins, and MCP servers, ranks the best fits, and hands work off to the right runtime path.
+**Oracle is the orchestration layer for overloaded local AI setups.** It reads the task, scans the installed Skills, Agents, Plugins, and MCP servers, ranks the best fits, and hands work off to the right runtime path.
 
 It was built to solve a specific problem: when the right tool already exists in the workspace, but finding it fast is harder than doing the work itself.
 
@@ -186,13 +186,13 @@ what tools handle observability and incident response?
 Slash command:
 
 ```
-/skill-oracle deploy a Next.js app
-/skill-oracle --rebuild              # full re-scan + classify
-/skill-oracle --stats                # counts and last-build time
-/skill-oracle --list-domains         # all 20 domains + counts
-/skill-oracle --optimize             # dry-run lazy-loader
-/skill-oracle --optimize --apply     # apply with backup
-/skill-oracle --no-debate <task>     # cheapest path, no master debate
+/oracle deploy a Next.js app
+/oracle --rebuild              # full re-scan + classify
+/oracle --stats                # counts and last-build time
+/oracle --list-domains         # all 20 domains + counts
+/oracle --optimize             # dry-run lazy-loader
+/oracle --optimize --apply     # apply with backup
+/oracle --no-debate <task>     # cheapest path, no master debate
 ```
 
 ### Overclock/Codex/local usage

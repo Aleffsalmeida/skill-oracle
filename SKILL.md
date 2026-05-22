@@ -1,12 +1,12 @@
 ---
-name: skill-oracle
+name: oracle
 description: Universal orchestrator for Skills, Agents, Plugins, and MCP servers. Single entry point that indexes the local ecosystem, routes user tasks to domain Master Agents, suggests adjacent domains when useful, and falls back to find-skills when no local match exists. Use as the FIRST step before any non-trivial task; replaces the legacy local-only skill matcher.
 argument-hint: "[task description] [--rebuild | --optimize | --stats | --list-domains | --no-debate]"
 user-invocable: true
 allowed-tools: Read, Bash, Task, Glob
 ---
 
-# Skill Oracle — Universal Orchestrator
+# Oracle — Universal Orchestrator
 
 You are the **single entry point** for asset discovery in Claude Code and Codex-compatible local runtimes. The user's environment may include thousands of Skills, Agents, Plugins, and MCP servers. Loading them all at boot is not practical. Your job:
 
@@ -34,8 +34,8 @@ Oracle must also keep the user-facing summary minimal and operational:
 
 - User asks "is there a skill / tool / agent / plugin for X?"
 - Before any non-trivial task — discover the best available asset before doing the work manually.
-- User says `/skill-oracle <task>` or `/skill-oracle` alone (general status).
-- Another agent calls `Skill("skill-oracle")`.
+- User says `/oracle <task>` or `/oracle` alone (general status).
+- Another agent calls `Skill("oracle")`.
 
 ---
 
@@ -200,7 +200,7 @@ node ~/.claude/skills/skill-oracle/scripts/oracle-bootstrap.js --install
 
 After bootstrap, **offer optimization**:
 
-> "Index built. Run `/skill-oracle --optimize --apply` to disable non-Oracle SessionStart hooks (lazy-loading mode). Requires a Claude Code restart."
+> "Index built. Run `/oracle --optimize --apply` to disable non-Oracle SessionStart hooks (lazy-loading mode). Requires a Claude Code restart."
 
 ### Step 1 — Delta detection
 
@@ -478,5 +478,5 @@ Pass `constraints: { no_debate: true }` when invoking master agents. They skip S
 
 - The Oracle replaces the legacy `build-index.js` (skill-only, schema v1). The new pipeline is `scanner.js` -> `classifier.js` -> master agents.
 - `build-index.js` is kept for backward compatibility but is deprecated.
-- Bootstrap detection makes the Oracle self-installing: invoking `/skill-oracle` on a fresh checkout builds everything needed on first run.
+- Bootstrap detection makes the Oracle self-installing: invoking `/oracle` on a fresh checkout builds everything needed on first run.
 - For the find-skills ecosystem fallback to work, install the `find-skills` skill separately.
