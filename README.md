@@ -44,84 +44,23 @@ The full demo video is stored in [assets/demo.webm](assets/demo.webm). The inlin
 
 ---
 
-## What changed in v2
+## How it works
 
-| | v1 (skill-only matcher) | v2 (universal orchestrator) |
-|---|---|---|
-| Asset types | Skills only | Skills + Agents + Plugins + MCP |
-| Index size | ~90 skills | 5,000+ assets typical |
-| Discovery | Read every SKILL.md description on demand | 20 domain Master Agents in Claude Code; local domain selector in Codex |
-| Selection | Master-agent dispatch + debate | Semantic local executor over enriched skill content |
-| Lazy-loading | None | Optimizer disables non-Oracle SessionStart hooks |
-| Fallback | Manual `--compare` to find-skills | Automatic when no local match exists |
-
-The old `build-index.js` is preserved for backward compat. New pipeline is `scanner.js` -> `classifier.js` -> Master Agents.
-
-Every asset carries a `domain` and `master_agent` tag in the index. In Claude Code, Oracle dispatches in parallel and each master sees only its own cluster. In Overclock/Codex/local runtimes, `scripts/oracle-query.js` reads the same index, evaluates enriched semantic fields extracted from each `SKILL.md`, and ranks assets deterministically without requiring Claude Code's `Task` dispatcher. The ranked output is an execution bundle, not a suggestion list: Oracle should invoke every selected skill and agent through the host's supported mechanism. For command-style skills, it now resolves the real executable form from the skill's `Commands` table, then prefers a pinned shortcut when one exists. In Overclock, follow-up agent work should be delegated through visible `pane_spawn` panes only when the work genuinely splits into independent streams. Simple tasks should stay in the current pane.
-
-Overclock pane execution must use the verified local provider inventory. Oracle must not choose a provider that is not present in the current install, and it must always submit pane prompts with `pane_write submit=true` rather than leaving them visible at a shell prompt.
-
-When a visible pane is still in command-mode or startup chrome, Oracle should not treat it as ready just because the pane exists. The pane has to show a stable prompt surface first. If the Codex pane presents a command prompt such as `Run /review on my current changes`, Oracle should submit that visible activation command first, wait for the pane to enter a working state, and only then submit the actual workstream prompt. Oracle does not auto-insert `/review` into every pane anymore; the activation is conditional on the visible prompt. An echoed prompt is not execution. If a fresh pane reports `access token could not be refreshed` or stays on `Booting MCP server`, treat it as a runtime failure and reuse an already-warm pane instead of spawning another cold one. This avoids the common failure mode where a prompt is written too early and only gets echoed back instead of executed.
-
-If Codex opens a review-preset menu after `/review`, choose the preset that reviews the current uncommitted changes, then wait for the `Working` spinner before sending the Oracle workstream. A `pane_wait_idle` timeout during that activation flow is not enough to declare failure; check `pane_read` for `Working` before falling back.
-
-First-class host standards are:
-
-- `Overclock`
-- `Claude Code`
-- `Codex`
-- `Antigravity CLI`
-
-Any other IDE/CLI/terminal should be treated as an adapter target. If Oracle cannot adapt cleanly, it should recommend one of the four standards above instead of pretending to support the host natively.
-
-The local path is not a per-domain LLM orchestration layer. It is a semantic selector that approximates the master-agent bundle by combining:
-
-- `name`, `description`, and classification keywords
-- extracted `content_summary`, `use_when`, `workflow_terms`, and `capability_terms`
-- intent boosts for UI, desktop, branding, shortcuts, and tooling tasks
-- capability aliases for natural-language intents such as logo/brand, video/motion, tracking, signup/onboarding, SEO/schema, payments, security, testing, docs/files, mobile, ecommerce, and CRM
-
-This keeps the local runner fast and deterministic while still preserving most of the signal hidden inside the skill content.
-
-When an OpenAI API key and the embedding index are available, ambiguous multi-domain queries may also trigger a synthesis pass via the OpenAI Responses API. That pass does not replace the local selector; it only reorders and compresses the bundle when the task clearly benefits from a higher-level synthesis step.
-
-The local runner also emits a model hint so simple tasks can stay on a cheaper model by default:
-
-- **simple** -> `claude-haiku-4-5` / `gpt-5.4-mini`
-- **medium** -> `claude-sonnet-4-6` / `gpt-5.4`
-- **heavy** -> `claude-opus-4-7` / `gpt-5.5`
-
-Rule of thumb: start with the smallest model that can safely close the task, and only escalate when the task is multi-domain, long-running, or architecture-heavy. For Overclock visible panes, keep a per-workstream ladder: `gpt-5.4-mini` for review/read/analysis, `gpt-5.4` for ordinary implementation, and `gpt-5.5` for critical or problematic workstreams that need the most reliable execution path.
-
-Simple page-design work, local UI polish, and other single-surface tasks should usually stay in the current pane. Opening premium-model panes for that class of work is a policy violation, not an optimization.
+- Oracle reads the installed skills, agents, plugins, and MCP servers.
+- It ranks the best matches by task intent and local context.
+- It chooses a runtime path for Claude Code, Overclock, Codex/local, or Antigravity CLI.
+- It uses the cheapest safe model first, then escalates only when the task is more complex.
+- In Overclock, visible panes are used only when the task genuinely splits into independent workstreams.
 
 ---
 
-## Architecture
+## Files
 
-```
-~/.claude/oracle-index.json          # unified index v2 (built once, kept fresh)
-~/.claude/agents/oracle-master-*.md  # 20 master subagents (installed by install-agents.js)
-
-Indexed skill roots:
-- `~/.claude/skills`
-- `~/.codex/skills`
-- `~/.agents/skills`
-
-skill-oracle/
-  SKILL.md                           # orchestrator instructions (this entry point)
-  agents/oracle-master-*.md          # source masters (generated by gen-masters.js)
-  scripts/
-    scanner.js          # unified scanner (skills + agents + plugins + mcp across Claude/Codex/Agents roots)
-    classifier.js       # domain assignment via keyword scoring
-    gen-masters.js      # generates the 20 master .md files
-    install-agents.js   # copies masters into ~/.claude/agents/
-    optimizer.js        # settings.json lazy-loading optimizer
-    auto-rebuild.js     # SessionStart hook entry point
-    oracle-query.js     # Overclock/Codex/local semantic selector; no Task dispatcher required
-    oracle-smoke-test.js # local health check for scripts, index, agents, query
-    build-index.js      # legacy v1 builder (kept for backward compat)
-```
+- `SKILL.md` is the operator guide.
+- `scripts/oracle-query.js` does the local ranking and manifest generation.
+- `scripts/oracle-bootstrap.js` installs/refreshes the index and runtime support.
+- `scripts/oracle-smoke-test.js` checks that the install is healthy.
+- `assets/oracle-logo.svg` is the public logo shown on GitHub.
 
 ---
 
@@ -168,7 +107,7 @@ The index is delta-aware. Each scan writes an `inventory_signature` built from i
 - if a user installed, removed, or edited a Skill, Agent, Plugin, or MCP server, it automatically reruns `gen-masters.js`, `install-agents.js`, `scanner.js`, `classifier.js`, and embeddings when an API key is configured
 - after a `find-skills` recommendation is accepted and installed, the next Oracle run detects the new skill and classifies it into the correct domain/master agent
 
-The preflight report now states which dispatch mechanism the host is expected to use:
+The preflight report states which dispatch mechanism the host is expected to use:
 
 - `Task` on Claude Code
 - `pane_spawn` on Overclock
@@ -278,104 +217,11 @@ Exit codes:
 
 ---
 
-## Domains (20)
+## Public repo policy
 
-| Domain | Master Agent | Examples |
-|---|---|---|
-| web-dev | oracle-master-web | React, Next.js, Vercel, Tailwind |
-| backend-api | oracle-master-backend | FastAPI, Express, GraphQL |
-| database-data | oracle-master-database | Postgres, Snowflake, Prisma |
-| devops-infra | oracle-master-devops | Docker, Kubernetes, Terraform |
-| security-audit | oracle-master-security | OWASP, OAuth, secret scanning |
-| testing-qa | oracle-master-testing | TDD, Playwright, mutation tests |
-| ai-ml | oracle-master-ai | Claude, OpenAI, LangChain, RAG |
-| design-ui | oracle-master-design | Figma, WCAG, design systems |
-| mobile | oracle-master-mobile | iOS, Android, Expo, Flutter |
-| data-analytics | oracle-master-analytics | Posthog, dashboards, forecasting |
-| marketing-growth | oracle-master-marketing | SEO, ads, CRO, email |
-| crypto-web3 | oracle-master-crypto | DeFi, wallets, smart contracts |
-| productivity | oracle-master-productivity | Notion, Slack, Linear |
-| finance-billing | oracle-master-finance | Stripe, billing, invoicing |
-| docs-content | oracle-master-docs | Documentation, copywriting |
-| tooling-meta | oracle-master-tooling | Skill/plugin/hook builders |
-| observability | oracle-master-observability | Sentry, Datadog, alerts |
-| ecommerce | oracle-master-ecommerce | Shopify, WooCommerce |
-| crm-sales | oracle-master-crm | HubSpot, Salesforce |
-| misc | oracle-master-misc | Fallback for unclassified |
-
-Edit `scripts/classifier.js` to refine domain rules.
-
----
-
-## Index schema v2
-
-```jsonc
-{
-  "version": 2,
-  "generated_at": "ISO-8601",
-  "stats": {
-    "total": 5152,
-    "by_type": { "skill": 4184, "agent": 384, "plugin": 573, "mcp": 11 },
-    "by_domain": { "web-dev": 412 },
-    "by_master": { "oracle-master-web": 412 }
-  },
-  "domains": [
-    { "id": "web-dev", "label": "Web Development", "master_agent": "oracle-master-web", "asset_count": 412 }
-  ],
-  "assets": [
-    {
-      "id": "skill:plugin-foo/some-skill",
-      "type": "skill",
-      "name": "some-skill",
-      "description": "...",
-      "path": "/abs/path/SKILL.md",
-      "source": "plugin:plugin-foo",
-      "hash": "12-char sha256 prefix",
-      "user_invocable": true,
-      "model": null,
-      "domain": "web-dev",
-      "master_agent": "oracle-master-web",
-      "keywords": ["react"],
-      "last_seen": "ISO-8601"
-    }
-  ]
-}
-```
-
----
-
-## Ecosystem fallback
-
-When no master returns a strong match, the Oracle falls back to `find-skills` and applies safety filters.
-
-> **Don't have `find-skills` installed?** Oracle will tell you to install it from the official Vercel Labs repo before falling back:
-> **https://github.com/vercel-labs/skills**
->
-> Once installed, the fallback path activates automatically — no extra configuration.
-
-Safety filters applied to every ecosystem result:
-
-| Criterion | Requirement |
-|---|---|
-| Install count | >= 1,000 preferred; always shown explicitly |
-| GitHub stars | >= 500 required; blocked below 100 |
-| License | MIT, Apache 2.0, or BSD only |
-| Last commit | < 6 months ago |
-| Code safety | No `eval`, `base64 -d`, no unknown `curl \| sh` |
-| Author | Identifiable (anonymous blocked) |
-
-Accepted recommendations get **auto-indexed** on the next Oracle run because the inventory signature changes. No manual scanner/classifier command is required after the skill is installed.
-
-Overclock/Codex/local note: `oracle-query.js` cannot directly invoke another runtime skill by itself, so it exits with code `2` and prints the exact `find-skills` invocation. Claude Code skill orchestration should invoke `find-skills` immediately when it sees that fallback signal. In Overclock, visible panes are the supported delegation path for deeper agent review. When Oracle returns a non-fallback bundle, treat every selected skill and agent as mandatory execution, not advisory reference material, and write the exact workstream prompt into each spawned pane before waiting for completion.
-
-### Privacy and repository safety
-
-The public repository should contain only source scripts, generated master-agent templates, docs, images, and the manifest. Do not commit local runtime state or secrets:
-
-- never commit `~/.claude/settings.json`, `.credentials.json`, `history.jsonl`, `session-data`, `projects`, `oracle-index.json`, or `oracle-embeddings.json`
-- never commit API keys, GitHub tokens, OpenAI keys, Anthropic keys, MCP credentials, customer prompts, terminal history, or local cache files
-- use environment variables such as `ORACLE_GITHUB_TOKEN`, `GITHUB_TOKEN`, `GH_TOKEN`, and provider API keys only at runtime
-- keep generated backups such as `settings.json.oracle-*.bak` local
+- Keep the repository focused on installable source, generated master-agent templates, docs, images, and the manifest.
+- Do not commit local runtime state, secrets, terminal history, or cache files.
+- Keep the README high level. The detailed orchestration rules live in `SKILL.md`.
 
 ---
 

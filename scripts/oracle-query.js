@@ -2093,6 +2093,9 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
     if (Array.isArray(assets) && assets.length) {
       lines.push(`Assets: ${assets.slice(0, 3).map((asset) => asset.name).join(', ')}`);
     }
+    if (visiblePanes) {
+      lines.push('If the pane is command-mode, choose the preset that reviews the current uncommitted changes before the workstream prompt.');
+    }
     return lines.join('\n');
   };
 
@@ -2316,8 +2319,8 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
       visible_panes: visiblePanes,
       dispatch_style: visiblePanes ? 'visible-pane-swarm' : 'local-plan',
       state_machine: ['spawn', 'spawn_ready', 'activate_command', 'select_review_preset', 'working_ack', 'write', 'wait_idle', 'read', 'cleanup'],
-      command_mode_activation_required: false,
-      working_ack_required: false,
+      command_mode_activation_required: visiblePanes,
+      working_ack_required: visiblePanes,
       pane_write_submission_required: true,
       empty_read_is_failure: true,
       output_capture_required: true,
@@ -2347,8 +2350,8 @@ function buildExecutionManifest({ task, picks, bundle, dispatchPlan, parallelPla
     workstreams,
     execution_guardrails: {
       pane_spawn_alone_is_not_execution: true,
-      command_mode_requires_activation: false,
-      working_ack_required: false,
+      command_mode_requires_activation: visiblePanes,
+      working_ack_required: visiblePanes,
       blank_prompt_is_not_approval: true,
       echoed_prompt_is_not_work_result: true,
       cleanup_owned_panes_after_completion: visiblePanes,
