@@ -30,8 +30,6 @@ It was built to solve a specific problem: when the right tool already exists in 
 - Route to the best runtime path for Claude Code, Overclock, or Codex/local
 - Fall back to `find-skills` when the local match is weak
 
-The full demo video is stored in [assets/demo.webm](assets/demo.webm). The inline preview above uses [assets/demo.gif](assets/demo.gif) because GitHub renders GIFs reliably in repository READMEs.
-
 ---
 
 ## Core Flow
