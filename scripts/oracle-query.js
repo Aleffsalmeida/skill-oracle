@@ -550,10 +550,12 @@ function chooseProviderModel(provider, complexity = 'simple', options = {}) {
 
   if (providerId === 'codex-cli') {
     if (visiblePanes) {
-      // Visible-pane execution needs the model that actually reaches a working
-      // state reliably. In practice, gpt-5.5 was the first Codex model that
-      // consistently moved from shell chrome into real execution in Overclock.
-      return MODEL_HINTS.codex.heavy || pickByIndex(2) || pickByIndex(models.length - 1);
+      // Visible-pane execution should still follow the complexity ladder.
+      // Keep the cheapest safe model for simple work, use mid-tier for
+      // ordinary work, and reserve the heaviest model for critical tasks.
+      return MODEL_HINTS.codex[complexity] || pickByIndex(
+        complexity === 'heavy' ? 2 : complexity === 'medium' ? 1 : 0,
+      ) || pickByIndex(models.length - 1);
     }
     return MODEL_HINTS.codex[complexity] || pickByIndex(0);
   }
