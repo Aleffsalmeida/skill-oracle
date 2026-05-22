@@ -55,6 +55,7 @@ const PREFERRED_EXECUTION_PROVIDER_ORDER = [
   'mimo-DMlOoB',
   'claude-oauth',
 ];
+const MAX_VISIBLE_SWARM_WORKSTREAMS = Math.max(1, Number.parseInt(process.env.ORACLE_MAX_VISIBLE_WORKSTREAMS || '2', 10) || 2);
 const FIRST_CLASS_HOSTS = new Set(['overclock', 'claude-code', 'codex', 'antigravity']);
 const PREFERRED_SKILLS = new Set([
   'skill-oracle',
@@ -2016,7 +2017,7 @@ function parallelExecutionPlan(task, domains, preflight) {
             ? 'Use the Antigravity CLI adapter and local manifest execution.'
             : 'Use visible panes/agents only; do not use invisible Task subagents in Overclock.',
     orchestrationPolicy: overclockOrchestrationPolicy(workstreams.length >= 2),
-    workstreams: workstreams.slice(0, 4),
+    workstreams: workstreams.slice(0, MAX_VISIBLE_SWARM_WORKSTREAMS),
   };
 }
 
@@ -2164,7 +2165,7 @@ function buildDispatchPlan({ task, picks, bundle, parallelPlan, modelHints, exec
       model: selectedModel,
     })),
     parallel_workstreams: parallelPlan?.recommended
-      ? parallelPlan.workstreams.map((item, index) => {
+      ? parallelPlan.workstreams.slice(0, MAX_VISIBLE_SWARM_WORKSTREAMS).map((item, index) => {
           const assets = workstreamAssets(item);
           const activationCommand = buildActivationCommand(selectedProviderId);
           const workstreamModel = selectVisibleWorkstreamModel(
