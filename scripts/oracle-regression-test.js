@@ -321,7 +321,7 @@ async function main() {
   );
   const overclockResult = await selectAssets(
     idx,
-    'refazer o projeto Estrelagithub com leaderboard premium, Supabase e GitHub OAuth',
+    'refazer um projeto de produto com leaderboard premium, Supabase e GitHub OAuth',
     { preflight: { preflight: { executor: { name: 'pane_spawn' }, runtime: 'Overclock' } } }
   );
   assertCheck(
@@ -379,7 +379,7 @@ async function main() {
     'Overclock execution guardrails must reject echoed prompts and blank prompts as success'
   );
   const commandModeDispatch = buildDispatchPlan({
-    task: 'refazer o projeto Estrelagithub com leaderboard premium e GitHub OAuth',
+    task: 'refazer um projeto de produto com leaderboard premium e GitHub OAuth',
     picks: [{
       name: 'superpowers',
       type: 'skill',
@@ -459,7 +459,7 @@ async function main() {
   );
   const antigravityResult = await selectAssets(
     idx,
-    'refazer o projeto Estrelagithub com leaderboard premium, Supabase e GitHub OAuth',
+    'refazer um projeto de produto com leaderboard premium, Supabase e GitHub OAuth',
     { preflight: { preflight: { executor: { name: 'agy' }, runtime: 'Antigravity' } } }
   );
   assertCheck(
