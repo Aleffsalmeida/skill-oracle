@@ -11,11 +11,7 @@ const CLAUDE_ROOT = path.join(HOME, '.claude');
 const INDEX_PATH = path.join(CLAUDE_ROOT, 'oracle-index.json');
 const SETTINGS_PATH = path.join(CLAUDE_ROOT, 'settings.json');
 const LOCAL_MANIFEST_PATH = path.join(REPO_ROOT, 'oracle-manifest.json');
-const GITHUB_REPO = 'Aleffsalmeida/skill-oracle';
 const GITHUB_BRANCH = 'main';
-const REMOTE_MANIFEST_URL = 'https://raw.githubusercontent.com/Aleffsalmeida/skill-oracle/main/oracle-manifest.json';
-const REMOTE_RAW_BASE = 'https://raw.githubusercontent.com/Aleffsalmeida/skill-oracle/main';
-const REMOTE_API_BASE = `https://api.github.com/repos/${GITHUB_REPO}/contents`;
 const BOOTSTRAP_SCRIPTS = ['sync-runtime-skills.js', 'gen-masters.js', 'install-agents.js', 'scanner.js', 'classifier.js'];
 const SESSION_HOOK_COMMAND = 'node ~/.claude/skills/skill-oracle/scripts/auto-rebuild.js';
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -23,6 +19,57 @@ const FETCH_TIMEOUT_MS = 10000;
 const REQUIRED_MASTER_COUNT = 20;
 const FIRST_CLASS_HOSTS = ['overclock', 'claude-code', 'codex', 'antigravity'];
 const GH_AUTH_CACHE = { checked: false, available: false };
+let RESOLVED_GITHUB_REPO = null;
+let RESOLVED_GITHUB_REMOTE_BASE = null;
+
+function parseGitHubRepoFromUrl(remoteUrl) {
+  const text = String(remoteUrl || '').trim();
+  if (!text) return null;
+  let match = text.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?(?:\/)?$/i);
+  if (match) return `${match[1]}/${match[2]}`;
+  match = text.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/i);
+  if (match) return `${match[1]}/${match[2]}`;
+  return null;
+}
+
+function resolveGitHubRepo() {
+  if (RESOLVED_GITHUB_REPO) return RESOLVED_GITHUB_REPO;
+  const explicit = String(process.env.ORACLE_GITHUB_REPO || '').trim();
+  if (explicit) {
+    RESOLVED_GITHUB_REPO = explicit;
+    RESOLVED_GITHUB_REMOTE_BASE = `https://raw.githubusercontent.com/${explicit}/${GITHUB_BRANCH}`;
+    return RESOLVED_GITHUB_REPO;
+  }
+
+  const result = spawnSync('git', ['-C', REPO_ROOT, 'remote', 'get-url', 'origin'], { encoding: 'utf8', timeout: 8000 });
+  if (result.status === 0) {
+    const repo = parseGitHubRepoFromUrl(result.stdout);
+    if (repo) {
+      RESOLVED_GITHUB_REPO = repo;
+      RESOLVED_GITHUB_REMOTE_BASE = `https://raw.githubusercontent.com/${repo}/${GITHUB_BRANCH}`;
+      return RESOLVED_GITHUB_REPO;
+    }
+  }
+
+  RESOLVED_GITHUB_REPO = '';
+  RESOLVED_GITHUB_REMOTE_BASE = '';
+  return RESOLVED_GITHUB_REPO;
+}
+
+function getRemoteManifestUrl() {
+  const repo = resolveGitHubRepo();
+  return repo ? `https://raw.githubusercontent.com/${repo}/${GITHUB_BRANCH}/oracle-manifest.json` : null;
+}
+
+function getRemoteRawBase() {
+  resolveGitHubRepo();
+  return RESOLVED_GITHUB_REMOTE_BASE || null;
+}
+
+function getRemoteApiBase() {
+  const repo = resolveGitHubRepo();
+  return repo ? `https://api.github.com/repos/${repo}/contents` : null;
+}
 
 function readJson(filePath, fallback = null) {
   try {
@@ -311,8 +358,12 @@ function ghAvailable() {
 }
 
 function ghApiContent(relativePath) {
+  const apiBase = getRemoteApiBase();
+  if (!apiBase) {
+    throw new Error('GitHub repository could not be resolved from origin or ORACLE_GITHUB_REPO.');
+  }
   const safePath = relativePath.replace(/\\/g, '/').replace(/^\/+/, '');
-  const endpoint = `repos/${GITHUB_REPO}/contents/${safePath}?ref=${GITHUB_BRANCH}`;
+  const endpoint = `${apiBase.replace('https://api.github.com/', '')}/${safePath}?ref=${GITHUB_BRANCH}`;
   const args = ['api', endpoint, '-H', 'Accept: application/vnd.github.raw'];
   if (getGitHubToken()) {
     args.unshift('--silent');
@@ -352,14 +403,18 @@ function runScript(name, args = []) {
 async function downloadManifestFile(relativePath) {
   const safePath = relativePath.replace(/\\/g, '/').replace(/^\/+/, '');
   const localPath = path.join(REPO_ROOT, safePath);
+  const remoteBase = getRemoteRawBase();
+  if (!remoteBase && !ghAvailable()) {
+    throw new Error('GitHub repository could not be resolved from origin or ORACLE_GITHUB_REPO.');
+  }
   const content = ghAvailable()
     ? ghApiContent(safePath)
-    : await fetchText(`${REMOTE_RAW_BASE}/${safePath}`);
+    : await fetchText(`${remoteBase}/${safePath}`);
   ensureDir(localPath);
   fs.writeFileSync(localPath, content, 'utf8');
   return {
     path: localPath,
-    url: ghAvailable() ? `gh api ${GITHUB_REPO}/contents/${safePath}` : `${REMOTE_RAW_BASE}/${safePath}`,
+    url: ghAvailable() ? `gh api ${getRemoteApiBase().replace('https://api.github.com/', '')}/${safePath}` : `${remoteBase}/${safePath}`,
   };
 }
 
@@ -409,10 +464,14 @@ function ensureSessionHook() {
 
 async function fetchRemoteManifestSafe(warnings) {
   try {
+    const remoteManifestUrl = getRemoteManifestUrl();
+    if (!remoteManifestUrl) {
+      throw new Error('GitHub repository could not be resolved from origin or ORACLE_GITHUB_REPO.');
+    }
     if (ghAvailable()) {
       return { manifest: JSON.parse(ghApiContent('oracle-manifest.json')), error: null, source: 'gh' };
     }
-    return { manifest: await fetchJson(REMOTE_MANIFEST_URL), error: null, source: 'raw' };
+    return { manifest: await fetchJson(remoteManifestUrl), error: null, source: 'raw' };
   } catch (error) {
     const ghHint = ghAvailable() ? '' : ' Authenticate GitHub with `gh auth login` or set `ORACLE_GITHUB_TOKEN`/`GITHUB_TOKEN` for private repos.';
     if (Array.isArray(warnings) && ghHint) {

@@ -1,5 +1,7 @@
 'use strict';
 
+const os = require('os');
+const path = require('path');
 const {
   loadIndex,
   selectAssets,
@@ -255,7 +257,7 @@ async function main() {
   const impeccableSkill = {
     name: 'impeccable',
     type: 'skill',
-    path: 'C:\\Users\\aleff\\.claude\\skills\\impeccable\\SKILL.md',
+    path: path.join(os.homedir(), '.claude', 'skills', 'impeccable', 'SKILL.md'),
   };
   const layoutInvocation = resolveSkillInvocation(
     impeccableSkill,

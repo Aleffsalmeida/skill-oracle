@@ -130,13 +130,13 @@ skill-oracle/
 ### Step 1 — Install the skill files
 
 ```bash
-npx skills add Aleffsalmeida/skill-oracle
+npx skills add <owner>/skill-oracle
 ```
 
 Or clone manually:
 
 ```bash
-git clone https://github.com/Aleffsalmeida/skill-oracle ~/.claude/skills/skill-oracle
+git clone https://github.com/<owner>/skill-oracle ~/.claude/skills/skill-oracle
 ```
 
 ### Step 2 — Bootstrap
@@ -402,4 +402,4 @@ cp ~/.claude/settings.json.oracle-YYYYMMDD-HHmmss.bak ~/.claude/settings.json
 
 ## License
 
-MIT — by [Aleffsalmeida](https://github.com/Aleffsalmeida)
+MIT License
